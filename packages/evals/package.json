@@ -1,0 +1,24 @@
+{
+  "name": "@proofdesk/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@proofdesk/agent": "workspace:*",
+    "@proofdesk/billing": "workspace:*",
+    "@proofdesk/db": "workspace:*",
+    "@proofdesk/gateway": "workspace:*",
+    "@proofdesk/identity": "workspace:*",
+    "@proofdesk/mcp-billing": "workspace:*",
+    "@proofdesk/portal": "workspace:*",
+    "@proofdesk/service": "workspace:*",
+    "@proofdesk/simulator": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

@@ -88,6 +88,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/simulator
 
+  packages/agent:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
+      '@proofdesk/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/db:
     dependencies:
       dbmate:
@@ -103,6 +115,39 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+
+  packages/evals:
+    dependencies:
+      '@proofdesk/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@proofdesk/billing':
+        specifier: workspace:*
+        version: link:../../services/billing
+      '@proofdesk/db':
+        specifier: workspace:*
+        version: link:../db
+      '@proofdesk/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@proofdesk/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@proofdesk/mcp-billing':
+        specifier: workspace:*
+        version: link:../../mcp/billing
+      '@proofdesk/portal':
+        specifier: workspace:*
+        version: link:../../apps/portal
+      '@proofdesk/service':
+        specifier: workspace:*
+        version: link:../service
+      '@proofdesk/simulator':
+        specifier: workspace:*
+        version: link:../simulator
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/gateway:
     dependencies:

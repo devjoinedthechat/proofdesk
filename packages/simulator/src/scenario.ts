@@ -68,7 +68,8 @@ export type SolverContext = {
   requestApproval(request: ApprovalRequest): Promise<"approved" | "rejected">;
 };
 
-export type SolverResult = { outcome: Outcome; reasonCode: ReasonCode; reply: string };
+/** `reasonCode` is free text here: a solver may give a reason the reference policy does not have. */
+export type SolverResult = { outcome: Outcome; reasonCode: string; reply: string };
 
 /** Anything that resolves a ticket: the scripted oracle now, the agent later. */
 export type Solver = (context: SolverContext) => Promise<SolverResult>;

@@ -1,0 +1,392 @@
+import { testPostgresUrl } from "@proofdesk/db";
+import {
+  type Message,
+  MockProvider,
+  type MockStep,
+  type ModelRequest,
+  toolUseResponse,
+} from "@proofdesk/gateway";
+import { testKeycloakUrl } from "@proofdesk/identity";
+import {
+  baseWorld,
+  createSimEnv,
+  materialise,
+  REFUND_SCENARIOS,
+  runScenario,
+  type Scenario,
+  type Solver,
+} from "@proofdesk/simulator";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createAgentSolver } from "./agent-solver.ts";
+import { createSecuredHarness, type SecuredHarness } from "./secured.ts";
+
+// No model runs here. A scripted stand-in plays the model's part, so these
+// tests check everything around it: the loop, the tools, the policy hook, the
+// guards, and (in the secured block) the whole token chain. Whether a real
+// model makes the right decisions is the job of the evaluation suite.
+
+const scenario = (id: string): Scenario => {
+  const spec = REFUND_SCENARIOS.find((candidate) => candidate.id === id);
+  if (!spec) throw new Error(`No scenario ${id}`);
+  return materialise(spec, baseWorld());
+};
+
+type Invoice = { number: string; payments: { id: string; amountCents: number; status: string }[] };
+
+/** The invoices returned by the most recent list_invoices call in the conversation. */
+function invoicesSeen(request: ModelRequest): Invoice[] {
+  const results = request.messages.flatMap((message: Message) =>
+    message.role === "user" ? message.content.filter((block) => block.type === "tool_result") : [],
+  );
+  for (const result of results.reverse()) {
+    try {
+      const parsed = JSON.parse(result.content);
+      if (parsed.invoices) return parsed.invoices;
+    } catch {
+      // Not every tool result is JSON.
+    }
+  }
+  return [];
+}
+
+let step = 0;
+const call = (name: string, input: unknown) =>
+  toolUseResponse({ id: `call_${++step}`, name, input });
+const listInvoices = (invoiceNumber?: string) =>
+  call("list_invoices", invoiceNumber ? { invoiceNumber } : {});
+const resolve = (outcome: string, reasonCode: string, reply: string) =>
+  call("resolve_ticket", { outcome, reasonCode, reply });
+
+/** Refunds the last successful payment on the first invoice seen. */
+const refundLastPayment =
+  (reason: string): MockStep =>
+  (request) => {
+    const [invoice] = invoicesSeen(request);
+    const payment = invoice?.payments
+      .filter((candidate) => candidate.status === "succeeded")
+      .at(-1);
+    return call("create_refund", {
+      paymentId: payment?.id,
+      amountCents: payment?.amountCents,
+      reason,
+    });
+  };
+
+const scripted = (steps: MockStep[]) => {
+  const provider = new MockProvider(steps);
+  return { provider, solver: createAgentSolver({ gateway: provider, model: "mock-model" }) };
+};
+
+async function runDirect(target: Scenario, solver: Solver) {
+  const env = await createSimEnv(testPostgresUrl());
+  try {
+    return await runScenario(env, target, solver);
+  } finally {
+    await env.dispose();
+  }
+}
+
+describe("the agent as a scenario solver", () => {
+  it("refunds a duplicate charge and passes the final-state check", async () => {
+    const target = scenario("refund-duplicate-with-invoice");
+    const { solver, provider } = scripted([
+      listInvoices(),
+      (request) => {
+        const invoice = invoicesSeen(request).find((candidate) => candidate.payments.length === 2);
+        const duplicate = invoice?.payments.at(-1);
+        return call("create_refund", {
+          paymentId: duplicate?.id,
+          amountCents: duplicate?.amountCents,
+          reason: "duplicate_charge",
+        });
+      },
+      (request) => {
+        const invoice = invoicesSeen(request).find((candidate) => candidate.payments.length === 2);
+        return resolve(
+          "refunded",
+          "duplicate_charge",
+          `I have refunded $87.00 for invoice ${invoice?.number}.`,
+        );
+      },
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(provider.remaining).toBe(0);
+  });
+
+  it("shows the model the refund tool without an idempotency key", async () => {
+    const { solver, provider } = scripted([resolve("refused", "outside_window", "No.")]);
+    await runDirect(scenario("refund-outside-window"), solver);
+
+    const refundTool = provider.calls[0]?.request.tools?.find(
+      (tool) => tool.name === "create_refund",
+    );
+    expect(Object.keys((refundTool?.inputSchema.properties ?? {}) as object).sort()).toEqual([
+      "amountCents",
+      "paymentId",
+      "reason",
+    ]);
+  });
+
+  it("puts the tenant's policy in the system prompt and the ticket in the first message", async () => {
+    const target = scenario("refund-longer-window-tenant");
+    const { solver, provider } = scripted([resolve("refused", "outside_window", "No.")]);
+    await runDirect(target, solver);
+
+    const request = provider.calls[0]?.request;
+    expect(request?.system).toContain("Tallyfield refund policy");
+    expect(request?.system).toContain("within 30 days");
+    expect(request?.system).toContain("above $500.00");
+    const [first] = request?.messages ?? [];
+    const text = first?.content[0]?.type === "text" ? first.content[0].text : "";
+    expect(text).toContain("Today is 2026-03-15");
+    expect(text).toContain(`<subject>${target.ticket.subject}</subject>`);
+  });
+
+  it("pauses an over-limit refund for approval, then pays when staff approve", async () => {
+    const target = scenario("refund-over-limit-approved");
+    const { solver } = scripted([
+      listInvoices(),
+      refundLastPayment("customer_request"),
+      (request) =>
+        resolve(
+          "refunded",
+          "within_window",
+          `Refunded $290.00 for ${invoicesSeen(request)[0]?.number}.`,
+        ),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(result.approvalRequests).toMatchObject([{ totalCents: 290_00 }]);
+  });
+
+  it("does not pay when staff reject, and tells the model so", async () => {
+    const target = scenario("refund-over-limit-rejected");
+    const { solver, provider } = scripted([
+      listInvoices(),
+      refundLastPayment("customer_request"),
+      (request) =>
+        resolve(
+          "refused",
+          "approval_rejected",
+          `Our team declined the refund for ${invoicesSeen(request)[0]?.number}.`,
+        ),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    const lastRequest = provider.calls.at(-1)?.request.messages.at(-1);
+    expect(JSON.stringify(lastRequest)).toContain("approval_rejected");
+  });
+
+  it("does not ask for approval at exactly the limit", async () => {
+    const target = scenario("refund-at-limit-no-approval");
+    const { solver } = scripted([
+      listInvoices(),
+      refundLastPayment("customer_request"),
+      (request) =>
+        resolve(
+          "refunded",
+          "within_window",
+          `Refunded $200.00 for ${invoicesSeen(request)[0]?.number}.`,
+        ),
+    ]);
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(result.approvalRequests).toEqual([]);
+  });
+
+  it("counts earlier refunds on the ticket towards the approval limit", async () => {
+    // The limit applies to the ticket's running total, not to each call.
+    // Two refunds of $38.00 total $76.00, under Tallyfield's $500.00.
+    const target = scenario("refund-triple-charge");
+    const refundNth =
+      (index: number): MockStep =>
+      (request) => {
+        const payment = invoicesSeen(request)[0]?.payments[index];
+        return call("create_refund", {
+          paymentId: payment?.id,
+          amountCents: payment?.amountCents,
+          reason: "duplicate_charge",
+        });
+      };
+    const { solver } = scripted([
+      listInvoices(),
+      refundNth(1),
+      refundNth(2),
+      (request) =>
+        resolve(
+          "refunded",
+          "duplicate_charge",
+          `Refunded $76.00 for ${invoicesSeen(request)[0]?.number}.`,
+        ),
+    ]);
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(result.approvalRequests).toEqual([]);
+  });
+
+  it("hands over a run that claims a refund it never made", async () => {
+    const target = scenario("refund-within-window");
+    const { solver } = scripted([resolve("refunded", "within_window", "I have refunded $58.00.")]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.result).toMatchObject({
+      outcome: "handed_to_staff",
+      reasonCode: "guard_claims_refund_not_made",
+    });
+    expect(result.passed).toBe(false);
+  });
+
+  it("hands over a run that never resolves", async () => {
+    const { solver } = scripted(Array.from({ length: 12 }, () => listInvoices()));
+    const result = await runDirect(scenario("refund-within-window"), solver);
+    expect(result.result).toMatchObject({
+      outcome: "handed_to_staff",
+      reasonCode: "agent_turn_limit",
+    });
+  });
+
+  it("pays once even if the model repeats the refund call", async () => {
+    const target = scenario("refund-within-window");
+    const { solver } = scripted([
+      listInvoices(),
+      refundLastPayment("customer_request"),
+      (request) => {
+        const payment = invoicesSeen(request)[0]?.payments.at(-1);
+        return call("create_refund", {
+          paymentId: payment?.id,
+          amountCents: payment?.amountCents,
+          reason: "customer_request",
+        });
+      },
+      (request) =>
+        resolve(
+          "refunded",
+          "within_window",
+          `Refunded $58.00 for ${invoicesSeen(request)[0]?.number}.`,
+        ),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    // The second call reuses the first call's key, so billing returns the
+    // first refund. The final state holds exactly one.
+    expect(result.failures).toEqual([]);
+  });
+});
+
+describe("the agent through Keycloak and the MCP server", () => {
+  let harness: SecuredHarness;
+
+  beforeAll(async () => {
+    harness = await createSecuredHarness({
+      postgresUrl: testPostgresUrl(),
+      keycloakUrl: testKeycloakUrl(),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await harness?.dispose();
+  });
+
+  const secured = (steps: MockStep[]) => {
+    const provider = new MockProvider(steps);
+    return {
+      provider,
+      solverFor: (tools: Parameters<Parameters<SecuredHarness["run"]>[1]>[0]) =>
+        createAgentSolver({ gateway: provider, model: "mock-model", tools }),
+    };
+  };
+
+  it("resolves a duplicate charge with real tokens, judged on final state", async () => {
+    const target = scenario("refund-duplicate-with-invoice");
+    const { solverFor, provider } = secured([
+      listInvoices(),
+      (request) => {
+        const duplicate = invoicesSeen(request)
+          .find((candidate) => candidate.payments.length === 2)
+          ?.payments.at(-1);
+        return call("create_refund", {
+          paymentId: duplicate?.id,
+          amountCents: duplicate?.amountCents,
+          reason: "duplicate_charge",
+        });
+      },
+      (request) => {
+        const invoice = invoicesSeen(request).find((candidate) => candidate.payments.length === 2);
+        return resolve(
+          "refunded",
+          "duplicate_charge",
+          `I have refunded $87.00 for invoice ${invoice?.number}.`,
+        );
+      },
+    ]);
+
+    const result = await harness.run(target, solverFor);
+
+    expect(result.failures).toEqual([]);
+    // The tool list came from the MCP server, one request per scope.
+    expect(provider.calls[0]?.request.tools?.map((tool) => tool.name)).toEqual([
+      "list_invoices",
+      "list_subscriptions",
+      "create_refund",
+      "resolve_ticket",
+    ]);
+    // Every token traces to the ticket: two to discover tools, one per call.
+    expect(result.assertions.map((row) => row.scope)).toEqual([
+      "billing:read",
+      "billing:refund",
+      "billing:read",
+      "billing:refund",
+    ]);
+  });
+
+  it("cannot refund another customer's payment, even when the model tries", async () => {
+    // The ticket names another customer's invoice. A manipulated model that
+    // somehow knew that customer's payment id still gets nowhere.
+    const target = scenario("refund-other-customers-invoice");
+    const theirs = target.added.payments.find(
+      (payment) => payment.customerId !== target.customer.id,
+    );
+    const { solverFor } = secured([
+      call("create_refund", {
+        paymentId: theirs?.id,
+        amountCents: theirs?.amountCents,
+        reason: "customer_request",
+      }),
+      resolve("refused", "invoice_not_found", "I could not find that invoice on your account."),
+    ]);
+
+    const result = await harness.run(target, solverFor);
+
+    expect(result.failures).toEqual([]);
+  });
+
+  it("gets no refund tool for a ticket whose category does not grant it", async () => {
+    const target = scenario("refund-within-window");
+    const planChange = {
+      ...target,
+      ticket: { ...target.ticket, category: "plan_change" as const },
+    };
+    const { solverFor, provider } = secured([
+      resolve("handed_to_staff", "other", "I have passed this to our team."),
+    ]);
+
+    await harness.run(planChange, solverFor);
+
+    expect(provider.calls[0]?.request.tools?.map((tool) => tool.name)).toEqual([
+      "list_invoices",
+      "list_subscriptions",
+      "resolve_ticket",
+    ]);
+  });
+});

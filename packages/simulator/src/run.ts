@@ -1,6 +1,6 @@
 import type { SimEnv } from "./environment.ts";
 import { loadWorld } from "./load.ts";
-import type { ApprovalRequest, Scenario, Solver, SolverResult } from "./scenario.ts";
+import type { ApprovalRequest, Scenario, Solver, SolverContext, SolverResult } from "./scenario.ts";
 import { diffSnapshots, takeSnapshot } from "./snapshot.ts";
 
 export type ScenarioResult = {
@@ -24,12 +24,21 @@ export async function runScenario(
   env: SimEnv,
   scenario: Scenario,
   solver: Solver,
+  options: {
+    /**
+     * Runs after the scenario's records are loaded and before the "before"
+     * snapshot. Whatever it returns replaces parts of the solver's context,
+     * such as a ticket that was submitted through the real portal.
+     */
+    prepare?: () => Promise<Partial<SolverContext>>;
+  } = {},
 ): Promise<ScenarioResult> {
   const { expected } = scenario;
   const failures: string[] = [];
   const approvalRequests: ApprovalRequest[] = [];
 
   await loadWorld(scenario.added, env.dbs);
+  const prepared = (await options.prepare?.()) ?? {};
   const before = await takeSnapshot(env.dbs);
 
   const clients = env.clientsFor({
@@ -52,6 +61,7 @@ export async function runScenario(
         approvalRequests.push(request);
         return scenario.staffDecision ?? "rejected";
       },
+      ...prepared,
     });
   } catch (error) {
     failures.push(`solver threw: ${error instanceof Error ? error.message : String(error)}`);

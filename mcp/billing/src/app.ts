@@ -12,7 +12,7 @@ import {
   type VerifiedToken,
 } from "@proofdesk/identity";
 import { createJsonApp, ServiceApiError } from "@proofdesk/service";
-import { z } from "zod";
+import { BILLING_TOOLS } from "./tools.ts";
 
 export type BillingMcpDeps = {
   /** Verifies tokens addressed to this MCP server. */
@@ -70,66 +70,18 @@ function buildServer(deps: BillingMcpDeps, caller: VerifiedToken, customerId: st
     });
   }
 
-  if (caller.scopes.includes(SCOPES.billingRead)) {
+  for (const tool of BILLING_TOOLS) {
+    if (!caller.scopes.includes(tool.scope)) continue;
     server.registerTool(
-      "list_invoices",
+      tool.name,
       {
-        description:
-          "Lists the customer's invoices, newest first. Each invoice includes its payments, their status, and any refunds already made against them.",
-        inputSchema: {
-          invoiceNumber: z
-            .string()
-            .optional()
-            .describe("Return only the invoice with this number, such as INV-000123."),
-        },
-        annotations: { readOnlyHint: true },
+        description: tool.description,
+        inputSchema: tool.input.shape,
+        annotations: tool.writes
+          ? { readOnlyHint: false, destructiveHint: true, idempotentHint: true }
+          : { readOnlyHint: true },
       },
-      ({ invoiceNumber }) =>
-        attempt(async () => {
-          const client = await billing(SCOPES.billingRead);
-          const filter = invoiceNumber === undefined ? {} : { number: invoiceNumber };
-          return { invoices: await client.listInvoices(customerId, filter) };
-        }),
-    );
-
-    server.registerTool(
-      "list_subscriptions",
-      {
-        description: "Lists the customer's subscriptions with plan, price, seats and status.",
-        inputSchema: {},
-        annotations: { readOnlyHint: true },
-      },
-      () =>
-        attempt(async () => {
-          const client = await billing(SCOPES.billingRead);
-          return { subscriptions: await client.listSubscriptions(customerId) };
-        }),
-    );
-  }
-
-  if (caller.scopes.includes(SCOPES.billingRefund)) {
-    server.registerTool(
-      "create_refund",
-      {
-        description:
-          "Refunds money to the customer against one of their payments. This moves real money and cannot be undone. Repeating a call with the same idempotencyKey returns the first refund instead of paying again.",
-        inputSchema: {
-          paymentId: z.string().describe("The payment to refund, from list_invoices."),
-          amountCents: z.number().int().positive().describe("Amount to refund, in cents."),
-          reason: z.enum(["duplicate_charge", "customer_request", "service_credit"]),
-          idempotencyKey: z
-            .string()
-            .min(8)
-            .max(200)
-            .describe("A stable key for this refund. Reuse it when retrying."),
-        },
-        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-      },
-      ({ idempotencyKey, ...request }) =>
-        attempt(async () => {
-          const client = await billing(SCOPES.billingRefund);
-          return { refund: await client.createRefund(request, idempotencyKey) };
-        }),
+      (args: unknown) => attempt(async () => tool.run(await billing(tool.scope), customerId, args)),
     );
   }
 
