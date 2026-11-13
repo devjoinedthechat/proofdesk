@@ -10,3 +10,6 @@ export function testPostgresUrl(): string {
   }
   return url;
 }
+
+/** Password of the service roles on a test or simulation server. Not used anywhere real. */
+export const TEST_ROLE_PASSWORD = "simulation-only";

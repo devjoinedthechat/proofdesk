@@ -44,3 +44,23 @@ export async function dropDatabase(adminUrl: string, name: string): Promise<void
     client.query(`DROP DATABASE IF EXISTS ${quote(name)} WITH (FORCE)`),
   );
 }
+
+/**
+ * Creates the login roles the services connect as. Roles belong to the server,
+ * not to one database, so they must exist before any migration grants to them.
+ */
+export async function ensureRoles(
+  adminUrl: string,
+  roles: readonly string[],
+  password: string,
+): Promise<void> {
+  await withAdmin(adminUrl, async (client) => {
+    for (const role of roles) {
+      const exists = await client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [role]);
+      if (exists.rowCount === 0) {
+        const literal = await client.query("SELECT quote_literal($1) AS value", [password]);
+        await client.query(`CREATE ROLE ${quote(role)} LOGIN PASSWORD ${literal.rows[0].value}`);
+      }
+    }
+  });
+}

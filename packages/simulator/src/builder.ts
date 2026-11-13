@@ -166,6 +166,7 @@ export class ScenarioBuilder {
       id: this.#rng.id("tkt"),
       tenantId: customer.tenantId,
       customerId: customer.id,
+      category: "refund",
       subject: input.subject,
       body: input.body,
       status: "open",

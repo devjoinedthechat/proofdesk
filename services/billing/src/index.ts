@@ -7,7 +7,7 @@ export type {
   Refund,
   Subscription,
 } from "./api.ts";
-export { createBillingApp } from "./app.ts";
+export { BILLING_SCOPES, createBillingApp } from "./app.ts";
 export { type BillingClient, createBillingClient } from "./client.ts";
 export type {
   BillingDatabase,

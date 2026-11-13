@@ -14,7 +14,7 @@ pnpm check      # lint, type checks, all tests
 pnpm stack:up   # Postgres with pgvector, Keycloak, Temporal
 ```
 
-`pnpm test` starts its own Postgres container, so it does not need the stack. `pnpm test:unit` runs the tests that need no Docker.
+`pnpm test` starts its own Postgres and Keycloak containers, so it does not need the stack. `pnpm test:unit` runs the tests that need no Docker.
 
 | Service     | Address               | Local login               |
 | ----------- | --------------------- | ------------------------- |
@@ -40,6 +40,31 @@ The agent works for two fictional companies with different refund rules, so the 
 
 Billing enforces what must always hold: a refund never exceeds what was paid, and a retried request with the same idempotency key pays once. Company policy, such as the refund window, is deliberately not billing's job.
 
+## Identity and authority
+
+The agent never holds a customer's credential. Submitting a ticket creates a grant, and each tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it.
+
+```
+customer signs in → submits a ticket          the grant: this customer, these scopes
+worker → portal:   "ticket T, scope S"        → signed, single-use assertion
+worker → Keycloak: assertion + own secret     → token for the MCP server
+worker → MCP server: tool call
+MCP server → Keycloak: token exchange         → token for the billing service
+MCP server → billing service → Postgres under row-level security
+```
+
+| Claim                                          | Test that tries to break it                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A token without the refund scope cannot refund | It is not shown the tool, the tool call fails, Keycloak refuses to widen it, and billing refuses it directly |
+| One tenant cannot reach another's data         | Unfiltered queries as the service's database role return only the scoped tenant's rows                       |
+| One customer cannot reach another's payment    | A refund against it fails as not found; the database rejects the row                                         |
+| A token works only where it was addressed      | The MCP token is rejected by billing; a sign-in token is rejected by the MCP server                          |
+| The worker cannot name a customer              | A self-signed assertion, a replayed assertion and a bare service token are all refused                       |
+| The grant is checked on every call             | Revoked, expired, closed and out-of-category requests are refused                                            |
+| The service role cannot rewrite history        | Updates and deletes on billing tables fail with permission denied                                            |
+
+Each row was also checked from the other side: with the control removed, the test fails.
+
 ## Layout
 
 | Path                     | Contents                                                                       |
@@ -60,6 +85,7 @@ Billing enforces what must always hold: a refund never exceeds what was paid, an
 - [Temporal for durable execution](docs/adr/0002-temporal-for-durable-execution.md)
 - [Postgres for vectors](docs/adr/0003-postgres-for-vectors.md)
 - [Ground truth before the agent](docs/adr/0004-ground-truth-before-the-agent.md)
+- [Ticket grants for agent authority](docs/adr/0005-ticket-grants-for-agent-authority.md)
 
 ## Licence
 

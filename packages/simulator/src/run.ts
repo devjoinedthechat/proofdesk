@@ -37,6 +37,7 @@ export async function runScenario(
     actor: "agent",
     subject: `agent:ticket:${scenario.ticket.id}`,
     customerId: scenario.customer.id,
+    scopes: ["billing:read", "billing:refund", "entitlements:read", "entitlements:write"],
   });
 
   let result: SolverResult | undefined;

@@ -1,6 +1,16 @@
-import { connect, createDatabase, dropDatabase, testPostgresUrl } from "@proofdesk/db";
+import {
+  asRole,
+  connect,
+  createDatabase,
+  DB_ROLES,
+  dropDatabase,
+  TEST_ROLE_PASSWORD,
+  testPostgresUrl,
+  withRowScope,
+} from "@proofdesk/db";
 import type { Principal } from "@proofdesk/service";
 import { ServiceApiError } from "@proofdesk/service";
+import { sql } from "kysely";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createBillingApp } from "./app.ts";
 import { createBillingClient } from "./client.ts";
@@ -14,10 +24,19 @@ const agentFor = (customerId: string, tenantId = "ten_a"): Principal => ({
   actor: "agent",
   subject: "agent:test",
   customerId,
+  scopes: ["billing:read", "billing:refund"],
 });
-const staff: Principal = { tenantId: "ten_a", actor: "staff", subject: "staff:1" };
+const staff: Principal = {
+  tenantId: "ten_a",
+  actor: "staff",
+  subject: "staff:1",
+  scopes: ["billing:read", "billing:refund"],
+};
 
+/** Owner connection, for seeding and for checking what really got written. */
 let db: ReturnType<typeof connect<BillingDatabase>>;
+/** The connection the service uses: the restricted `billing_app` role. */
+let appDb: ReturnType<typeof connect<BillingDatabase>>;
 let database: string;
 let app: ReturnType<typeof createBillingApp>;
 
@@ -113,10 +132,13 @@ async function expectApiError(promise: Promise<unknown>, status: number, code: s
 beforeEach(async () => {
   database = `billing_${Math.random().toString(36).slice(2, 12)}`;
   const url = await createDatabase(testPostgresUrl(), database, { template: "tpl_billing" });
-  db = connect<BillingDatabase>(url, { maxConnections: 10 });
+  db = connect<BillingDatabase>(url);
+  appDb = connect<BillingDatabase>(asRole(url, DB_ROLES.billing, TEST_ROLE_PASSWORD), {
+    maxConnections: 10,
+  });
   let sequence = 0;
   app = createBillingApp({
-    db,
+    db: appDb,
     clock: () => NOW,
     newId: (prefix) => `${prefix}_${++sequence}`,
     authenticate: (request) => {
@@ -128,6 +150,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await appDb.destroy();
   await db.destroy();
   await dropDatabase(testPostgresUrl(), database);
 });
@@ -202,6 +225,123 @@ describe("access", () => {
       "payment_not_found",
     );
     expect(await refundCount()).toBe(0);
+  });
+  it("rejects a caller whose credential lacks the scope", async () => {
+    const readOnly = clientFor({ ...agentFor("cus_a1"), scopes: ["billing:read"] });
+    const noScopes = clientFor({ ...agentFor("cus_a1"), scopes: [] });
+
+    expect(await readOnly.listInvoices("cus_a1")).toHaveLength(1);
+    await expectApiError(
+      readOnly.createRefund(
+        { paymentId: "pay_a1", amountCents: 1_00, reason: "customer_request" },
+        "key-00000004",
+      ),
+      403,
+      "insufficient_scope",
+    );
+    await expectApiError(noScopes.listInvoices("cus_a1"), 403, "insufficient_scope");
+    expect(await refundCount()).toBe(0);
+  });
+});
+
+// These tests skip the service and talk to the database as the service's own
+// role, with queries that have no tenant or customer filter at all. Whatever
+// isolation holds here is enforced by Postgres, not by application code.
+describe("row-level security", () => {
+  beforeEach(async () => {
+    await seedInvoice({ id: "inv_a2", customerId: "cus_a2", payments: [{ id: "pay_a2" }] });
+    await seedInvoice({
+      id: "inv_b1",
+      tenantId: "ten_b",
+      customerId: "cus_b1",
+      payments: [{ id: "pay_b1" }],
+    });
+  });
+
+  const allInvoiceIds = (scope: Parameters<typeof withRowScope>[1]) =>
+    withRowScope(appDb, scope, async (trx) =>
+      (await trx.selectFrom("invoices").select("id").orderBy("id").execute()).map((row) => row.id),
+    );
+
+  it("shows an unfiltered query only the tenant's rows", async () => {
+    expect(await allInvoiceIds({ tenantId: "ten_a" })).toEqual(["inv_a1", "inv_a2"]);
+    expect(await allInvoiceIds({ tenantId: "ten_b" })).toEqual(["inv_b1"]);
+  });
+
+  it("shows a customer-scoped query only that customer's rows", async () => {
+    expect(await allInvoiceIds({ tenantId: "ten_a", customerId: "cus_a2" })).toEqual(["inv_a2"]);
+    expect(await allInvoiceIds({ tenantId: "ten_b", customerId: "cus_a2" })).toEqual([]);
+  });
+
+  it("shows nothing to a query that set no scope", async () => {
+    for (const table of ["plans", "subscriptions", "invoices", "payments", "refunds"] as const) {
+      expect(await appDb.selectFrom(table).selectAll().execute()).toEqual([]);
+    }
+  });
+
+  it("refuses a refund row for a payment the scope cannot see", async () => {
+    const insert = (
+      scope: Parameters<typeof withRowScope>[1],
+      paymentId: string,
+      tenantId: string,
+    ) =>
+      withRowScope(appDb, scope, (trx) =>
+        trx
+          .insertInto("refunds")
+          .values({
+            id: `ref_${paymentId}`,
+            tenantId,
+            paymentId,
+            amountCents: 1_00,
+            reason: "customer_request",
+            createdBy: "attacker",
+            createdAt: NOW,
+            idempotencyKey: `rls-${paymentId}-${tenantId}`,
+            requestFingerprint: "x",
+          })
+          .execute(),
+      );
+
+    // Another tenant's payment, another customer's payment, and a row that
+    // claims a different tenant than the scope.
+    await expect(insert({ tenantId: "ten_a" }, "pay_b1", "ten_a")).rejects.toThrow(
+      /row-level security/,
+    );
+    await expect(insert({ tenantId: "ten_a" }, "pay_b1", "ten_b")).rejects.toThrow(
+      /row-level security/,
+    );
+    await expect(
+      insert({ tenantId: "ten_a", customerId: "cus_a1" }, "pay_a2", "ten_a"),
+    ).rejects.toThrow(/row-level security/);
+    expect(await refundCount()).toBe(0);
+  });
+
+  it("gives the service role no way to change or delete billing history", async () => {
+    const inScope = <T>(
+      fn: (
+        trx: Parameters<Parameters<typeof withRowScope<BillingDatabase, T>>[2]>[0],
+      ) => Promise<T>,
+    ) => withRowScope(appDb, { tenantId: "ten_a" }, fn);
+
+    await expect(
+      inScope((trx) => trx.updateTable("invoices").set({ amountCents: 1 }).execute()),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      inScope((trx) => trx.updateTable("payments").set({ amountCents: 1 }).execute()),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      inScope((trx) => trx.updateTable("payments").set({ status: "failed" }).execute()),
+    ).rejects.toThrow(/row-level security/);
+    await expect(inScope((trx) => trx.deleteFrom("refunds").execute())).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(
+      inScope((trx) =>
+        sql`set local row_security = off`
+          .execute(trx)
+          .then(() => trx.selectFrom("invoices").selectAll().execute()),
+      ),
+    ).rejects.toThrow();
   });
 });
 

@@ -1,4 +1,12 @@
-import { connect, createDatabase, dropDatabase, testPostgresUrl } from "@proofdesk/db";
+import {
+  asRole,
+  connect,
+  createDatabase,
+  DB_ROLES,
+  dropDatabase,
+  TEST_ROLE_PASSWORD,
+  testPostgresUrl,
+} from "@proofdesk/db";
 import { type Principal, ServiceApiError } from "@proofdesk/service";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEntitlementsApp } from "./app.ts";
@@ -9,6 +17,7 @@ const NOW = new Date("2026-03-15T10:00:00.000Z");
 const HEADER = "x-test-principal";
 
 let db: ReturnType<typeof connect<EntitlementsDatabase>>;
+let appDb: ReturnType<typeof connect<EntitlementsDatabase>>;
 let database: string;
 let app: ReturnType<typeof createEntitlementsApp>;
 
@@ -25,6 +34,7 @@ const agentFor = (customerId: string, tenantId = "ten_a"): Principal => ({
   actor: "agent",
   subject: "agent:test",
   customerId,
+  scopes: ["entitlements:read", "entitlements:write"],
 });
 
 async function codeOf(promise: Promise<unknown>) {
@@ -37,9 +47,12 @@ async function codeOf(promise: Promise<unknown>) {
 beforeEach(async () => {
   database = `entitlements_${Math.random().toString(36).slice(2, 12)}`;
   const url = await createDatabase(testPostgresUrl(), database, { template: "tpl_entitlements" });
-  db = connect<EntitlementsDatabase>(url, { maxConnections: 10 });
+  db = connect<EntitlementsDatabase>(url);
+  appDb = connect<EntitlementsDatabase>(asRole(url, DB_ROLES.entitlements, TEST_ROLE_PASSWORD), {
+    maxConnections: 10,
+  });
   app = createEntitlementsApp({
-    db,
+    db: appDb,
     clock: () => NOW,
     authenticate: (request) => {
       const header = request.headers.get(HEADER);
@@ -64,6 +77,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await appDb.destroy();
   await db.destroy();
   await dropDatabase(testPostgresUrl(), database);
 });

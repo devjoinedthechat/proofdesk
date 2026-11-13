@@ -9,6 +9,8 @@ export type Principal = {
   subject: string;
   /** When set, the caller may only touch this customer's records. */
   customerId?: string;
+  /** What the caller's credential allows, such as `billing:refund`. */
+  scopes: string[];
 };
 
 /** Turns a request into a principal, or null when the caller is not authenticated. */
@@ -31,19 +33,9 @@ export class HttpError extends Error {
   }
 }
 
-/**
- * A Hono app where every route requires an authenticated principal and
- * failures have one JSON shape. Unexpected errors return 500 without detail.
- */
-export function createServiceApp(authenticate: Authenticate): Hono<ServiceEnv> {
-  const app = new Hono<ServiceEnv>();
-
-  app.use(async (c, next) => {
-    const principal = await authenticate(c.req.raw);
-    if (!principal) throw new HttpError(401, "unauthenticated", "Authentication is required");
-    c.set("principal", principal);
-    await next();
-  });
+/** A Hono app whose failures all have one JSON shape. Unexpected errors return 500 without detail. */
+export function createJsonApp<Env extends { Variables: object } = { Variables: object }>() {
+  const app = new Hono<Env>();
 
   app.onError((error, c) => {
     if (error instanceof HttpError) {
@@ -58,6 +50,20 @@ export function createServiceApp(authenticate: Authenticate): Hono<ServiceEnv> {
   return app;
 }
 
+/** A JSON app where every route requires an authenticated principal. */
+export function createServiceApp(authenticate: Authenticate): Hono<ServiceEnv> {
+  const app = createJsonApp<ServiceEnv>();
+
+  app.use(async (c, next) => {
+    const principal = await authenticate(c.req.raw);
+    if (!principal) throw new HttpError(401, "unauthenticated", "Authentication is required");
+    c.set("principal", principal);
+    await next();
+  });
+
+  return app;
+}
+
 /**
  * Rejects a caller that is limited to one customer and asks for another.
  * The answer is 404, not 403, so the caller cannot learn which records exist.
@@ -65,6 +71,13 @@ export function createServiceApp(authenticate: Authenticate): Hono<ServiceEnv> {
 export function assertCustomerAccess(principal: Principal, customerId: string): void {
   if (principal.customerId !== undefined && principal.customerId !== customerId) {
     throw new HttpError(404, "not_found", "Not found");
+  }
+}
+
+/** Rejects a caller whose credential does not carry `scope`. */
+export function requireScope(principal: Principal, scope: string): void {
+  if (!principal.scopes.includes(scope)) {
+    throw new HttpError(403, "insufficient_scope", `This action requires the scope "${scope}"`);
   }
 }
 

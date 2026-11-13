@@ -8,10 +8,14 @@ import {
 import {
   APP_MIGRATIONS_DIR,
   type AppDatabase,
+  asRole,
   connect,
   createDatabase,
+  DB_ROLES,
   dropDatabase,
+  ensureRoles,
   migrate,
+  TEST_ROLE_PASSWORD,
 } from "@proofdesk/db";
 import {
   createEntitlementsApp,
@@ -43,6 +47,8 @@ export const TEMPLATES = {
   },
 } as const;
 
+const SIM_ROLE_PASSWORD = TEST_ROLE_PASSWORD;
+
 let cachedBase: World | undefined;
 
 export function baseWorld(): World {
@@ -67,6 +73,7 @@ async function close(dbs: Databases): Promise<void> {
  * starts from a copy, which takes milliseconds instead of a migrate and reseed.
  */
 export async function prepareTemplates(adminUrl: string): Promise<void> {
+  await ensureRoles(adminUrl, Object.values(DB_ROLES), SIM_ROLE_PASSWORD);
   const urls = { app: "", billing: "", entitlements: "" };
   for (const part of PARTS) {
     const url = await createDatabase(adminUrl, TEMPLATES.empty[part.key]);
@@ -112,18 +119,26 @@ export async function createSimEnv(
   for (const { key, name } of names) {
     urls[key] = await createDatabase(adminUrl, name, { template: templates[key] });
   }
+  // `dbs` connects as the owner, for loading history and taking snapshots.
+  // The services connect as their own restricted roles, like in production.
   const dbs = open(urls);
+  const serviceDbs = {
+    billing: connect<BillingDatabase>(asRole(urls.billing, DB_ROLES.billing, SIM_ROLE_PASSWORD)),
+    entitlements: connect<EntitlementsDatabase>(
+      asRole(urls.entitlements, DB_ROLES.entitlements, SIM_ROLE_PASSWORD),
+    ),
+  };
 
   let sequence = 0;
   const clock = () => now;
   const billingApp = createBillingApp({
-    db: dbs.billing,
+    db: serviceDbs.billing,
     clock,
     newId: (prefix) => `${prefix}_sim${String(++sequence).padStart(6, "0")}`,
     authenticate: simulationAuthenticate,
   });
   const entitlementsApp = createEntitlementsApp({
-    db: dbs.entitlements,
+    db: serviceDbs.entitlements,
     clock,
     authenticate: simulationAuthenticate,
   });
@@ -131,6 +146,8 @@ export async function createSimEnv(
   return {
     now,
     dbs,
+    urls,
+    serviceDbs,
     billingApp,
     entitlementsApp,
     /** Service clients that act as the given principal. */
@@ -150,6 +167,7 @@ export async function createSimEnv(
       };
     },
     async dispose() {
+      await Promise.all([serviceDbs.billing.destroy(), serviceDbs.entitlements.destroy()]);
       await close(dbs);
       for (const { name } of names) await dropDatabase(adminUrl, name);
     },

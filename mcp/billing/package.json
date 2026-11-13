@@ -1,0 +1,25 @@
+{
+  "name": "@proofdesk/mcp-billing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@proofdesk/billing": "workspace:*",
+    "@proofdesk/identity": "workspace:*",
+    "@proofdesk/service": "workspace:*",
+    "hono": "4.13.18",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@proofdesk/db": "workspace:*",
+    "@proofdesk/portal": "workspace:*",
+    "@proofdesk/simulator": "workspace:*"
+  }
+}
