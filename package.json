@@ -20,7 +20,12 @@
     "check:secrets": "scripts/check-secrets.sh --all",
     "prepare": "git config core.hooksPath .githooks || true",
     "evals": "node --env-file-if-exists=.env packages/evals/src/cli.ts",
-    "evals:report": "node packages/evals/src/report.ts"
+    "evals:report": "node packages/evals/src/report.ts",
+    "local:up": "scripts/local.sh up",
+    "local:demo": "scripts/local.sh demo",
+    "local:logs": "scripts/local.sh logs",
+    "local:down": "scripts/local.sh down",
+    "local:reset": "scripts/local.sh reset"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

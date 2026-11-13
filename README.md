@@ -134,7 +134,24 @@ pnpm check        # secret scan, lint, type checks and every test
 pnpm test:unit    # only the tests that need no Docker
 ```
 
-`pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes about a minute. It includes the test that runs every service as a separate process and kills the worker mid-refund.
+`pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes a few minutes. It includes the test that runs every service as a separate process and kills the worker mid-refund.
+
+### Run the whole system locally
+
+```sh
+pnpm local:up            # build one image, provision, start every service
+pnpm local:demo          # file a duplicate-charge ticket and print the reply
+pnpm local:demo approval # a refund above the limit: waits for staff, is approved, is paid
+pnpm local:down          # stop, keeping the data (local:reset deletes it)
+```
+
+`local:up` starts Postgres, Keycloak and Temporal, then a provisioning step that creates the databases and their roles, seeds a company dated today, loads the help centre, creates the Keycloak realm and writes the signing key for ticket grants. The portal, both services, the three MCP servers and the worker start once it has finished. Running it again changes nothing.
+
+The demo signs in at Keycloak as a customer, submits a ticket to the portal and waits. Everything in between is the real path: a grant, a workflow, a fresh token per tool call, policy, billing.
+
+With `ANTHROPIC_API_KEY` in the environment or in `.env`, the agent is Claude and a demo ticket costs about two cents. Without it, or with `SCRIPTED_MODEL=1`, a scripted stand-in handles the two demo tickets and nothing is spent.
+
+### Evals
 
 To run the agent on the scenarios with a real model:
 
@@ -181,6 +198,8 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                  |
 | `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                              |
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay                                    |
+| `apps/stack`                                                      | Provisioning and the demo client for the local stack                                   |
+| `infra`                                                           | Compose file and the image every service runs from                                     |
 | `docs`                                                            | Decision records, eval report, threat model                                            |
 
 ## Design decisions
@@ -205,7 +224,8 @@ The systems of record run as a seeded environment, so every ticket has a known c
 - **One agent, by choice.** Every property here can be shown with one. Multi-agent orchestration would add surface without adding a proof.
 - **No agent framework.** The loop is a few hundred lines, and the controls around it are the point.
 - **One model provider.** Failover is between Claude models, which covers a model short of capacity and not the provider being down. Help-centre search is full-text with queries the agent writes; the vector path is built and switched off. See [ADR 10](docs/adr/0010-one-model-provider.md).
-- **Services run as processes in tests, not as a deployed stack.** There is no browser interface; the portal and staff approvals are HTTP APIs.
+- **Local only.** The whole system runs on one machine with Docker Compose. It is not deployed to a cloud, and the local stack uses development settings: plain HTTP, password sign-in and fixed local secrets.
+- **No browser interface.** The portal, staff approvals and the kill switch are HTTP APIs.
 
 ## Licence
 

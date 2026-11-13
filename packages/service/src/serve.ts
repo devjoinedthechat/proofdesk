@@ -9,7 +9,9 @@ export function serve(
   app: Fetchable,
   options: { port: number; hostname?: string },
 ): Promise<Served> {
-  const hostname = options.hostname ?? "127.0.0.1";
+  // Loopback unless told otherwise: a service is not reachable from outside
+  // its machine by accident. A container sets HOST to listen on its network.
+  const hostname = options.hostname ?? process.env.HOST ?? "127.0.0.1";
   return new Promise((resolve) => {
     const server = nodeServe({ fetch: app.fetch, port: options.port, hostname }, (info) => {
       resolve({

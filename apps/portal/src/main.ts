@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { type AppDatabase, connect } from "@proofdesk/db";
 import {
   CLIENTS,
@@ -24,7 +25,13 @@ main(async () => {
     signer: await createGrantSigner({
       issuer: env("GRANT_ISSUER"),
       audience: issuer,
-      key: JSON.parse(env("GRANT_KEY_JSON")) as GrantKey,
+      // The signing key comes from a file where one is mounted, and from the
+      // environment otherwise.
+      key: JSON.parse(
+        process.env.GRANT_KEY_FILE
+          ? readFileSync(process.env.GRANT_KEY_FILE, "utf8")
+          : env("GRANT_KEY_JSON"),
+      ) as GrantKey,
     }),
     clock: () => new Date(),
     newId: (prefix) => `${prefix}_${randomUUID().replaceAll("-", "")}`,

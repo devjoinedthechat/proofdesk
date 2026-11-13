@@ -1,0 +1,14 @@
+# Nothing private or local goes into an image.
+.git
+.env
+.env.*
+.build-plan.md
+.dev-log.md
+.failure-log.md
+.private-patterns
+.architecture-target.html
+**/node_modules
+recordings
+coverage
+*.pem
+*.key

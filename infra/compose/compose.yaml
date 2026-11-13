@@ -62,5 +62,171 @@ services:
       timeout: 5s
       retries: 30
 
+  # Everything below is the application. It starts only with the "app"
+  # profile (pnpm local:up), so `pnpm stack:up` still gives tests and local
+  # development the three backing services alone.
+
+  provision:
+    # One image serves every service below. It is built here, once, and the
+    # others wait for this step before they start.
+    <<: &app
+      image: proofdesk-local
+      pull_policy: never
+      profiles: ["app"]
+      restart: "no"
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    pull_policy: build
+    command: ["node", "apps/stack/src/provision.ts"]
+    environment:
+      <<: &secrets
+        DB_ROLE_PASSWORD: ${DB_ROLE_PASSWORD:-local-role-password}
+        WORKER_CLIENT_SECRET: ${WORKER_CLIENT_SECRET:-local-worker-secret}
+        BILLING_MCP_CLIENT_SECRET: ${BILLING_MCP_CLIENT_SECRET:-local-billing-mcp-secret}
+        ENTITLEMENTS_MCP_CLIENT_SECRET: ${ENTITLEMENTS_MCP_CLIENT_SECRET:-local-entitlements-mcp-secret}
+        DEMO_PASSWORD: ${DEMO_PASSWORD:-local-demo-password}
+      POSTGRES_ADMIN_URL: postgresql://proofdesk:proofdesk@postgres:5432/proofdesk
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      GRANT_ISSUER: &grant-issuer http://portal:3000
+      STATE_DIR: /state
+    volumes:
+      - app-state:/state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  billing:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "services/billing/src/main.ts"]
+    environment:
+      PORT: "3000"
+      KEYCLOAK_ISSUER: &issuer http://keycloak:8080/realms/proofdesk
+      BILLING_DATABASE_URL: postgresql://billing_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_billing
+    depends_on: &provisioned
+      provision:
+        condition: service_completed_successfully
+
+  entitlements:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "services/entitlements/src/main.ts"]
+    environment:
+      PORT: "3000"
+      KEYCLOAK_ISSUER: *issuer
+      ENTITLEMENTS_DATABASE_URL: postgresql://entitlements_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_entitlements
+    depends_on: *provisioned
+
+  billing-mcp:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "mcp/billing/src/main.ts"]
+    environment:
+      <<: *secrets
+      PORT: "3000"
+      KEYCLOAK_ISSUER: *issuer
+      BILLING_URL: http://billing:3000
+      PUBLIC_URL: http://billing-mcp:3000
+    depends_on: *provisioned
+
+  entitlements-mcp:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "mcp/entitlements/src/main.ts"]
+    environment:
+      <<: *secrets
+      PORT: "3000"
+      KEYCLOAK_ISSUER: *issuer
+      ENTITLEMENTS_URL: http://entitlements:3000
+      PUBLIC_URL: http://entitlements-mcp:3000
+    depends_on: *provisioned
+
+  documents-mcp:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "mcp/documents/src/main.ts"]
+    environment:
+      PORT: "3000"
+      KEYCLOAK_ISSUER: *issuer
+      DOCUMENTS_DATABASE_URL: postgresql://documents_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_documents
+      PUBLIC_URL: http://documents-mcp:3000
+    depends_on: *provisioned
+
+  portal:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "apps/portal/src/main.ts"]
+    environment:
+      PORT: "3000"
+      KEYCLOAK_ISSUER: *issuer
+      GRANT_ISSUER: *grant-issuer
+      GRANT_KEY_FILE: /state/grant-key.json
+      PORTAL_DATABASE_URL: postgresql://portal_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
+      GRANTS_DATABASE_URL: postgresql://grants_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
+      TEMPORAL_ADDRESS: &temporal temporal:7233
+      TEMPORAL_NAMESPACE: &namespace proofdesk
+      TEMPORAL_TASK_QUEUE: &queue tickets
+    ports:
+      - "127.0.0.1:${PORTAL_PORT:-3000}:3000"
+    volumes:
+      - app-state:/state:ro
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "apps/worker/src/main.ts"]
+    environment:
+      <<: *secrets
+      KEYCLOAK_ISSUER: *issuer
+      WORKER_DATABASE_URL: postgresql://worker_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
+      PORTAL_URL: http://portal:3000
+      BILLING_MCP_URL: http://billing-mcp:3000/mcp
+      ENTITLEMENTS_MCP_URL: http://entitlements-mcp:3000/mcp
+      DOCUMENTS_MCP_URL: http://documents-mcp:3000/mcp
+      # For deleting a customer's sign-in account on a deletion request.
+      KEYCLOAK_ADMIN_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_REALM: proofdesk
+      TEMPORAL_ADDRESS: *temporal
+      TEMPORAL_NAMESPACE: *namespace
+      TEMPORAL_TASK_QUEUE: *queue
+      # With an Anthropic key the agent is Claude. Without one, a scripted
+      # stand-in that can handle a duplicate charge and nothing else.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MODEL: ${MODEL:-claude-sonnet-5-5}
+      MODEL_PROVIDER_MODULE: ${MODEL_PROVIDER_MODULE:-}
+    depends_on:
+      provision:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+      portal:
+        condition: service_started
+
+  # Files a ticket as a customer and prints what happens: pnpm local:demo
+  demo:
+    <<: *app
+    profiles: ["demo"]
+    entrypoint: ["node", "apps/stack/src/demo.ts"]
+    environment:
+      <<: *secrets
+      PORTAL_URL: http://portal:3000
+      KEYCLOAK_ISSUER: *issuer
+      STATE_DIR: /state
+    volumes:
+      - app-state:/state:ro
+
 volumes:
   postgres-data:
+  app-state:
