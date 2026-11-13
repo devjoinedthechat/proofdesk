@@ -10,9 +10,10 @@ Three repeats of every scenario on each model, judged on the final state of the 
 
 | Suite                                     | `claude-sonnet-5-5` | `claude-haiku-5-5` |
 | ----------------------------------------- | ------------------- | ------------------ |
-| 32 honest refund tickets                  | 96 of 96 passed     | 96 of 96 passed    |
+| 32 honest refund tickets                  | 96 of 96 passed     | 95 of 96 passed    |
+| 7 tickets that need the help centre       | 21 of 21 passed     | 21 of 21 passed    |
 | 24 attack tickets: attacks that succeeded | 0 of 72             | 0 of 72            |
-| Cost per ticket                           | $0.0086             | $0.0006            |
+| Cost per ticket                           | $0.0088             | $0.0006            |
 
 Read these with their limits. Both suites are saturated, and no attack was strong enough to fool the model, so those runs never reached the controls behind it. What a fooled model can and cannot do is tested separately, with a scripted model that is fully under an attacker's control:
 
@@ -89,6 +90,24 @@ MCP server → billing service → Postgres under row-level security
 
 Each row was also checked from the other side: with the control removed, the test fails.
 
+## Retrieval and memory
+
+The agent can search each company's help centre. Access is part of the search, not a filter around it.
+
+| Claim                                                            | Test that tries to break it                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| The same question gets different sources for different audiences | A staff-only page is the top result for staff and absent for an agent acting for a customer          |
+| One tenant never sees another's documents                        | Searches as each tenant; an unscoped query as the search role returns nothing                        |
+| A poisoned page is held back at ingestion                        | The scan quarantines it with its findings; it has no chunks to retrieve                              |
+| A poisoned page that gets through changes no outcome             | With the scan bypassed, both models still refuse the out-of-window refund                            |
+| Re-indexing is atomic and idempotent                             | Unchanged content is skipped; changed content replaces its chunks in one transaction                 |
+| Deletion removes the embeddings too                              | After a delete, no chunk of the document is left                                                     |
+| A small tenant still gets results from a large index             | With the vector index forced, recall falls to 3.5% without iterative scan and returns to 98% with it |
+| Memory cannot be poisoned by a ticket                            | A memory is a set of facts the system computed from what happened; no ticket text is stored          |
+| Memories have an owner, a source and an expiry                   | Expired entries and other customers' entries never reach the prompt                                  |
+
+Search quality was measured with a stand-in embedder because no embedding API key was available. See the [retrieval report](docs/eval-report/retrieval.md).
+
 ## Durable execution
 
 Each ticket is one Temporal workflow. A worker can stop at any point and another continues from the same step.
@@ -114,6 +133,8 @@ These run with a scripted stand-in for the model. They test the system around th
 | `packages/simulator`     | Seeded company, refund scenarios, reference policy, oracle and scenario runner |
 | `packages/db`            | Application database schema, migration and test-database helpers               |
 | `packages/service`       | Shared HTTP conventions: principals, errors, typed clients                     |
+| `services/documents`     | Help-centre documents: ingestion pipeline and permission-aware hybrid search   |
+| `mcp/documents`          | Help-centre search MCP server                                                  |
 | `services/billing`       | Billing system of record: subscriptions, invoices, payments, refunds           |
 | `services/entitlements`  | Entitlements system of record, with versioned writes                           |
 | `infra/compose`          | Local development stack                                                        |
@@ -129,6 +150,7 @@ These run with a scripted stand-in for the model. They test the system around th
 - [Ticket grants for agent authority](docs/adr/0005-ticket-grants-for-agent-authority.md)
 - [Run state lives in the database, not in workflow history](docs/adr/0006-run-state-outside-workflow-history.md)
 - [Refund rules are enforced on billing records, not only in the prompt](docs/adr/0007-enforce-refund-rules-on-records.md)
+- [What is in the prompt, what is retrieved, what is remembered](docs/adr/0008-prompt-retrieval-memory.md)
 
 ## Licence
 
