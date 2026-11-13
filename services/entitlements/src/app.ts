@@ -15,6 +15,7 @@ import type { EntitlementRow, EntitlementsDatabase } from "./schema.ts";
 export const ENTITLEMENTS_SCOPES = {
   read: "entitlements:read",
   write: "entitlements:write",
+  erase: "entitlements:erase",
 } as const;
 
 export type EntitlementsDeps = {
@@ -159,6 +160,32 @@ export function createEntitlementsApp(deps: EntitlementsDeps & { authenticate: A
       return result;
     });
     return c.json({ entitlement });
+  });
+
+  // Removes the customer's access and the record of the writes that set it.
+  // Safe to repeat: a second call finds nothing to remove.
+  app.delete("/customers/:customerId/entitlement", async (c) => {
+    const principal = c.get("principal");
+    const customerId = c.req.param("customerId");
+    requireScope(principal, ENTITLEMENTS_SCOPES.erase);
+    assertCustomerAccess(principal, customerId);
+
+    const erased = await withRowScope(deps.db, rowScopeOf(principal), async (trx) => {
+      const writes = await trx
+        .deleteFrom("entitlementWrites")
+        .where("tenantId", "=", principal.tenantId)
+        .where("customerId", "=", customerId)
+        .returning("idempotencyKey")
+        .execute();
+      const entitlements = await trx
+        .deleteFrom("entitlements")
+        .where("tenantId", "=", principal.tenantId)
+        .where("customerId", "=", customerId)
+        .returning("customerId")
+        .execute();
+      return { entitlements: entitlements.length, writes: writes.length };
+    });
+    return c.json({ erased });
   });
 
   return app;

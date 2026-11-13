@@ -210,14 +210,20 @@ describe("help-centre search behind real tokens", () => {
 
   it("offers the tool only when the ticket's grant includes it", async () => {
     const refund = await submitTicket(maya.email, "refund");
-    const deletion = await submitTicket(maya.email, "data_deletion");
+    // A ticket whose grant was created without the search scope.
+    const without = await submitTicket(maya.email, "refund");
+    await env.dbs.app
+      .updateTable("ticketGrants")
+      .set({ scopes: [SCOPES.billingRead] })
+      .where("ticketId", "=", without)
+      .execute();
 
     const listed = async (ticketId: string) =>
       (await listMcpTools({ ...mcpFor(ticketId), scopes: [SCOPES.documentsRead] })).map(
         (tool) => tool.definition.name,
       );
     expect(await listed(refund)).toEqual(["search_help_center"]);
-    expect(await listed(deletion)).toEqual([]);
+    expect(await listed(without)).toEqual([]);
   });
 
   it("rejects a token addressed to another service, and a request with none", async () => {

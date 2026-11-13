@@ -1,4 +1,5 @@
 import {
+  accountClosed,
   type BillingClient,
   invoiceList,
   planChangeResult,
@@ -17,6 +18,22 @@ const define = <Input extends z.ZodObject, Output extends z.ZodObject>(
 
 // No tool takes a customer id. The customer is fixed by the caller's
 // credential, so a manipulated model cannot point a tool at someone else.
+/**
+ * Closes the account of the customer the token is about. It is not in
+ * BILLING_TOOLS and is never described to a model: only the deletion
+ * workflow calls it, with a token from a deletion request's grant.
+ */
+export const CLOSE_ACCOUNT_TOOL: BillingTool = define({
+  name: "close_account",
+  scope: SCOPES.billingErase,
+  description:
+    "Closes the customer's billing account at their own request: cancels their subscriptions and clears the free text on their invoices. Payment records are kept.",
+  input: z.object({}),
+  output: accountClosed,
+  writes: true,
+  run: async (billing, customerId) => ({ closed: await billing.closeAccount(customerId) }),
+});
+
 export const BILLING_TOOLS: BillingTool[] = [
   define({
     name: "list_invoices",

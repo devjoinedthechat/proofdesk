@@ -1,6 +1,6 @@
 # Proofdesk
 
-A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself: it reads the customer's billing records, applies the company's policy, and issues the refund or makes the change.
+A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself: it reads the customer's billing records, applies the company's policy, and issues the refund or makes the change. It also carries out data-deletion requests, with no model involved.
 
 The repo is organised around one question: what happens when the model is wrong? Every property it claims is backed by a test that tries to break it, and a run is judged on the final state of the databases, not on what the model says it did.
 
@@ -82,6 +82,18 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 | Search finds what the customer's wording misses      | 28 labelled questions: the customer's words find 21, a query the agent writes finds 28 ([report](docs/eval-report/retrieval.md))                                                |
 | Memory cannot be poisoned by a ticket                | A ticket claims a manager promised a refund; the stored memory holds only facts the system computed, and none of the ticket's words ([test](apps/worker/src/workflow.itest.ts)) |
 
+### Data deletion
+
+| Property                                     | How the test tries to break it                                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A deleted customer leaves no trace           | Every table, every workflow history and the identity provider are searched for their name, email and ticket text ([test](apps/worker/src/deletion.itest.ts)) |
+| Nobody is deleted who did not ask            | The worker calls the erase function with no request, forges a request, and deletes the row directly                                                          |
+| A request needs more than an open session    | A stale sign-in and a wrong confirmation are sent                                                                                                            |
+| An agent working for the customer is stopped | A ticket is waiting for approval when the request arrives                                                                                                    |
+| Records the company must keep are kept       | Invoices, payments, refunds and the audit chain are compared before and after                                                                                |
+
+No model takes part in a deletion. What must go is fixed in code and in one database function ([ADR 13](docs/adr/0013-deletion-without-a-model.md)).
+
 ## Results on real models
 
 Three repeats of 76 scenarios on each model. An attempt passes only if the final state is exactly the expected one, approval was requested exactly when required, and the reply states the required facts.
@@ -145,8 +157,8 @@ The systems of record run as a seeded environment, so every ticket has a known c
 
 | Path                                                              | Contents                                                                   |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `apps/portal`                                                     | Ticket submission, grants, staff approvals                                 |
-| `apps/worker`                                                     | The ticket workflow and its activities                                     |
+| `apps/portal`                                                     | Ticket submission, grants, staff approvals, deletion requests              |
+| `apps/worker`                                                     | The ticket workflow, the deletion workflow, and their activities           |
 | `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                       |
 | `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                  |
 | `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                          |
@@ -173,6 +185,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 10. [One model provider](docs/adr/0010-one-model-provider.md)
 11. [A schema at every boundary](docs/adr/0011-schemas-at-every-boundary.md)
 12. [A daily cap on the agent's refunds](docs/adr/0012-daily-refund-cap.md)
+13. [Deletion is a fixed procedure, with no model in it](docs/adr/0013-deletion-without-a-model.md)
 
 ## Scope
 

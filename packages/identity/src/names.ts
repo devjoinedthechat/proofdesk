@@ -36,6 +36,10 @@ export const SCOPES = {
   entitlementsRead: "entitlements:read",
   entitlementsWrite: "entitlements:write",
   documentsRead: "documents:read",
+  /** Closing a customer's billing account at their own request. Never offered to a model. */
+  billingErase: "billing:erase",
+  /** Removing a customer's access at their own request. Never offered to a model. */
+  entitlementsErase: "entitlements:erase",
 } as const;
 
 export function realmIssuer(keycloakUrl: string, realm: string = REALM): string {

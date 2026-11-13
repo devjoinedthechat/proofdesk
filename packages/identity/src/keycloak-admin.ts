@@ -9,24 +9,35 @@ export async function connectKeycloakAdmin(options: {
   password: string;
 }) {
   const base = options.url.replace(/\/$/, "");
-  const login = await fetch(`${base}/realms/master/protocol/openid-connect/token`, {
-    method: "POST",
-    body: new URLSearchParams({
-      client_id: "admin-cli",
-      grant_type: "password",
-      username: options.username,
-      password: options.password,
-    }),
-  });
-  const { access_token: token } = (await login.json()) as { access_token?: string };
-  if (!token) throw new Error(`Keycloak admin sign-in failed with status ${login.status}`);
+  async function signIn(): Promise<string> {
+    const login = await fetch(`${base}/realms/master/protocol/openid-connect/token`, {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: "admin-cli",
+        grant_type: "password",
+        username: options.username,
+        password: options.password,
+      }),
+    });
+    const { access_token: accessToken } = (await login.json()) as { access_token?: string };
+    if (!accessToken) throw new Error(`Keycloak admin sign-in failed with status ${login.status}`);
+    return accessToken;
+  }
+  let token = await signIn();
 
   async function call(method: string, path: string, body?: unknown) {
-    const response = await fetch(`${base}/admin${path}`, {
-      method,
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
+    const send = () =>
+      fetch(`${base}/admin${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    let response = await send();
+    // An administrator's token lives about a minute. Sign in again once.
+    if (response.status === 401) {
+      token = await signIn();
+      response = await send();
+    }
     const text = await response.text();
     if (!response.ok && !(method === "DELETE" && response.status === 404)) {
       throw new Error(`Keycloak ${method} ${path} failed: ${response.status} ${text}`);
@@ -141,6 +152,8 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await scope(SCOPES.billingRead, true, [audienceMapper(CLIENTS.billingMcp)]);
   await scope(SCOPES.billingRefund, true, [audienceMapper(CLIENTS.billingMcp)]);
   await scope(SCOPES.billingPlan, true, [audienceMapper(CLIENTS.billingMcp)]);
+  await scope(SCOPES.billingErase, true, [audienceMapper(CLIENTS.billingMcp)]);
+  await scope(SCOPES.entitlementsErase, true, [audienceMapper(CLIENTS.entitlementsMcp)]);
   await scope(SCOPES.entitlementsRead, true, [audienceMapper(CLIENTS.entitlementsMcp)]);
   await scope(SCOPES.entitlementsWrite, true, [audienceMapper(CLIENTS.entitlementsMcp)]);
   await scope(ENTITLEMENTS_API_AUDIENCE, false, [audienceMapper(CLIENTS.entitlementsApi)]);
@@ -204,6 +217,8 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
       SCOPES.entitlementsRead,
       SCOPES.entitlementsWrite,
       SCOPES.documentsRead,
+      SCOPES.billingErase,
+      SCOPES.entitlementsErase,
     ],
     attributes: {
       "oauth2.jwt.authorization.grant.enabled": "true",
@@ -215,7 +230,12 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await client({
     clientId: CLIENTS.billingMcp,
     secret: options.secrets.billingMcp,
-    optionalClientScopes: [SCOPES.billingRead, SCOPES.billingRefund, SCOPES.billingPlan],
+    optionalClientScopes: [
+      SCOPES.billingRead,
+      SCOPES.billingRefund,
+      SCOPES.billingPlan,
+      SCOPES.billingErase,
+    ],
     defaultClientScopes: [...IDENTITY_SCOPES, BILLING_API_AUDIENCE],
     attributes: { "standard.token.exchange.enabled": "true", "access.token.lifespan": "60" },
   });
@@ -224,7 +244,11 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await client({
     clientId: CLIENTS.entitlementsMcp,
     secret: options.secrets.entitlementsMcp,
-    optionalClientScopes: [SCOPES.entitlementsRead, SCOPES.entitlementsWrite],
+    optionalClientScopes: [
+      SCOPES.entitlementsRead,
+      SCOPES.entitlementsWrite,
+      SCOPES.entitlementsErase,
+    ],
     defaultClientScopes: [...IDENTITY_SCOPES, ENTITLEMENTS_API_AUDIENCE],
     attributes: { "standard.token.exchange.enabled": "true", "access.token.lifespan": "60" },
   });
@@ -291,6 +315,25 @@ export async function provisionCustomer(
     userName: customer.email,
   });
   return userId;
+}
+
+/**
+ * Deletes a customer's sign-in account, found by the customer id it carries.
+ * Returns how many accounts were removed, so a repeat reports zero.
+ */
+export async function deleteCustomerAccount(
+  admin: KeycloakAdmin,
+  customerId: string,
+  realm: string = REALM,
+): Promise<number> {
+  const query = encodeURIComponent(`customer_id:${customerId}`);
+  const users = (await admin.call("GET", `/realms/${realm}/users?q=${query}&exact=true`)).json<
+    { id: string; attributes?: { customer_id?: string[] } }[]
+  >();
+  // The search is by attribute; the match is checked again before deleting.
+  const matches = users.filter((user) => user.attributes?.customer_id?.includes(customerId));
+  for (const user of matches) await admin.call("DELETE", `/realms/${realm}/users/${user.id}`);
+  return matches.length;
 }
 
 export async function deleteRealm(admin: KeycloakAdmin, realm: string): Promise<void> {

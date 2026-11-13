@@ -129,7 +129,7 @@ export async function callService<Schema extends z.ZodType>(
   options: ClientOptions,
   schema: Schema,
   request: {
-    method: "GET" | "POST" | "PUT";
+    method: "GET" | "POST" | "PUT" | "DELETE";
     path: string;
     body?: unknown;
     headers?: Record<string, string>;

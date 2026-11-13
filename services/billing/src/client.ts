@@ -1,5 +1,7 @@
 import { type ClientOptions, callService } from "@proofdesk/service";
 import {
+  type AccountClosed,
+  accountClosed,
   type ChangeSubscriptionRequest,
   type CreateRefundRequest,
   type Invoice,
@@ -16,6 +18,12 @@ export type BillingClient = ReturnType<typeof createBillingClient>;
 
 export function createBillingClient(options: ClientOptions) {
   return {
+    /** Cancels the customer's subscriptions and clears their free text. Safe to repeat. */
+    async closeAccount(customerId: string): Promise<AccountClosed> {
+      const path = `/customers/${encodeURIComponent(customerId)}/close`;
+      return (await callService(options, accountClosed, { method: "POST", path })).closed;
+    },
+
     async listSubscriptions(customerId: string): Promise<Subscription[]> {
       const path = `/customers/${encodeURIComponent(customerId)}/subscriptions`;
       const result = await callService(options, subscriptionList, { method: "GET", path });

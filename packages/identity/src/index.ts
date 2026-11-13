@@ -1,6 +1,7 @@
 export { createGrantSigner, type GrantKey, type GrantSigner, generateGrantKey } from "./grants.ts";
 export {
   connectKeycloakAdmin,
+  deleteCustomerAccount,
   deleteRealm,
   type KeycloakAdmin,
   provisionCustomer,

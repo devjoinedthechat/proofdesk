@@ -8,6 +8,7 @@ import {
   condition,
   defineQuery,
   defineSignal,
+  getExternalWorkflowHandle,
   proxyActivities,
   setHandler,
 } from "@temporalio/workflow";
@@ -18,6 +19,7 @@ import type {
   TicketRef,
   TurnOutput,
 } from "./activities.ts";
+import type { DeletionActivities, DeletionRef, DeletionReport } from "./deletion.ts";
 
 const { startRun, executeNext, finishRun, stopRun } = proxyActivities<Activities>({
   startToCloseTimeout: "2 minutes",
@@ -126,4 +128,48 @@ export async function ticketWorkflow(ref: TicketRef): Promise<FinishOutput> {
   const outcome = await finishRun(ref);
   status.phase = "done";
   return outcome;
+}
+
+const { beginDeletion, eraseElsewhere, eraseRecords, eraseIdentity, finishDeletion } =
+  proxyActivities<DeletionActivities>({
+    startToCloseTimeout: "2 minutes",
+    heartbeatTimeout: "10 seconds",
+    retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
+  });
+
+/** The workflow id of a ticket. `suffix` exists so tests can run side by side. */
+const ticketWorkflowId = (ticketId: string, suffix = "") => `ticket-${ticketId}${suffix}`;
+
+/**
+ * Deletes one customer's data at their request. There is no model in this
+ * workflow and no decision: the steps and their order are fixed.
+ *
+ * 1. Stop any agent still working for the customer.
+ * 2. Close the billing account and remove access, on the request's own grant.
+ * 3. Erase this system's records, which also removes that grant.
+ * 4. Remove the sign-in account.
+ *
+ * Steps 2 comes before 3 because it needs the grant, and 4 comes last because
+ * a token for step 2 can only be issued for an account that still exists.
+ */
+export async function deletionWorkflow(
+  ref: DeletionRef,
+  options: { ticketWorkflowSuffix?: string } = {},
+): Promise<DeletionReport> {
+  const { openTicketIds } = await beginDeletion(ref);
+  for (const ticketId of openTicketIds) {
+    try {
+      await getExternalWorkflowHandle(
+        ticketWorkflowId(ticketId, options.ticketWorkflowSuffix),
+      ).cancel();
+    } catch {
+      // Already finished, or never started. Either way no agent is running.
+    }
+  }
+  const elsewhere = await eraseElsewhere(ref);
+  const records = await eraseRecords(ref);
+  const signInAccounts = await eraseIdentity(ref);
+  const report: DeletionReport = { ...elsewhere, records, signInAccounts };
+  await finishDeletion({ ref, report });
+  return report;
 }

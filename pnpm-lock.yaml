@@ -101,10 +101,16 @@ importers:
       kysely:
         specifier: 0.29.8
         version: 0.29.8
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@proofdesk/billing':
         specifier: workspace:*
         version: link:../../services/billing
+      '@proofdesk/entitlements':
+        specifier: workspace:*
+        version: link:../../services/entitlements
       '@proofdesk/evals':
         specifier: workspace:*
         version: link:../../packages/evals
@@ -120,9 +126,6 @@ importers:
       '@proofdesk/simulator':
         specifier: workspace:*
         version: link:../../packages/simulator
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
 
   mcp/billing:
     dependencies:

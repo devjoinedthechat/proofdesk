@@ -13,6 +13,7 @@ So every control below is judged by one question: does it still hold if the mode
 | Asset                    | Harm if lost                                                            |
 | ------------------------ | ----------------------------------------------------------------------- |
 | Money                    | A refund is paid that the company's policy does not allow               |
+| A customer's data        | It is deleted without their asking, or kept after they asked            |
 | Other customers' records | One customer reads or changes another's billing data                    |
 | Staff oversight          | A refund that needs approval is paid without it                         |
 | The record               | The audit log, or what a customer is told, does not match what happened |
@@ -50,6 +51,7 @@ So every control below is judged by one question: does it still hold if the mode
 | Tools    | Arguments are constrained to each tool's schema, and results are checked against a declared output         | Yes                               |
 | Runtime  | A ticket whose model cannot be reached goes to staff, with nothing changed                                 | Yes                               |
 | Runtime  | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
+| Deletion | No model takes part; the worker can erase a customer only on a request the portal recorded                 | Yes                               |
 | Prompt   | Ticket text and tool results are declared untrusted                                                        | No                                |
 | Screen   | A small model flags manipulative tickets                                                                   | No                                |
 | Ingest   | A scan quarantines help-centre pages that address an agent                                                 | No                                |
@@ -93,4 +95,5 @@ From the [eval report](eval-report/README.md):
 - **Poisoned pages beyond one hand-written example.** The ingestion scan is a list of patterns, and one page was tested end to end.
 - **Denial of service and cost attacks** beyond the per-ticket and per-tenant budgets.
 - **Compromise of Keycloak, Postgres or Temporal themselves.**
+- **Deletion from backups and from the model provider's logs.** See [ADR 13](adr/0013-deletion-without-a-model.md).
 - **Staff as attackers.** An approver can approve anything within their tenant.

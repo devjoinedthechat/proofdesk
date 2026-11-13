@@ -10,6 +10,7 @@ export type {
   Subscription,
 } from "./api.ts";
 export {
+  accountClosed,
   invoiceList,
   planChange,
   planChangeResult,

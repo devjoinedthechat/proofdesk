@@ -21,16 +21,17 @@
     "@temporalio/common": "1.25.0",
     "@temporalio/worker": "1.25.0",
     "@temporalio/workflow": "1.25.0",
-    "kysely": "0.29.8"
+    "kysely": "0.29.8",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@proofdesk/billing": "workspace:*",
+    "@proofdesk/entitlements": "workspace:*",
     "@proofdesk/evals": "workspace:*",
     "@proofdesk/mcp-billing": "workspace:*",
     "@proofdesk/mcp-entitlements": "workspace:*",
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",
-    "@proofdesk/simulator": "workspace:*",
-    "zod": "4.6.7"
+    "@proofdesk/simulator": "workspace:*"
   }
 }

@@ -11,6 +11,7 @@ import { changeSubscriptionRequest, createRefundRequest } from "./api.ts";
 import {
   type BillingDeps,
   changeSubscription,
+  closeAccount,
   createRefund,
   listInvoices,
   listSubscriptions,
@@ -23,6 +24,7 @@ export const BILLING_SCOPES = {
   read: "billing:read",
   refund: "billing:refund",
   plan: "billing:plan",
+  erase: "billing:erase",
 } as const;
 
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{8,200}$/;
@@ -51,6 +53,14 @@ export function createBillingApp(deps: BillingDeps & { authenticate: Authenticat
       listInvoices(trx, principal.tenantId, customerId, number === undefined ? {} : { number }),
     );
     return c.json({ invoices });
+  });
+
+  app.post("/customers/:customerId/close", async (c) => {
+    const principal = c.get("principal");
+    const customerId = c.req.param("customerId");
+    requireScope(principal, BILLING_SCOPES.erase);
+    assertCustomerAccess(principal, customerId);
+    return c.json({ closed: await closeAccount(deps, principal, customerId) });
   });
 
   app.post("/refunds", async (c) => {

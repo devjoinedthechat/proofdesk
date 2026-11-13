@@ -628,4 +628,24 @@ describe("plan changes", () => {
       inScope((trx) => trx.updateTable("subscriptions").set({ customerId: "cus_a2" }).execute()),
     ).rejects.toThrow(/permission denied/);
   });
+
+  it("closes an account only through the one function, and only inside the row scope", async () => {
+    const close = (scope: { tenantId: string; customerId?: string }, customerId: string) =>
+      withRowScope(appDb, scope, (trx) =>
+        sql`select close_customer_account(${scope.tenantId}, ${customerId}, now())`.execute(trx),
+      );
+    // Scoped to one customer, the function refuses to touch another.
+    await expect(close({ tenantId: "ten_a", customerId: "cus_a1" }, "cus_a2")).rejects.toThrow(
+      /not scoped to this customer/,
+    );
+    // And with no scope at all it refuses everyone.
+    await expect(
+      sql`select close_customer_account('ten_a', 'cus_a1', now())`.execute(appDb),
+    ).rejects.toThrow(/not scoped to this customer/);
+    await expect(
+      withRowScope(appDb, { tenantId: "ten_a" }, (trx) =>
+        trx.updateTable("invoices").set({ reference: null }).execute(),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
 });

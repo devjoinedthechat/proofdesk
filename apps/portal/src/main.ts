@@ -7,7 +7,7 @@ import {
   type GrantKey,
 } from "@proofdesk/identity";
 import { env, main, serve } from "@proofdesk/service";
-import { Client, Connection } from "@temporalio/client";
+import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { createPortalApp } from "./app.ts";
 
 main(async () => {
@@ -36,6 +36,18 @@ main(async () => {
         taskQueue,
         workflowId: workflowId(ref.ticketId),
       });
+    },
+    // One request has one workflow, for the same reason.
+    onDeletionRequested: async (ref) => {
+      await temporal.workflow
+        .start("deletionWorkflow", {
+          args: [ref],
+          taskQueue,
+          workflowId: `deletion-${ref.requestId}`,
+        })
+        .catch((error: unknown) => {
+          if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
+        });
     },
     decideApproval: async ({ ticketId, ...decision }) => {
       await temporal.workflow.getHandle(workflowId(ticketId)).signal("approvalDecided", decision);

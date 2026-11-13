@@ -1,6 +1,7 @@
 import {
   createEntitlementsClient,
   type EntitlementsClient,
+  entitlementErased,
   entitlementResult,
 } from "@proofdesk/entitlements";
 import { CLIENTS, SCOPES, type TokenClient, type TokenVerifier } from "@proofdesk/identity";
@@ -38,6 +39,23 @@ export const ENTITLEMENTS_TOOLS: ServiceTool<EntitlementsClient>[] = [
   }),
 ];
 
+/**
+ * Removes the access of the customer the token is about. It is not in
+ * ENTITLEMENTS_TOOLS and is never described to a model: only the deletion
+ * workflow calls it, with a token from a deletion request's grant.
+ */
+export const ERASE_ENTITLEMENT_TOOL: ServiceTool<EntitlementsClient> = defineTool({
+  name: "erase_entitlement",
+  scope: SCOPES.entitlementsErase,
+  description: "Removes the customer's access to the product at their own request.",
+  input: z.object({}),
+  output: entitlementErased,
+  writes: true,
+  run: async (client: EntitlementsClient, customerId) => ({
+    erased: await client.eraseEntitlement(customerId),
+  }),
+});
+
 export type EntitlementsMcpDeps = {
   verify: TokenVerifier;
   tokens: TokenClient;
@@ -50,7 +68,7 @@ export type EntitlementsMcpDeps = {
 export function createEntitlementsMcpApp(deps: EntitlementsMcpDeps) {
   return createServiceMcpApp<EntitlementsClient>({
     name: "proofdesk-entitlements",
-    tools: ENTITLEMENTS_TOOLS,
+    tools: [...ENTITLEMENTS_TOOLS, ERASE_ENTITLEMENT_TOOL],
     verify: deps.verify,
     tokens: deps.tokens,
     downstreamAudience: CLIENTS.entitlementsApi,

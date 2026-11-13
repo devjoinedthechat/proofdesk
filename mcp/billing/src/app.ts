@@ -1,7 +1,7 @@
 import { type BillingClient, createBillingClient } from "@proofdesk/billing";
 import { CLIENTS, type TokenClient, type TokenVerifier } from "@proofdesk/identity";
 import { createServiceMcpApp } from "@proofdesk/mcp-server";
-import { BILLING_TOOLS } from "./tools.ts";
+import { BILLING_TOOLS, CLOSE_ACCOUNT_TOOL } from "./tools.ts";
 
 export type BillingMcpDeps = {
   /** Verifies tokens addressed to this MCP server. */
@@ -20,7 +20,7 @@ export type BillingMcpDeps = {
 export function createBillingMcpApp(deps: BillingMcpDeps) {
   return createServiceMcpApp<BillingClient>({
     name: "proofdesk-billing",
-    tools: BILLING_TOOLS,
+    tools: [...BILLING_TOOLS, CLOSE_ACCOUNT_TOOL],
     verify: deps.verify,
     tokens: deps.tokens,
     downstreamAudience: CLIENTS.billingApi,

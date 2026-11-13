@@ -80,6 +80,14 @@ export const planChange = z.object({
 
 export const planChangeResult = z.object({ change: planChange });
 
+/** What closing an account changed. Payment records are kept and so are not counted. */
+export const accountClosed = z.object({
+  closed: z.object({
+    subscriptionsCanceled: z.number().int().nonnegative(),
+    referencesCleared: z.number().int().nonnegative(),
+  }),
+});
+
 export const invoiceList = z.object({ invoices: z.array(invoice) });
 export const subscriptionList = z.object({ subscriptions: z.array(subscription) });
 export const refundResult = z.object({ refund });
@@ -91,3 +99,4 @@ export type Subscription = z.infer<typeof subscription>;
 export type CreateRefundRequest = z.infer<typeof createRefundRequest>;
 export type ChangeSubscriptionRequest = z.infer<typeof changeSubscriptionRequest>;
 export type PlanChange = z.infer<typeof planChange>;
+export type AccountClosed = z.infer<typeof accountClosed>["closed"];

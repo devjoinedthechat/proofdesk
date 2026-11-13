@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { type RowScope, withRowScope } from "@proofdesk/db";
 import { HttpError, type Principal } from "@proofdesk/service";
-import type { Kysely, Transaction } from "kysely";
+import { type Kysely, sql, type Transaction } from "kysely";
 import type {
+  AccountClosed,
   ChangeSubscriptionRequest,
   CreateRefundRequest,
   Invoice,
@@ -10,6 +11,7 @@ import type {
   Refund,
   Subscription,
 } from "./api.ts";
+import { accountClosed } from "./api.ts";
 import type { BillingDatabase, PlanChangeRow, RefundRow } from "./schema.ts";
 
 export type BillingDeps = {
@@ -451,5 +453,26 @@ export async function revertPlanChange(
       .where("id", "=", changeId)
       .execute();
     return toPlanChange(trx, { ...change, status: "reverted", revertedAt });
+  });
+}
+
+/**
+ * Closes a customer's account at their request: cancels every subscription
+ * that is still running and clears the text they typed onto invoices.
+ * Invoices, payments and refunds stay, because the company must keep them.
+ * Safe to repeat: a second call finds nothing left to change.
+ */
+export async function closeAccount(
+  deps: BillingDeps,
+  principal: Principal,
+  customerId: string,
+): Promise<AccountClosed> {
+  // The service's own role cannot cancel a subscription or edit an invoice.
+  // It calls one database function, which acts only inside the row scope.
+  return withRowScope(deps.db, rowScopeOf(principal), async (trx) => {
+    const result = await sql<{ closed: unknown }>`
+      select close_customer_account(${principal.tenantId}, ${customerId}, ${deps.clock()}) as closed
+    `.execute(trx);
+    return accountClosed.shape.closed.parse(result.rows[0]?.closed);
   });
 }

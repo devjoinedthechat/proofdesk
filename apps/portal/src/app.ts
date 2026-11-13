@@ -27,6 +27,15 @@ export type PortalDeps = {
     tenantId: string;
     customerId: string;
   }) => Promise<void>;
+  /** Hands a deletion request to the workflow that carries it out. */
+  onDeletionRequested?: (ref: {
+    requestId: string;
+    ticketId: string;
+    tenantId: string;
+    customerId: string;
+  }) => Promise<void>;
+  /** The real time, for judging how old a sign-in is. Defaults to the system clock. */
+  wallClock?: () => Date;
   /** Delivers a staff decision to the ticket's workflow. */
   decideApproval?: (decision: {
     ticketId: string;
@@ -50,7 +59,9 @@ export const GRANT_SCOPES: Record<TicketCategory, string[]> = {
     SCOPES.entitlementsWrite,
     SCOPES.documentsRead,
   ],
-  data_deletion: [],
+  // A deletion is not handled by the agent. These scopes let the deletion
+  // workflow act in the other systems, and no model is ever given them.
+  data_deletion: [SCOPES.billingErase, SCOPES.entitlementsErase],
 };
 
 const GRANT_LIFETIME_DAYS = 30;
@@ -59,10 +70,20 @@ const CLOSED: ReadonlySet<string> = new Set(["resolved", "refused"]);
 const SIGN_IN_CLIENTS: ReadonlySet<string> = new Set([CLIENTS.portalWeb, CLIENTS.devLogin]);
 
 const submitTicket = z.strictObject({
-  category: z.enum(["refund", "plan_change", "data_deletion"]),
+  // A deletion is requested through its own endpoint, which checks more.
+  category: z.enum(["refund", "plan_change"]),
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(10_000),
 });
+
+const requestDeletion = z.strictObject({
+  /** The customer types their own email address to confirm. */
+  confirmEmail: z.string().trim().min(3).max(320),
+});
+
+/** A deletion request must come from a sign-in this recent, not from a session left open. */
+const MAX_SIGN_IN_AGE_SECONDS = 300;
+const DELETION_GRANT_DAYS = 1;
 
 const requestAssertion = z.strictObject({ scope: z.string().min(1).max(100) });
 
@@ -99,7 +120,7 @@ export function createPortalApp(deps: PortalDeps) {
     ) {
       throw new HttpError(403, "forbidden", "This action requires a signed-in customer");
     }
-    return { tenantId: token.tenantId, customerId: token.customerId };
+    return { tenantId: token.tenantId, customerId: token.customerId, token };
   }
 
   /** A signed-in member of staff who may decide approvals, limited to their own tenant. */
@@ -166,9 +187,102 @@ export function createPortalApp(deps: PortalDeps) {
     return c.json({ accepted: true }, 202);
   });
 
+  // A customer asks for their data to be deleted. Nothing here is free text
+  // for a model to interpret: the request is a fixed action, confirmed by a
+  // fresh sign-in and by the customer typing their own email address.
+  app.post("/account/deletion-request", async (c) => {
+    const { token, ...scope } = await customer(c.req.raw);
+    const issuedAt = typeof token.claims.iat === "number" ? token.claims.iat : 0;
+    const wallNow = (deps.wallClock ?? (() => new Date()))().getTime() / 1000;
+    if (wallNow - issuedAt > MAX_SIGN_IN_AGE_SECONDS) {
+      throw new HttpError(401, "sign_in_too_old", "Sign in again to confirm this request");
+    }
+    const { confirmEmail } = await parseBody(c.req.raw, requestDeletion);
+    const now = deps.clock();
+
+    const outcome = await withRowScope(deps.db, scope, async (trx) => {
+      const me = await trx
+        .selectFrom("customers")
+        .select("email")
+        .where("id", "=", scope.customerId)
+        .executeTakeFirst();
+      if (!me || me.email.toLowerCase() !== confirmEmail.toLowerCase()) {
+        throw new HttpError(
+          422,
+          "confirmation_mismatch",
+          "The email address does not match this account",
+        );
+      }
+      const open = await trx
+        .selectFrom("deletionRequests")
+        .select(["id", "ticketId"])
+        .where("status", "=", "requested")
+        .executeTakeFirst();
+      if (open) return { requestId: open.id, ticketId: open.ticketId, created: false };
+
+      // From this moment no agent may act for the customer on any ticket.
+      await trx
+        .updateTable("ticketGrants")
+        .set({ revokedAt: now })
+        .where("revokedAt", "is", null)
+        .execute();
+
+      const ticketId = deps.newId("tkt");
+      const requestId = deps.newId("del");
+      await trx
+        .insertInto("tickets")
+        .values({
+          id: ticketId,
+          ...scope,
+          category: "data_deletion",
+          subject: "Data deletion request",
+          body: "Requested by the customer from their account.",
+          status: "open",
+          createdAt: now,
+          outcome: null,
+          reasonCode: null,
+          reply: null,
+          resolvedAt: null,
+        })
+        .execute();
+      await trx
+        .insertInto("ticketGrants")
+        .values({
+          ticketId,
+          ...scope,
+          scopes: GRANT_SCOPES.data_deletion,
+          createdAt: now,
+          expiresAt: new Date(now.getTime() + DELETION_GRANT_DAYS * 86_400_000),
+          revokedAt: null,
+        })
+        .execute();
+      await trx
+        .insertInto("deletionRequests")
+        .values({
+          id: requestId,
+          ...scope,
+          ticketId,
+          status: "requested",
+          requestedAt: now,
+          completedAt: null,
+          erased: null,
+        })
+        .execute();
+      return { requestId, ticketId, created: true };
+    });
+
+    // Also on a repeat, so a request whose workflow failed to start is picked up.
+    await deps.onDeletionRequested?.({
+      requestId: outcome.requestId,
+      ticketId: outcome.ticketId,
+      ...scope,
+    });
+    return c.json({ request: { id: outcome.requestId, status: "requested" } }, 202);
+  });
+
   // Submitting a ticket is also what grants the agent authority to act on it.
   app.post("/tickets", async (c) => {
-    const scope = await customer(c.req.raw);
+    const { token: _token, ...scope } = await customer(c.req.raw);
     const input = await parseBody(c.req.raw, submitTicket);
     const now = deps.clock();
 
@@ -204,7 +318,7 @@ export function createPortalApp(deps: PortalDeps) {
   });
 
   app.get("/tickets", async (c) => {
-    const scope = await customer(c.req.raw);
+    const { token: _token, ...scope } = await customer(c.req.raw);
     const rows = await withRowScope(deps.db, scope, (trx) =>
       trx.selectFrom("tickets").selectAll().orderBy("createdAt", "desc").orderBy("id").execute(),
     );
@@ -213,7 +327,7 @@ export function createPortalApp(deps: PortalDeps) {
 
   // A customer can withdraw the agent's authority at any time.
   app.post("/tickets/:ticketId/revoke-grant", async (c) => {
-    const scope = await customer(c.req.raw);
+    const { token: _token, ...scope } = await customer(c.req.raw);
     const revoked = await withRowScope(deps.db, scope, (trx) =>
       trx
         .updateTable("ticketGrants")

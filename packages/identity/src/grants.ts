@@ -31,6 +31,8 @@ export type GrantSigner = Awaited<ReturnType<typeof createGrantSigner>>;
  * worker cannot, so a compromised worker gets tokens only for tickets that
  * hold a live grant, and only within each grant's scopes.
  */
+const CLOCK_SKEW_SECONDS = 5;
+
 export async function createGrantSigner(options: {
   /** This signer's name, as registered with Keycloak. */
   issuer: string;
@@ -51,14 +53,18 @@ export async function createGrantSigner(options: {
     /** Signs a single-use assertion for one customer and one set of scopes. */
     async sign(input: { customerId: string; scopes: string[] }) {
       const jti = randomUUID();
-      const issuedAt = Math.floor(clock().getTime() / 1000);
+      const now = Math.floor(clock().getTime() / 1000);
+      // Keycloak refuses an assertion issued in its future. Two machines'
+      // clocks are never exactly equal, so the issue time is set a few
+      // seconds back. The expiry is still counted from now.
+      const issuedAt = now - CLOCK_SKEW_SECONDS;
       const assertion = await new SignJWT({ scope: input.scopes.join(" ") })
         .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: options.key.kid })
         .setIssuer(options.issuer)
         .setSubject(input.customerId)
         .setAudience(options.audience)
         .setIssuedAt(issuedAt)
-        .setExpirationTime(issuedAt + lifetime)
+        .setExpirationTime(now + lifetime)
         .setJti(jti)
         .sign(privateKey);
       return { assertion, jti };

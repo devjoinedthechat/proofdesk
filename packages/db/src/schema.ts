@@ -119,6 +119,19 @@ export type MemoryRow = {
   expiresAt: Date;
 };
 
+/** A customer's request to be deleted, and the record that it was done. */
+export type DeletionRequestRow = {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  ticketId: string;
+  status: "requested" | "completed";
+  requestedAt: Date;
+  completedAt: Date | null;
+  /** Rows removed per table. No content. */
+  erased: unknown;
+};
+
 export type AuditLogRow = {
   seq: number;
   tenantId: string;
@@ -143,5 +156,6 @@ export type AppDatabase = {
   approvals: ApprovalRow;
   spend: SpendRow;
   agentRefunds: AgentRefundRow;
+  deletionRequests: DeletionRequestRow;
   memories: MemoryRow;
 };

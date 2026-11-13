@@ -22,5 +22,13 @@ export const setEntitlementRequest = z.strictObject({
 
 export const entitlementResult = z.object({ entitlement });
 
+/** What erasing a customer's access removed. */
+export const entitlementErased = z.object({
+  erased: z.object({
+    entitlements: z.number().int().nonnegative(),
+    writes: z.number().int().nonnegative(),
+  }),
+});
+
 export type Entitlement = z.infer<typeof entitlement>;
 export type SetEntitlementRequest = z.infer<typeof setEntitlementRequest>;

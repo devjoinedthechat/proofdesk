@@ -12,8 +12,10 @@ import {
 } from "@proofdesk/gateway";
 import {
   CLIENTS,
+  connectKeycloakAdmin,
   createTokenClient,
   createToolTokenSource,
+  deleteCustomerAccount,
   SCOPES,
   TokenError,
 } from "@proofdesk/identity";
@@ -21,6 +23,7 @@ import { createToolPolicy, invoiceRecords } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
+import { createDeletionActivities, mcpErasers } from "./deletion.ts";
 import { createDbLedger } from "./ledger.ts";
 import { createTicketWorker } from "./worker.ts";
 
@@ -82,7 +85,18 @@ async function start() {
   };
   // The MCP servers the agent may use, and the scopes to try on each.
   const servers = [
-    { url: env("BILLING_MCP_URL"), scopes: [SCOPES.billingRead, SCOPES.billingRefund] },
+    {
+      url: env("BILLING_MCP_URL"),
+      scopes: [SCOPES.billingRead, SCOPES.billingRefund, SCOPES.billingPlan],
+    },
+    ...(process.env.ENTITLEMENTS_MCP_URL
+      ? [
+          {
+            url: process.env.ENTITLEMENTS_MCP_URL,
+            scopes: [SCOPES.entitlementsRead, SCOPES.entitlementsWrite],
+          },
+        ]
+      : []),
     ...(process.env.DOCUMENTS_MCP_URL
       ? [{ url: process.env.DOCUMENTS_MCP_URL, scopes: [SCOPES.documentsRead] }]
       : []),
@@ -137,11 +151,45 @@ async function start() {
     },
   });
 
+  // Deletion needs the entitlements server and a Keycloak account that may
+  // delete users. A worker without them handles tickets and no deletions.
+  const entitlementsUrl = process.env.ENTITLEMENTS_MCP_URL;
+  const keycloakAdminUrl = process.env.KEYCLOAK_ADMIN_URL;
+  const deletion =
+    entitlementsUrl && keycloakAdminUrl
+      ? createDeletionActivities({
+          db,
+          clock: () => new Date(),
+          ...mcpErasers(
+            (ref, server, tool) =>
+              callMcpTool(
+                {
+                  url: server === "billing" ? env("BILLING_MCP_URL") : entitlementsUrl,
+                  tokenFor: tokenFor(ref),
+                },
+                tool,
+                {},
+              ),
+            { billingErase: SCOPES.billingErase, entitlementsErase: SCOPES.entitlementsErase },
+          ),
+          identity: {
+            async deleteAccount(customerId) {
+              const admin = await connectKeycloakAdmin({
+                url: keycloakAdminUrl,
+                username: env("KEYCLOAK_ADMIN_USER"),
+                password: env("KEYCLOAK_ADMIN_PASSWORD"),
+              });
+              return deleteCustomerAccount(admin, customerId, env("KEYCLOAK_REALM"));
+            },
+          },
+        })
+      : {};
+
   const worker = await createTicketWorker({
     connection: await NativeConnection.connect({ address: env("TEMPORAL_ADDRESS") }),
     namespace: env("TEMPORAL_NAMESPACE"),
     taskQueue: env("TEMPORAL_TASK_QUEUE"),
-    activities,
+    activities: { ...activities, ...deletion },
   });
   console.log("worker started");
   await worker.run();
