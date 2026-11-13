@@ -20,7 +20,15 @@ export type ToolResultBlock = {
   isError?: boolean;
 };
 
-export type AssistantBlock = TextBlock | ToolUseBlock;
+/**
+ * Something a provider returned that only that provider understands, such as
+ * a thinking block. It is sent back unchanged on later turns to the provider
+ * that produced it and dropped for any other, which is what happens on a
+ * failover. Callers never look inside.
+ */
+export type OpaqueBlock = { type: "opaque"; provider: string; data: unknown };
+
+export type AssistantBlock = TextBlock | ToolUseBlock | OpaqueBlock;
 export type UserBlock = TextBlock | ToolResultBlock;
 
 export type Message =
@@ -32,7 +40,11 @@ export type ToolDefinition = {
   description: string;
   /** JSON Schema for the tool input. */
   inputSchema: Record<string, unknown>;
+  /** Ask the provider to guarantee the input matches the schema, where supported. */
+  strict?: boolean;
 };
+
+export type Effort = "low" | "medium" | "high";
 
 export type ModelRequest = {
   model: string;
@@ -40,6 +52,8 @@ export type ModelRequest = {
   messages: Message[];
   tools?: ToolDefinition[];
   maxTokens: number;
+  /** How hard the model should work. Providers map it to their own control. */
+  effort?: Effort;
 };
 
 export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal";
