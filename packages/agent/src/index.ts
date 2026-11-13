@@ -1,6 +1,24 @@
 export { checkResolution, refundsMade } from "./guards.ts";
-export { type AgentResult, type AgentRun, runAgent, type StopCause } from "./loop.ts";
-export { discoverMcpTools, type McpToolOptions } from "./mcp.ts";
+export {
+  type AgentResult,
+  type AgentRun,
+  type AgentState,
+  initialState,
+  inspectNext,
+  type ModelStep,
+  modelStep,
+  type NextCall,
+  runAgent,
+  type StopCause,
+  settleNext,
+} from "./loop.ts";
+export {
+  callMcpTool,
+  discoverMcpTools,
+  listMcpTools,
+  type McpToolDescriptor,
+  type McpToolOptions,
+} from "./mcp.ts";
 export { refundPolicyText, systemPrompt, type TenantPolicy, ticketMessage } from "./prompt.ts";
 export {
   OUTCOMES,
