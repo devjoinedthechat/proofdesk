@@ -37,7 +37,9 @@ import {
   refundRequest,
   type ToolPolicy,
 } from "@proofdesk/policy";
+import type { Telemetry } from "@proofdesk/telemetry";
 import type { Kysely } from "kysely";
+import { recordEvent } from "./telemetry.ts";
 
 /** Identifiers only. This is all that ever travels through the workflow engine. */
 export type TicketRef = { ticketId: string; tenantId: string; customerId: string };
@@ -84,6 +86,8 @@ export type ActivityDeps = {
    */
   agentPaused?: (tenantId: string) => boolean | Promise<boolean>;
   clock: () => Date;
+  /** Where metrics and traces go. Nothing is recorded without it. */
+  telemetry?: Telemetry;
 };
 
 const TICKET_STATUS: Record<string, TicketStatus> = {
@@ -111,8 +115,8 @@ const DAY_MS = 86_400_000;
 
 export function createActivities(deps: ActivityDeps) {
   const scope = (ref: TicketRef) => ({ tenantId: ref.tenantId, customerId: ref.customerId });
-  const audit = (ref: TicketRef, event: string, detail: Record<string, unknown>) =>
-    appendAudit(deps.db, {
+  const audit = async (ref: TicketRef, event: string, detail: Record<string, unknown>) => {
+    await appendAudit(deps.db, {
       tenantId: ref.tenantId,
       ticketId: ref.ticketId,
       at: deps.clock(),
@@ -120,6 +124,8 @@ export function createActivities(deps: ActivityDeps) {
       event,
       detail,
     });
+    if (deps.telemetry) recordEvent(deps.telemetry, { ...ref, event, detail });
+  };
 
   async function load(ref: TicketRef) {
     const row = await withRowScope(deps.db, scope(ref), (trx) =>

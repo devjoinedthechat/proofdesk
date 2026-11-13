@@ -206,6 +206,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       MODEL: ${MODEL:-claude-sonnet-5-5}
       MODEL_PROVIDER_MODULE: ${MODEL_PROVIDER_MODULE:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
     depends_on:
       provision:
         condition: service_completed_successfully
@@ -213,6 +214,24 @@ services:
         condition: service_healthy
       portal:
         condition: service_started
+      telemetry:
+        condition: service_healthy
+
+  # Traces and metrics. One container with a collector, Tempo, Prometheus
+  # and Grafana, meant for development.
+  telemetry:
+    image: grafana/otel-lgtm:0.41.0
+    profiles: ["app"]
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/proofdesk.yaml:ro
+      - ./grafana/proofdesk.json:/otel-lgtm/proofdesk.json:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
 
   # Files a ticket as a customer and prints what happens: pnpm local:demo
   demo:

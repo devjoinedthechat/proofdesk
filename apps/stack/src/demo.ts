@@ -79,6 +79,12 @@ for (;;) {
   const current = tickets.find((candidate) => candidate.id === ticket.id);
   if (!current) throw new Error("The ticket disappeared");
 
+  if (current.status === "waiting_approval" && approved) {
+    // The agent asked again after the first approval. That is for a person.
+    console.log("\nThe agent has asked for approval a second time. Leaving that to staff.");
+    console.log("To replay this demo from the start: pnpm local:reset && pnpm local:up");
+    break;
+  }
   if (current.status === "waiting_approval" && !approved) {
     const approver = staff[demo.tenantId]?.approver;
     if (!approver) throw new Error("No approver is set up for this company");
@@ -93,6 +99,8 @@ for (;;) {
     await call("POST", `/staff/approvals/${pending.id}/decision`, token, { decision: "approved" });
     console.log(`Approved by ${approver}.`);
     approved = true;
+    // Give the workflow a moment to take the decision before looking again.
+    await sleep(3000);
     continue;
   }
   if (current.status !== "open" && current.status !== "waiting_approval") {

@@ -21,11 +21,13 @@ import {
 } from "@proofdesk/identity";
 import { createToolPolicy, invoiceRecords } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
+import { startTelemetry } from "@proofdesk/telemetry";
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
 import { createDeletionActivities, mcpErasers } from "./deletion.ts";
 import { createDbLedger } from "./ledger.ts";
+import { recordModelCall } from "./telemetry.ts";
 import { createWatchdogActivities } from "./watchdog.ts";
 import { createTicketWorker } from "./worker.ts";
 
@@ -58,9 +60,15 @@ async function loadProvider(): Promise<{
 async function start() {
   const db = connect<AppDatabase>(env("WORKER_DATABASE_URL"));
   const { routes, prices } = await loadProvider();
+  // Traces and metrics go to a collector when one is configured, and nowhere otherwise.
+  const { telemetry } = startTelemetry({
+    serviceName: "proofdesk-worker",
+    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+  });
   const gateway = createGateway({
     routes,
     prices,
+    onCall: (record) => recordModelCall(telemetry, record, new Date()),
     ledger: createDbLedger(db),
     limits: {
       perTicketMicros: Number(process.env.BUDGET_PER_TICKET_MICROS ?? 500_000),
@@ -115,6 +123,7 @@ async function start() {
     },
     policy: createToolPolicy(),
     clock: () => new Date(),
+    telemetry,
     ...(screenModel
       ? {
           screen: (ref: TicketRef, ticket: { subject: string; body: string }) =>
@@ -162,6 +171,7 @@ async function start() {
       ? createDeletionActivities({
           db,
           clock: () => new Date(),
+          telemetry,
           ...mcpErasers(
             (ref, server, tool) =>
               callMcpTool(
@@ -191,12 +201,14 @@ async function start() {
     connection: await NativeConnection.connect({ address: env("TEMPORAL_ADDRESS") }),
     namespace: env("TEMPORAL_NAMESPACE"),
     taskQueue: env("TEMPORAL_TASK_QUEUE"),
+    telemetry,
     activities: {
       ...activities,
       ...deletion,
       ...createWatchdogActivities({
         db,
         clock: () => new Date(),
+        telemetry,
         // Until an alerting channel is connected, an alert is a log line, a
         // row in the alerts table and an audit entry.
         notify: async (alert) => console.warn("ALERT", JSON.stringify(alert)),

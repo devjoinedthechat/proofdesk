@@ -1,4 +1,5 @@
 import { type AppDatabase, appendAudit } from "@proofdesk/db";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { type Kysely, sql } from "kysely";
 
 /** How the agent did for one tenant on one route, as counts. */
@@ -95,6 +96,7 @@ export type WatchdogDeps = {
   thresholds?: Thresholds;
   /** Tells a person. Called once per action taken, never for one already in effect. */
   notify?: (alert: { kind: string; tenantId: string | null; detail: unknown }) => Promise<void>;
+  telemetry?: Telemetry;
 };
 
 const ACTOR = "system:watchdog";
@@ -141,6 +143,11 @@ export function createWatchdogActivities(deps: WatchdogDeps) {
           actor: ACTOR,
           event: action.kind === "rollback_canary" ? "canary_rolled_back" : "agent_paused",
           detail,
+        });
+        deps.telemetry?.count("events", 1, {
+          event: action.kind === "rollback_canary" ? "canary_rolled_back" : "agent_paused",
+          "tenant.id": tenantId ?? PLATFORM,
+          "watchdog.action": action.kind,
         });
         await deps.notify?.({ kind: action.kind, tenantId, detail });
         taken.push(action);

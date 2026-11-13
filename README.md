@@ -84,13 +84,14 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 
 ### Operations
 
-| Property                                           | How the test tries to break it                                                                                                                                           |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A bad build is rolled back without anyone acting   | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back ([test](apps/worker/src/canary.itest.ts)) |
-| The kill switch stops work already in progress     | An operator pauses the agent after the model has read the invoices and before it refunds ([test](apps/worker/src/controls.itest.ts))                                     |
-| One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                            |
-| Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                              |
-| Only the right staff can use the switch            | An approver, a customer and another company's operator each try                                                                                                          |
+| Property                                           | How the test tries to break it                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A bad build is rolled back without anyone acting   | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back ([test](apps/worker/src/canary.itest.ts))  |
+| The kill switch stops work already in progress     | An operator pauses the agent after the model has read the invoices and before it refunds ([test](apps/worker/src/controls.itest.ts))                                      |
+| One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                             |
+| Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                               |
+| Only the right staff can use the switch            | An approver, a customer and another company's operator each try                                                                                                           |
+| Telemetry carries no customer text                 | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts)) |
 
 Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stopping-the-agent.md)).
 
@@ -149,6 +150,8 @@ pnpm local:down          # stop, keeping the data (local:reset deletes it)
 
 The demo signs in at Keycloak as a customer, submits a ticket to the portal and waits. Everything in between is the real path: a grant, a workflow, a fresh token per tool call, policy, billing.
 
+Grafana is at `http://localhost:3001/d/proofdesk`, with a dashboard of what the agent did, what it cost and what stopped it, and a trace per ticket.
+
 With `ANTHROPIC_API_KEY` in the environment or in `.env`, the agent is Claude and a demo ticket costs about two cents. Without it, or with `SCRIPTED_MODEL=1`, a scripted stand-in handles the two demo tickets and nothing is spent.
 
 ### Evals
@@ -196,6 +199,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/identity`                                               | Token verification, grant signing, realm provisioning                                  |
 | `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                 |
 | `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                  |
+| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                              |
 | `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                              |
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay                                    |
 | `apps/stack`                                                      | Provisioning and the demo client for the local stack                                   |
@@ -218,6 +222,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 12. [A daily cap on the agent's refunds](docs/adr/0012-daily-refund-cap.md)
 13. [Deletion is a fixed procedure, with no model in it](docs/adr/0013-deletion-without-a-model.md)
 14. [Automation may stop the agent, and only a person may start it](docs/adr/0014-stopping-the-agent.md)
+15. [Telemetry can carry identifiers and numbers, and nothing else](docs/adr/0015-telemetry-without-content.md)
 
 ## Scope
 

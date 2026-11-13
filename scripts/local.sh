@@ -38,6 +38,7 @@ case "${1:-}" in
     echo "  Portal:    http://localhost:${PORTAL_PORT:-3000}"
     echo "  Temporal:  http://localhost:${TEMPORAL_UI_PORT:-8233}"
     echo "  Keycloak:  http://localhost:${KEYCLOAK_PORT:-8080}"
+    echo "  Grafana:   http://localhost:${GRAFANA_PORT:-3001}/d/proofdesk"
     echo "Next: pnpm local:demo"
     ;;
   demo)

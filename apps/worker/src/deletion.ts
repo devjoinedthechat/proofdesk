@@ -1,6 +1,8 @@
 import { type AppDatabase, appendAudit, withRowScope } from "@proofdesk/db";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { type Kysely, sql } from "kysely";
 import { z } from "zod";
+import { recordEvent } from "./telemetry.ts";
 
 /** One deletion request: the request itself, and the ticket whose grant authorises it. */
 export type DeletionRef = {
@@ -30,6 +32,7 @@ export type DeletionDeps = {
   entitlements: { erase(ref: DeletionRef): Promise<DeletionReport["entitlements"]> };
   /** Removes the customer's sign-in account and returns how many were removed. */
   identity: { deleteAccount(customerId: string): Promise<number> };
+  telemetry?: Telemetry;
 };
 
 const billingClosed = z.object({
@@ -106,8 +109,8 @@ const erasedCounts = z.record(z.string(), z.number().int().nonnegative());
  */
 export function createDeletionActivities(deps: DeletionDeps) {
   const scope = (ref: DeletionRef) => ({ tenantId: ref.tenantId, customerId: ref.customerId });
-  const audit = (ref: DeletionRef, event: string, detail: Record<string, unknown>) =>
-    appendAudit(deps.db, {
+  const audit = async (ref: DeletionRef, event: string, detail: Record<string, unknown>) => {
+    await appendAudit(deps.db, {
       tenantId: ref.tenantId,
       ticketId: ref.ticketId,
       at: deps.clock(),
@@ -115,6 +118,8 @@ export function createDeletionActivities(deps: DeletionDeps) {
       event,
       detail: { requestId: ref.requestId, ...detail },
     });
+    if (deps.telemetry) recordEvent(deps.telemetry, { ...ref, event, detail: {} });
+  };
 
   return {
     /**
