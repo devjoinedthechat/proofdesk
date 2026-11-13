@@ -13,6 +13,7 @@ export {
 } from "./environment.ts";
 export { type GenerateOptions, generateCompany } from "./generate.ts";
 export { KNOWLEDGE_BASE, type KnowledgeDocument } from "./knowledge.ts";
+export { KNOWLEDGE_QUESTIONS, type KnowledgeQuestion } from "./knowledge-questions.ts";
 export { type Databases, loadWorld } from "./load.ts";
 export { createOracle } from "./oracle.ts";
 export {

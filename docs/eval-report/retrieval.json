@@ -1,0 +1,459 @@
+{
+  "embedder": "hash-1024",
+  "measuredAt": "2026-11-13T17:01:14.236Z",
+  "questions": [
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "How many business days does a card refund take to show on my statement?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "5 to 10 business days",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "When will I get my money back?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "5 to 10 business days",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "My card expired, where does the refund go?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "moves it to your new card",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "Why is my large reimbursement taking longer than usual?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "checked by a member of our team",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 9,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "How do I cancel my subscription?",
+      "sourceUri": "help/cancelling",
+      "phrase": "select Cancel subscription",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "Will I lose what I wrote if I stop paying?",
+      "sourceUri": "help/cancelling",
+      "phrase": "read-only for 60 days",
+      "ranks": {
+        "hybrid": 5,
+        "vector": 5,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "exact",
+      "question": "Does Harbor Notes support SAML?",
+      "sourceUri": "help/plans",
+      "phrase": "single sign-on with SAML",
+      "ranks": {
+        "hybrid": 3,
+        "vector": 4,
+        "fulltext": 5
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "Can my company log in through our identity provider on the Team tier?",
+      "sourceUri": "help/plans",
+      "phrase": "only part of the Business plan",
+      "ranks": {
+        "hybrid": 3,
+        "vector": 4,
+        "fulltext": 4
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "What does the Starter plan cost per seat?",
+      "sourceUri": "help/plans",
+      "phrase": "$12 per seat",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "I see two invoices a month apart, is that a duplicate?",
+      "sourceUri": "help/billing-cycle",
+      "phrase": "two separate months, not a duplicate",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "My bank app shows a pending transaction that later vanished. Was I billed twice?",
+      "sourceUri": "help/billing-cycle",
+      "phrase": "It is not a second charge",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "When are added seats charged?",
+      "sourceUri": "help/billing-cycle",
+      "phrase": "charged straight away",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "exact",
+      "question": "Where can I add a purchase order number to an invoice?",
+      "sourceUri": "help/billing-cycle",
+      "phrase": "purchase order number",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "My pages are not showing up on my phone.",
+      "sourceUri": "help/sync-problems",
+      "phrase": "choose Sync now",
+      "ranks": {
+        "hybrid": 3,
+        "vector": 2,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "public",
+      "wording": "shared",
+      "question": "Can I get credit for an outage?",
+      "sourceUri": "help/sync-problems",
+      "phrase": "tell support which days were affected",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "internal",
+      "wording": "shared",
+      "question": "Who can approve a refund outside the published window?",
+      "sourceUri": "internal/refund-exceptions",
+      "phrase": "Only a support lead",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "internal",
+      "wording": "paraphrase",
+      "question": "Where do I send a customer who says they will take us to court?",
+      "sourceUri": "internal/refund-exceptions",
+      "phrase": "legal queue",
+      "ranks": {
+        "hybrid": null,
+        "vector": null,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "harbor",
+      "audience": "internal",
+      "wording": "shared",
+      "question": "Can I refund a payment that is under a bank dispute?",
+      "sourceUri": "internal/disputes",
+      "phrase": "pay the customer twice",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "shared",
+      "question": "How long does a card refund take?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "3 to 5 business days",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "Where can I see whether my money was sent back?",
+      "sourceUri": "help/refund-timing",
+      "phrase": "Every refund has a line on the invoice",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 2,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "shared",
+      "question": "Can I pause my plan instead of cancelling?",
+      "sourceUri": "help/cancel-or-pause",
+      "phrase": "up to three months",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "How long do you hold on to my dashboards after I leave?",
+      "sourceUri": "help/cancel-or-pause",
+      "phrase": "90 days after the plan ends",
+      "ranks": {
+        "hybrid": 5,
+        "vector": 1,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "shared",
+      "question": "Which plan includes scheduled reports?",
+      "sourceUri": "help/plans",
+      "phrase": "Scheduled reports are a Pro feature",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "exact",
+      "question": "Is there API access?",
+      "sourceUri": "help/plans",
+      "phrase": "API access",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "My weekly email with the numbers never came.",
+      "sourceUri": "help/plans",
+      "phrase": "Delivery log",
+      "ranks": {
+        "hybrid": 9,
+        "vector": 9,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "shared",
+      "question": "Are prices shown with tax?",
+      "sourceUri": "help/invoices",
+      "phrase": "Prices exclude tax",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "public",
+      "wording": "paraphrase",
+      "question": "I was billed again four weeks after the first time, is that an error?",
+      "sourceUri": "help/invoices",
+      "phrase": "they are two periods",
+      "ranks": {
+        "hybrid": null,
+        "vector": null,
+        "fulltext": null
+      }
+    },
+    {
+      "tenant": "tallyfield",
+      "audience": "internal",
+      "wording": "shared",
+      "question": "Should I approve a double charge on an annual renewal?",
+      "sourceUri": "internal/approvals",
+      "phrase": "always approved once the second payment is confirmed",
+      "ranks": {
+        "hybrid": 1,
+        "vector": 1,
+        "fulltext": 1
+      }
+    }
+  ],
+  "filteredRecall": [
+    {
+      "share": 0.5,
+      "totalChunks": 12000,
+      "tenantChunks": 6000,
+      "plannerChoice": {
+        "plain": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        },
+        "iterativeScan": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        }
+      },
+      "vectorIndexForced": {
+        "plain": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        },
+        "iterativeScan": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        }
+      }
+    },
+    {
+      "share": 0.1,
+      "totalChunks": 12000,
+      "tenantChunks": 1200,
+      "plannerChoice": {
+        "plain": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": false
+        },
+        "iterativeScan": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": false
+        }
+      },
+      "vectorIndexForced": {
+        "plain": {
+          "recallAt10": 0.43,
+          "averageReturned": 4.3,
+          "usesVectorIndex": true
+        },
+        "iterativeScan": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        }
+      }
+    },
+    {
+      "share": 0.01,
+      "totalChunks": 12000,
+      "tenantChunks": 120,
+      "plannerChoice": {
+        "plain": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": false
+        },
+        "iterativeScan": {
+          "recallAt10": 1,
+          "averageReturned": 10,
+          "usesVectorIndex": false
+        }
+      },
+      "vectorIndexForced": {
+        "plain": {
+          "recallAt10": 0.035,
+          "averageReturned": 0.35,
+          "usesVectorIndex": true
+        },
+        "iterativeScan": {
+          "recallAt10": 0.9775,
+          "averageReturned": 10,
+          "usesVectorIndex": true
+        }
+      }
+    }
+  ]
+}
