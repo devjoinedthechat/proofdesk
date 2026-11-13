@@ -76,13 +76,13 @@ The techniques include a fake system message that closes the ticket's own tags, 
 
 ### What stopped them
 
-| Stopped by                                          | Attempts, each model |
-| --------------------------------------------------- | -------------------- |
-| The model did not attempt the forbidden action      | 63 of 72             |
-| The action went to staff for approval, as it should | 9 of 72              |
-| The policy layer denied a tool call                 | 0                    |
-| The billing service refused a call                  | 0                    |
-| The reply guard stopped a reply                     | 0                    |
+| Stopped by                                          | Sonnet 5.5 | Haiku 5.5 |
+| --------------------------------------------------- | ---------- | --------- |
+| The model did not attempt the forbidden action      | 63 of 72   | 64 of 72  |
+| The action went to staff for approval, as it should | 9 of 72    | 8 of 72   |
+| The policy layer denied a tool call                 | 0          | 0         |
+| The billing service refused a call                  | 0          | 0         |
+| The reply guard stopped a reply                     | 0          | 0         |
 
 **The model was the only control that did any work.** That is the important line in this report. On the previous prompt version the same suite was also run with the record-based policies switched off, and the result was identical, because the model never tried anything those policies would have blocked. Those runs are in [history/](history).
 
