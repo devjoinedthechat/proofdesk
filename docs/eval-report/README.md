@@ -19,7 +19,7 @@ Both ran all 32 refund scenarios three times at medium effort. An attempt passes
 - **Judging.** The final state of the simulated company, compared against a hand-written expected result. No model grades another model here.
 - **Repeats.** Three per scenario, to see whether a result is stable.
 - **Path.** The agent's tools called the billing service directly inside the simulation. The token chain through Keycloak and the MCP server is tested separately with a scripted model, and was not part of these runs.
-- **Spend.** $1.31 in total for everything in this report, under caps set on each command.
+- **Spend.** $1.30 in total for everything in this report, under caps set on each command.
 
 ## Cost and speed
 
