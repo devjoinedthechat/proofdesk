@@ -1,7 +1,8 @@
-# private planning documents
+# private working documents and local-only settings
 .build-plan.md
 .failure-log.md
 .dev-log.md
+.private-patterns
 
 node_modules/
 coverage/
@@ -10,3 +11,14 @@ dist/
 .env.*
 !.env.example
 .DS_Store
+
+# credentials and keys
+*.pem
+*.p12
+*.key
+id_rsa*
+id_ed25519*
+
+# raw model transcripts, which can hold account details; publish only reviewed reports
+recordings/
+*.transcript.json

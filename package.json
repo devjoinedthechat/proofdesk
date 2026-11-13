@@ -12,11 +12,13 @@
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit -p . && pnpm -r typecheck",
     "test": "vitest run",
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm check:secrets && pnpm lint && pnpm typecheck && pnpm test",
     "stack:up": "docker compose -f infra/compose/compose.yaml up --detach --wait",
     "stack:down": "docker compose -f infra/compose/compose.yaml down",
     "stack:reset": "docker compose -f infra/compose/compose.yaml down --volumes",
-    "test:unit": "vitest run --project unit"
+    "test:unit": "vitest run --project unit",
+    "check:secrets": "scripts/check-secrets.sh --all",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

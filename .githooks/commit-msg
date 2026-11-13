@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Commit messages are public too. Refuse tool attribution and personal paths.
+if grep -i -n -E 'co-authored-by|generated with|/Users/[A-Za-z0-9._-]+/' "$1"; then
+  echo "refused: the commit message contains an attribution line or a personal path"
+  exit 1
+fi
