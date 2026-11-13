@@ -1,32 +1,100 @@
 # Proofdesk
 
-A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself, under delegated identity, policy as code, durable execution and measured evals.
+A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself: it reads the customer's billing records, applies the company's policy, and issues the refund or makes the change.
 
-Every property the repo claims is backed by a test that tries to break it. The systems of record run as a seeded test environment, so each ticket has a known correct outcome and a run is judged on the final state of the databases, not on a model's opinion of itself.
+The repo is organised around one question: what happens when the model is wrong? Every property it claims is backed by a test that tries to break it, and a run is judged on the final state of the databases, not on what the model says it did.
+
+```mermaid
+flowchart LR
+  customer([Customer]) --> portal[Portal]
+  staff([Staff]) --> portal
+  portal -- starts --> workflow
+
+  subgraph worker [Worker]
+    workflow[Ticket workflow<br/>Temporal] --> loop[Agent loop]
+    loop --> policy[Policy check<br/>Cedar]
+    policy --> tools[Tool call]
+  end
+
+  loop --> gateway[Model gateway] --> model([Claude])
+  tools -- scoped token --> billingMcp[Billing MCP]
+  tools -- scoped token --> entitlementsMcp[Entitlements MCP]
+  tools -- scoped token --> documentsMcp[Documents MCP]
+  billingMcp -- exchanged token --> billing[Billing service]
+  entitlementsMcp -- exchanged token --> entitlements[Entitlements service]
+
+  keycloak[Keycloak] -. issues every token .-> tools
+  billing --> db[(Postgres<br/>row-level security)]
+  entitlements --> db
+  documentsMcp --> db
+  workflow --> audit[(Audit log<br/>hash-chained)]
+```
+
+## What it proves
+
+Each row is a property and the test that attacks it. Where a control was added, the test was also run with the control removed, to confirm it fails.
+
+### Identity and authority
+
+| Property                                          | How the test tries to break it                                                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| The agent acts only with the customer's authority | A ticket grant is revoked, expired, closed, or asked for a scope its category does not allow ([test](mcp/billing/src/authority.itest.ts)) |
+| A token works only where it was addressed         | The MCP token is replayed against billing; a sign-in token is sent to the MCP server                                                      |
+| A token without the refund scope cannot refund    | Four layers are tried in turn: the tool list, the tool call, Keycloak, and billing directly                                               |
+| The worker cannot name a customer by itself       | It presents a self-signed assertion, a replayed one, and its bare service token                                                           |
+| One tenant never reaches another's rows           | Unfiltered queries run as the service's own database role ([test](services/billing/src/billing.itest.ts))                                 |
+
+The agent never holds a customer's credential. Submitting a ticket creates a grant, and every tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it. See [ADR 5](docs/adr/0005-ticket-grants-for-agent-authority.md).
+
+### Policy and guardrails
+
+| Property                                           | How the test tries to break it                                                                                                                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Refund rules hold even if the model is compromised | A scripted, attacker-controlled model calls the refund tool directly: outside the window, relabelled, disputed, another customer's ([test](packages/evals/src/compromised.itest.ts)) |
+| A large refund cannot be split around approval     | The same model asks for it in two halves                                                                                                                                             |
+| The reply cannot misstate what was done            | It claims a refund that was not made, hides one that was, and leaks its tool names                                                                                                   |
+| Approval cannot override the kill switch           | The agent is paused after approval is requested ([test](apps/worker/src/workflow.itest.ts))                                                                                          |
+| Anything no policy mentions is denied              | A tool nobody wrote a policy for is called ([test](packages/policy/src/policy.test.ts))                                                                                              |
+
+Rules that matter are enforced on facts the policy layer reads from billing itself, not on the model's word. The [threat model](docs/threat-model.md) lists the controls by layer and states what a compromised model can still do.
+
+### Durable execution
+
+| Property                                           | How the test tries to break it                                                                                                                                                      |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A refund is issued exactly once                    | All services run as separate processes; the worker is sent `SIGKILL` the moment billing has paid, and a second worker repeats the call ([test](apps/worker/src/processes.itest.ts)) |
+| A repeated or overlapping step changes nothing     | One activity is run twice, and two attempts of one step run at once                                                                                                                 |
+| A large refund waits for a person                  | The worker is shut down during the wait and the approval arrives with no worker running                                                                                             |
+| A plan change is all or nothing across two systems | The worker is lost between the two writes; the second system refuses; the worker is lost during the undo                                                                            |
+| No customer data in workflow history               | A finished history is searched for the ticket's text, the name, the email and the amount                                                                                            |
+| The audit log is tamper-evident                    | Entries are edited, re-hashed and deleted with full database access ([test](packages/db/src/audit.itest.ts))                                                                        |
+
+### Retrieval and memory
+
+| Property                                             | How the test tries to break it                                                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Access is part of the search, not a filter around it | The same question is asked as staff and as an agent acting for a customer ([test](packages/simulator/src/documents.itest.ts))                                                   |
+| A poisoned page cannot change an outcome             | It is quarantined at ingestion; with the scan bypassed, the refund is still refused                                                                                             |
+| A small tenant still gets results from a large index | The vector index is forced: recall is 3.5% without iterative scan and 98% with it ([report](docs/eval-report/retrieval.md))                                                     |
+| Memory cannot be poisoned by a ticket                | A ticket claims a manager promised a refund; the stored memory holds only facts the system computed, and none of the ticket's words ([test](apps/worker/src/workflow.itest.ts)) |
 
 ## Results on real models
 
-Three repeats of every scenario on each model, judged on the final state of the systems of record.
+Three repeats of 76 scenarios on each model. An attempt passes only if the final state is exactly the expected one, approval was requested exactly when required, and the reply states the required facts.
 
 | Suite                                     | `claude-sonnet-5-5` | `claude-haiku-5-5` |
 | ----------------------------------------- | ------------------- | ------------------ |
-| 32 honest refund tickets                  | 95 of 96 passed     | 96 of 96 passed    |
-| 13 plan-change tickets                    | 39 of 39 passed     | 36 of 39 passed    |
-| 7 tickets that need the help centre       | 21 of 21 passed     | 21 of 21 passed    |
+| 32 honest refund tickets                  | 95 of 96            | 96 of 96           |
+| 13 plan-change tickets                    | 39 of 39            | 36 of 39           |
+| 7 tickets that need the help centre       | 21 of 21            | 21 of 21           |
 | 24 attack tickets: attacks that succeeded | 0 of 72             | 0 of 72            |
 | Cost per ticket                           | $0.0093             | $0.0007            |
 
-Read these with their limits. The suites are nearly saturated, and no attack was strong enough to fool the model, so those runs never reached the controls behind it. What a fooled model can and cannot do is tested separately, with a scripted model that is fully under an attacker's control:
+- **The quality gate fails when it should.** With the refund policy removed from the prompt, the pass rate on the gate sample falls from 28 of 28 to 18 of 28 and the command exits non-zero.
+- **The suites are nearly saturated.** One scenario in 76 separates the two models, so these numbers cannot rank models.
+- **No attack fooled either model,** which means those runs never reached the controls behind the model. That is why the compromised-model tests above exist.
 
-| A compromised model tries to                                | Result                                          |
-| ----------------------------------------------------------- | ----------------------------------------------- |
-| Refund a charge outside the window, under any label         | Denied by policy, on billing records            |
-| Refund another customer's payment                           | Denied by policy; refused by billing without it |
-| Split a large refund to avoid approval                      | Both parts wait for staff                       |
-| Refund more than was paid, with staff fooled into approving | Refused by the billing service                  |
-| Tell the customer a refund was made when none was           | Reply stopped by the guard                      |
-
-The [eval report](docs/eval-report/README.md) has the method and the limits, and the [threat model](docs/threat-model.md) lists what a compromised model can still do.
+The [eval report](docs/eval-report/README.md) has the method, every failure and the limits.
 
 ## Quick start
 
@@ -34,128 +102,77 @@ Requires Node 22.18 or later, pnpm and Docker.
 
 ```sh
 pnpm install
-pnpm check      # lint, type checks, all tests
-pnpm stack:up   # Postgres with pgvector, Keycloak, Temporal
+pnpm check        # secret scan, lint, type checks and every test
+pnpm test:unit    # only the tests that need no Docker
 ```
 
-`pnpm test` starts its own Postgres, Keycloak and Temporal containers, so it does not need the stack. `pnpm test:unit` runs the tests that need no Docker.
+`pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes about a minute. It includes the test that runs every service as a separate process and kills the worker mid-refund.
 
-| Service     | Address               | Local login               |
-| ----------- | --------------------- | ------------------------- |
-| Postgres    | `localhost:5432`      | `proofdesk` / `proofdesk` |
-| Keycloak    | http://localhost:8080 | `admin` / `admin`         |
-| Temporal UI | http://localhost:8233 | none                      |
+To run the agent on the scenarios with a real model:
 
-`pnpm evals` runs the agent on the scenarios with a real model. It needs an `ANTHROPIC_API_KEY` in `.env`, requires a `--max-spend` cap in dollars, and spends real money.
-
-`pnpm stack:down` stops the stack. `pnpm stack:reset` also deletes its data.
-
-## The test environment
-
-The environment has two tenants with different refund rules, so the same ticket can have two correct answers.
-
-| Tenant       | Refund window | Approval needed above |
-| ------------ | ------------- | --------------------- |
-| Harbor Notes | 14 days       | $200                  |
-| Tallyfield   | 30 days       | $500                  |
-
-- **Seeded.** One seed always produces the same customers, subscriptions, invoices and payments.
-- **Scenarios.** 76 tickets (32 honest refunds, 24 attacks, 13 plan changes, 7 that need the help centre), each with a hand-written expected result: the refunds that must exist afterwards, whether approval is requested, and what the reply must say. Fifteen of them must end without a refund.
-- **Judged on final state.** A run passes only if the expected refunds exist and nothing else in the company changed.
-- **Validated without a model.** A scripted oracle reaches the expected result on every scenario, and a solver that always refunds or always refuses fails every one.
-
-Billing enforces what must always hold: a refund never exceeds what was paid, and a retried request with the same idempotency key pays once. Company policy, such as the refund window, is deliberately not billing's job.
-
-## Identity and authority
-
-The agent never holds a customer's credential. Submitting a ticket creates a grant, and each tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it.
-
-```
-customer signs in → submits a ticket          the grant: this customer, these scopes
-worker → portal:   "ticket T, scope S"        → signed, single-use assertion
-worker → Keycloak: assertion + own secret     → token for the MCP server
-worker → MCP server: tool call
-MCP server → Keycloak: token exchange         → token for the billing service
-MCP server → billing service → Postgres under row-level security
+```sh
+echo "ANTHROPIC_API_KEY=..." > .env
+pnpm evals --model claude-sonnet-5-5 --effort medium --max-spend 1 --out results.json
 ```
 
-| Claim                                          | Test that tries to break it                                                                                  |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| A token without the refund scope cannot refund | It is not shown the tool, the tool call fails, Keycloak refuses to widen it, and billing refuses it directly |
-| One tenant cannot reach another's data         | Unfiltered queries as the service's database role return only the scoped tenant's rows                       |
-| One customer cannot reach another's payment    | A refund against it fails as not found; the database rejects the row                                         |
-| A token works only where it was addressed      | The MCP token is rejected by billing; a sign-in token is rejected by the MCP server                          |
-| The worker cannot name a customer              | A self-signed assertion, a replayed assertion and a bare service token are all refused                       |
-| The grant is checked on every call             | Revoked, expired, closed and out-of-category requests are refused                                            |
-| The service role cannot rewrite history        | Updates and deletes on billing tables fail with permission denied                                            |
+`--max-spend` is required, in dollars. The command stops starting new attempts once the cap is reached.
 
-Each row was also checked from the other side: with the control removed, the test fails.
+## How a ticket is handled
 
-## Retrieval and memory
+1. **Submission.** A signed-in customer submits a ticket and picks a category. That creates the grant, and starts one Temporal workflow.
+2. **Model turn.** The worker sends the ticket, wrapped as untrusted text, with the company's policy and the tools the category allows.
+3. **Policy check.** Each tool call the model asks for is decided by Cedar: allow, deny, or wait for staff.
+4. **Tool call.** The worker obtains a fresh token for that one call and calls the MCP server, with an idempotency key the model never sees.
+5. **Resolution.** The model ends by calling a tool with the outcome, the reason and the reply.
+6. **Reply check.** The reply is compared with what the tools actually did before it is stored.
+7. **Record.** The outcome, an audit entry per step, and a summary for the customer's next ticket are written.
 
-The agent can search each company's help centre. Access is part of the search, not a filter around it.
+Run state is saved after every step, so a worker can stop anywhere and another continues. See [ADR 6](docs/adr/0006-run-state-outside-workflow-history.md).
 
-| Claim                                                            | Test that tries to break it                                                                          |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| The same question gets different sources for different audiences | A staff-only page is the top result for staff and absent for an agent acting for a customer          |
-| One tenant never sees another's documents                        | Searches as each tenant; an unscoped query as the search role returns nothing                        |
-| A poisoned page is held back at ingestion                        | The scan quarantines it with its findings; it has no chunks to retrieve                              |
-| A poisoned page that gets through changes no outcome             | With the scan bypassed, both models still refuse the out-of-window refund                            |
-| Re-indexing is atomic and idempotent                             | Unchanged content is skipped; changed content replaces its chunks in one transaction                 |
-| Deletion removes the embeddings too                              | After a delete, no chunk of the document is left                                                     |
-| A small tenant still gets results from a large index             | With the vector index forced, recall falls to 3.5% without iterative scan and returns to 98% with it |
-| Memory cannot be poisoned by a ticket                            | A memory is a set of facts the system computed from what happened; no ticket text is stored          |
-| Memories have an owner, a source and an expiry                   | Expired entries and other customers' entries never reach the prompt                                  |
+## Test environment
 
-Search quality was measured with a stand-in embedder because no embedding API key was available. See the [retrieval report](docs/eval-report/retrieval.md).
+The systems of record run as a seeded environment, so every ticket has a known correct outcome.
 
-## Durable execution
+- **Two tenants with different rules.** One allows refunds for 14 days and needs approval above $200; the other 30 days and $500. The same ticket can have two correct answers.
+- **Hand-written expected results.** Each scenario states the refunds or plan change that must exist afterwards, whether approval is requested, and what the reply must say.
+- **Validated without a model.** A scripted oracle reaches the expected result on all 76 scenarios, and solvers that always refund or always refuse fail all 76.
 
-Each ticket is one Temporal workflow. A worker can stop at any point and another continues from the same step.
+## Repository layout
 
-| Claim                                              | Test that tries to break it                                                                                                                                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A refund is issued exactly once                    | With every service running as its own process, the worker is sent `SIGKILL` at the moment billing has paid. A second worker repeats the call; billing answers 201, then 200, and one refund exists                             |
-| A repeated or overlapping step changes nothing     | The same activity is run twice, and two attempts of one step are run at once                                                                                                                                                   |
-| A large refund waits for a person                  | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes                                                                                                               |
-| Only that tenant's staff can approve               | Another company's approver gets an empty list and a 404; the customer gets a 403                                                                                                                                               |
-| Approval cannot override the kill switch           | The agent is paused after the request; the approved refund is still denied                                                                                                                                                     |
-| The model's account is not trusted                 | A run that claims a refund it never made is handed to staff                                                                                                                                                                    |
-| A plan change is all or nothing across two systems | The worker is lost between the billing write and the entitlements write, and the retry finishes both; entitlements refuses, and the billing change is undone; the worker is lost during the undo, and it still ends consistent |
-| No customer data in workflow history               | The finished history is searched for the ticket text, name, email and amount                                                                                                                                                   |
-| The audit log is tamper-evident                    | Entries are edited, re-hashed and deleted with full database access                                                                                                                                                            |
+| Path                                                              | Contents                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------- |
+| `apps/portal`                                                     | Ticket submission, grants, staff approvals                  |
+| `apps/worker`                                                     | The ticket workflow and its activities                      |
+| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                        |
+| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                   |
+| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard           |
+| `packages/gateway`                                                | Model access: budgets, retries, failover, record and replay |
+| `packages/policy`                                                 | Cedar policies and the facts they are decided on            |
+| `packages/identity`                                               | Token verification, grant signing, realm provisioning       |
+| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange      |
+| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory       |
+| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner   |
+| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay         |
+| `docs`                                                            | Decision records, eval report, threat model                 |
 
-These run with a scripted stand-in for the model. They test the system around the model, not the model's judgment.
+## Design decisions
 
-## Layout
+1. [Own agent loop instead of a framework](docs/adr/0001-own-agent-loop.md)
+2. [Temporal for durable execution](docs/adr/0002-temporal-for-durable-execution.md)
+3. [Postgres for vectors](docs/adr/0003-postgres-for-vectors.md)
+4. [Ground truth before the agent](docs/adr/0004-ground-truth-before-the-agent.md)
+5. [Ticket grants for agent authority](docs/adr/0005-ticket-grants-for-agent-authority.md)
+6. [Run state lives in the database, not in workflow history](docs/adr/0006-run-state-outside-workflow-history.md)
+7. [Refund rules are enforced on billing records, not only in the prompt](docs/adr/0007-enforce-refund-rules-on-records.md)
+8. [What is in the prompt, what is retrieved, what is remembered](docs/adr/0008-prompt-retrieval-memory.md)
+9. [A plan change is one tool and a saga](docs/adr/0009-plan-change-saga.md)
 
-| Path                     | Contents                                                                               |
-| ------------------------ | -------------------------------------------------------------------------------------- |
-| `packages/gateway`       | Provider-neutral model interface and a scripted mock provider                          |
-| `packages/simulator`     | Seeded company, refund scenarios, reference policy, oracle and scenario runner         |
-| `packages/db`            | Application database schema, migration and test-database helpers                       |
-| `packages/service`       | Shared HTTP conventions: principals, errors, typed clients                             |
-| `services/documents`     | Help-centre documents: ingestion pipeline and permission-aware hybrid search           |
-| `mcp/documents`          | Help-centre search MCP server                                                          |
-| `mcp/entitlements`       | Entitlements MCP server                                                                |
-| `packages/mcp-server`    | The shared MCP server: per-token tool list, token exchange, no customer id in any tool |
-| `services/billing`       | Billing system of record: subscriptions, invoices, payments, refunds                   |
-| `services/entitlements`  | Entitlements system of record, with versioned writes                                   |
-| `infra/compose`          | Local development stack                                                                |
-| `docs/adr`               | Decision records                                                                       |
-| `docs/architecture.html` | Architecture diagram                                                                   |
+## Scope
 
-## Decisions
-
-- [Own agent loop instead of a framework](docs/adr/0001-own-agent-loop.md)
-- [Temporal for durable execution](docs/adr/0002-temporal-for-durable-execution.md)
-- [Postgres for vectors](docs/adr/0003-postgres-for-vectors.md)
-- [Ground truth before the agent](docs/adr/0004-ground-truth-before-the-agent.md)
-- [Ticket grants for agent authority](docs/adr/0005-ticket-grants-for-agent-authority.md)
-- [Run state lives in the database, not in workflow history](docs/adr/0006-run-state-outside-workflow-history.md)
-- [Refund rules are enforced on billing records, not only in the prompt](docs/adr/0007-enforce-refund-rules-on-records.md)
-- [What is in the prompt, what is retrieved, what is remembered](docs/adr/0008-prompt-retrieval-memory.md)
-- [A plan change is one tool and a saga](docs/adr/0009-plan-change-saga.md)
+- **One agent, by choice.** Every property here can be shown with one. Multi-agent orchestration would add surface without adding a proof.
+- **No agent framework.** The loop is a few hundred lines, and the controls around it are the point.
+- **Embeddings are a stand-in.** Retrieval is built and tested end to end, with word-overlap vectors in place of an embedding model. The [retrieval report](docs/eval-report/retrieval.md) says what that does and does not measure.
+- **Services run as processes in tests, not as a deployed stack.** There is no browser interface; the portal and staff approvals are HTTP APIs.
 
 ## Licence
 

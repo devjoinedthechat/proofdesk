@@ -31,7 +31,7 @@ if [ -f .private-patterns ]; then
 fi
 regex=$(IFS='|'; echo "${patterns[*]}")
 
-forbidden_names='(^|/)(\.env(\..*)?|.*\.pem|.*\.p12|.*\.key|id_rsa|id_ed25519|\.dev-log\.md|\.failure-log\.md|\.build-plan\.md|\.private-patterns)$'
+forbidden_names='(^|/)(\.env(\..*)?|.*\.pem|.*\.p12|.*\.key|id_rsa|id_ed25519|\.dev-log\.md|\.failure-log\.md|\.build-plan\.md|\.private-patterns|\.architecture-target\.html)$'
 
 if [ "${1:-}" = "--all" ]; then
   files=$(git ls-files)

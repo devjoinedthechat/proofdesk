@@ -3,6 +3,7 @@
 .failure-log.md
 .dev-log.md
 .private-patterns
+.architecture-target.html
 
 node_modules/
 coverage/

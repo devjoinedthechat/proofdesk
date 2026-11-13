@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!docs/architecture.html"]
+    "includes": ["**"]
   },
   "formatter": {
     "indentStyle": "space",
