@@ -1,6 +1,7 @@
 # private planning documents
 .build-plan.md
 .failure-log.md
+.dev-log.md
 
 node_modules/
 coverage/

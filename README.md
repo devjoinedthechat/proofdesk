@@ -36,3 +36,7 @@ pnpm check      # lint, type checks, tests
 - [Own agent loop instead of a framework](docs/adr/0001-own-agent-loop.md)
 - [Temporal for durable execution](docs/adr/0002-temporal-for-durable-execution.md)
 - [Postgres for vectors](docs/adr/0003-postgres-for-vectors.md)
+
+## Licence
+
+[MIT](LICENSE)
