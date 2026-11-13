@@ -1,8 +1,10 @@
 import {
+  type AgentResult,
   type AgentTool,
   checkResolution,
   runAgent,
   systemPrompt,
+  type TenantPolicy,
   ticketMessage,
   withSystemIdempotency,
 } from "@proofdesk/agent";
@@ -47,6 +49,10 @@ export type AgentSolverOptions = {
   model: string;
   effort?: Effort;
   maxTurns?: number;
+  /** Builds the system prompt. Defaults to the production prompt. */
+  system?: (policy: TenantPolicy) => string;
+  /** Called with the full result of each run, for metrics. */
+  onResult?: (result: AgentResult, violations: string[]) => void;
   /** Where the agent's tools come from. Defaults to the simulation's billing client. */
   tools?: (context: SolverContext) => Promise<AgentTool[]> | AgentTool[];
 };
@@ -66,7 +72,7 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       model: options.model,
       gateway: options.gateway,
       context: { tenantId: tenant.id, ticketId: ticket.id },
-      system: systemPrompt({
+      system: (options.system ?? systemPrompt)({
         tenantName: tenant.name,
         currency: tenant.currency,
         refundWindowDays: tenant.refundWindowDays,
@@ -106,8 +112,11 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       reasonCode,
       reply: "I have passed your request to our team, who will reply to you directly.",
     });
+    const violations = result.resolution
+      ? checkResolution(result.resolution, result.toolCalls)
+      : [];
+    options.onResult?.(result, violations);
     if (!result.resolution) return handOver(`agent_${result.stopped}`);
-    const [violation] = checkResolution(result.resolution, result.toolCalls);
-    return violation ? handOver(`guard_${violation}`) : result.resolution;
+    return violations[0] ? handOver(`guard_${violations[0]}`) : result.resolution;
   };
 }

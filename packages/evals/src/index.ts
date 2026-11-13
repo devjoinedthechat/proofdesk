@@ -3,6 +3,8 @@ export {
   createAgentSolver,
   directBillingTools,
 } from "./agent-solver.ts";
+export { type EvalOptions, type EvalResults, type RunRecord, runEval } from "./eval-run.ts";
+export { GATE_SAMPLE, PROMPT_VARIANTS } from "./prompts.ts";
 export {
   call,
   invoicesSeen,

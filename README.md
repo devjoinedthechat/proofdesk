@@ -4,6 +4,19 @@ A back-office support agent for a simulated subscription company, built as a ref
 
 The agent resolves refund, plan-change and data-deletion tickets by reading the company's records and making the changes itself. Each production property the repo claims is backed by a test that tries to break it.
 
+## Results on real models
+
+All 32 refund scenarios, three times each, judged on the final state of the simulated company.
+
+| Model               | Pass rate | Cost per ticket | Time per ticket (median) |
+| ------------------- | --------- | --------------- | ------------------------ |
+| `claude-sonnet-5-5` | 96 of 96  | $0.0084         | 4.9 s                    |
+| `claude-haiku-5-5`  | 95 of 96  | $0.0006         | 5.6 s                    |
+
+With the refund policy removed from the prompt, the pass rate on the gate sample falls to 18 of 28 and the quality gate fails.
+
+The suite is saturated at this difficulty and contains no adversarial tickets yet, so read these numbers as "applies the policy correctly on clear cases", not as a safety claim. The [eval report](docs/eval-report/README.md) has the method, the failure analysis and the limits.
+
 ## Quick start
 
 Requires Node 22.18 or later, pnpm and Docker.
@@ -21,6 +34,8 @@ pnpm stack:up   # Postgres with pgvector, Keycloak, Temporal
 | Postgres    | `localhost:5432`      | `proofdesk` / `proofdesk` |
 | Keycloak    | http://localhost:8080 | `admin` / `admin`         |
 | Temporal UI | http://localhost:8233 | none                      |
+
+`pnpm evals` runs the agent on the scenarios with a real model. It needs an `ANTHROPIC_API_KEY` in `.env`, requires a `--max-spend` cap in dollars, and spends real money.
 
 `pnpm stack:down` stops the stack. `pnpm stack:reset` also deletes its data.
 

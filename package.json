@@ -18,7 +18,9 @@
     "stack:reset": "docker compose -f infra/compose/compose.yaml down --volumes",
     "test:unit": "vitest run --project unit",
     "check:secrets": "scripts/check-secrets.sh --all",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "evals": "node --env-file-if-exists=.env packages/evals/src/cli.ts",
+    "evals:report": "node packages/evals/src/report.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

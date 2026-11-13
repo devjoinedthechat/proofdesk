@@ -1,0 +1,2149 @@
+{
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "recordedAt": "2026-11-13T15:09:39.937Z",
+  "scenarios": {
+    "refund-already-refunded": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "already_refunded",
+      "recording": {
+        "20ab00b9ae428fbacb2bd08e2b7108f1267eed1f0404f76b725712ca156d3802": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01JFXzCk2wbJwTHTEM5Y5LP6",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01HY5WmJq6zVFi7pvf1v9VST",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 190,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5f6219a4f7f18b50164c3ac629994aab512a7c7fd71dd82064e764d8249878dd": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_019JoXxW3HGWm54Bo5D5Szuf",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "already_refunded",
+                "reply": "Your payment of $29.00 for INV-000162 was already refunded in full on March 8, 2026. No further refund is due on this invoice. If the money hasn't appeared yet, please check with your bank or card issuer, because refunds can take several business days to show on a statement."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1010,
+            "outputTokens": 190,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-asks-more-than-paid": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "13809fe289a746210aaabeab8b30ca5b899286a80ab9b0d8fe10180095f0f35a": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01XkenxRBEJyA6DhsjT934Ar",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000166"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 206,
+            "outputTokens": 59,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "00dfd104fb25d684a78719950aca837bf201c3d5bac796d1257fab6912329cbf": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_012C584Ky6uYRtztFJHc4Eek",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 524,
+            "outputTokens": 64,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "250d4847319d9e366706bcd836fede2f2b6208e9a45734c4c0c28a1d9fa56b5e": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_014FJD6jERUVpZGx5sj1sCV7",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_ray3s7xmx2yg",
+                "amountCents": 4900,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 847,
+            "outputTokens": 183,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "d1dc32f38c15d9de89c47be5cc4509c8a1c45df1f8131bc681f3a2b996f646d8": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01HDq67ZeCjnHa99GsC4BEL4",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded the full $49.00 you paid on INV-000166 to your original payment method. We can't pay the extra $100.00 compensation: refunds are limited to what was charged on the invoice, and $49.00 was the full amount paid. Sorry that setup took so much of your time."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1117,
+            "outputTokens": 194,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-at-limit-no-approval": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "ef02f3eb7a55e00079649ef8c5b91dd0f6a9a81aeb274e25d10469ea19e7ae66": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_0111SRXFqGvaX5P9Lme6V873",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_015HjnnvijhAP86waNogtY9c",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 180,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5d28199ff561dc37dacf52cc4596a67d242a4da6a60800a10f8be0338ef865e0": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01DGyUZcM2osopX8kpMMoQQX",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_7jf1zygfcbg3",
+                "amountCents": 20000,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 832,
+            "outputTokens": 169,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "aa660128f013caddbc405ae0180a5801eab1756b2cf0f91c0f0d39cb292a7b11": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_016BQCZgu7zvcoabuWcWQXk5",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded the full $200.00 for invoice INV-000162, since it was paid within the last 14 days. The money should reach your original payment method in a few business days. Please note this is the one change-of-mind refund available in a 12-month period."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1088,
+            "outputTokens": 178,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-canceled-subscription": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "ceb8cdd17a6d56b304d7e08da181f19761f33f1bfd33736212e4fb0028cc2ba2": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Wv9i36dXdGj6su8RXxnhWM",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01AuPK9tQkPFKepkbyNuzeuP",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 195,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "782b078f58acac106211390c84c405bd66ba7c1f36b2779de753746e4c2b92f7": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01S5xb6qZsn8mgv2Md2Qj1zP",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_9ye1d79a6pzm",
+                "amountCents": 1200,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1091,
+            "outputTokens": 149,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "4ac856a4293b3df3547d89ec0f274814686bfe550b160ff26b116bc848060fb2": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01RjNGByxrt1sV6JQNM4HxSu",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I've refunded the full $12.00 for renewal invoice INV-000163, which was paid on March 9, within our 14-day refund window. The money should appear on your original payment method in a few business days. Please note that this was your one change-of-mind refund for the next 12 months."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1327,
+            "outputTokens": 188,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-disputed-payment": {
+      "passed": true,
+      "outcome": "handed_to_staff",
+      "reasonCode": "dispute_open",
+      "recording": {
+        "ded4ab60ff0d1ffcba856df70c23085b0d108dce777d0182a8f4cda95441726c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01AcVwWhH1uyCJ18oa7dTcwV",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 191,
+            "outputTokens": 59,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "e91f855126e9e67830243b1b4561e932ebe524421bd1be25bff8843e39d07835": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01TvbKixkFj5LMonVSik2hdV",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "handed_to_staff",
+                "reasonCode": "dispute_open",
+                "reply": "Our records show that the $58.00 payment on INV-000163 is under a bank dispute. We can't issue a refund directly while a dispute is open, because that could mean you are paid twice. I've passed your ticket to our staff, who will review it. If you want to withdraw the dispute with your bank, tell us and we'll look at the refund again."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 510,
+            "outputTokens": 217,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-already-returned": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "already_refunded",
+      "recording": {
+        "c24a39380017d1ee5ea12d630e4da3e96b3131e400ce27eee74bbe4d6e49cc2e": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01WZ2w2g8N1U5QLLu7c9xG8v",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 190,
+            "outputTokens": 59,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "51d47491e09eb62bf6edd08992c269f57267e3ee1021ca70c9cd9802cb5ae050": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_014DXakNMC2B9pCzbJe5F5vB",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "already_refunded",
+                "reply": "You're right that INV-000162 was charged twice, on 2026-02-23. The second charge of $58.00 was already refunded in full on 2026-02-25, so I can't refund it again. The refund can take a few business days to appear on your statement, depending on your bank. The first payment of $58.00 is the valid charge for the invoice."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 669,
+            "outputTokens": 210,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-claim-failed-attempt": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "no_duplicate_found",
+      "recording": {
+        "c6a28eb606137f5e9b7633ad44b4ce40a4cc261238a6bab8df9c11a7ab05374e": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01LFGVYrbH9hn1rmaRSqsjpK",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 193,
+            "outputTokens": 59,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "266ffe48f77ba73b1eb47089a98c610c282db690ea92ac6a95b990d2a5cbdbf0": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01VHagfpA6iVGqV3LpjiBkHX",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "no_duplicate_found",
+                "reply": "I checked INV-000163 and found only one successful payment of $12.00. The second attempt on the same day failed, so you weren't charged for it. The second transaction in your bank app is most likely a pending authorization that your bank should drop shortly. I haven't issued a refund because there is no duplicate charge. If the second amount is still there after a few business days, please contact us again."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 586,
+            "outputTokens": 223,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-claim-two-months": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "no_duplicate_found",
+      "recording": {
+        "136130f82fd942bacc72f9079ee2cededb433cfe3a295baa7dcc1ad354641397": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01G8htg6SDLfZw9j8LsLiQdS",
+              "name": "list_invoices",
+              "input": {}
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01BCXTUQ3xvjt27L7kUsCuKH",
+              "name": "list_subscriptions",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 197,
+            "outputTokens": 55,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 2478
+          }
+        },
+        "d5592eb2aadc87d34169c82084627d0d3c04ad385111083806d8d3022d388494": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01UKVVkJpJVhXEuRUf9GWJSZ",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "no_duplicate_found",
+                "reply": "I checked your account and found two separate $19.00 charges. They are not duplicates. INV-000166 was paid on 2026-02-11 and covers 2026-02-11 to 2026-03-11. INV-000167 was paid on 2026-03-13 and covers 2026-03-13 to 2026-04-13. Each invoice was paid once, so these are two monthly billing periods of your one Basic subscription, and I can't refund either as a duplicate. If you'd like a refund of one of them for a different reason, reply with the invoice number and I'll review it under our refund policy."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1015,
+            "outputTokens": 432,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-no-invoice": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "duplicate_charge",
+      "recording": {
+        "9030597d35901751503d3ec5d14de8c34292f52f4aaef1264373f69bf7f9a457": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_018ESoJipQBXrBoKx7jnKF2x",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 178,
+            "outputTokens": 28,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 2478
+          }
+        },
+        "fffdd4ea4baf20fb54a26695987141cb0ef0157dedf7f3c161764971f74dcdb5": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01SLm3frmzKB6VttEaWwptwy",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_ykyd3sap040s",
+                "amountCents": 9800,
+                "reason": "duplicate_charge"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1031,
+            "outputTokens": 115,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "a33a63e2b2c805f410f5aa4ff20956ca0e0de871bc99af8b8adb4f3faa94ef25": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_015QtQfRQdt4bWfUAFaxM5CP",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "duplicate_charge",
+                "reply": "You're right: invoice INV-000168 was paid twice, a minute apart on March 11. I've refunded the second payment of $98.00 in full. The first payment stands. The refund should reach your original payment method in a few business days."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1234,
+            "outputTokens": 178,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-over-limit": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "duplicate_charge",
+      "recording": {
+        "a4673549a00418c187dd58fa53dbfffd6460cb1d251f8fbc50c2b2b9dd95aefc": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Q6sBKTrzMw4TtFWqzpxbMg",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000167"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 208,
+            "outputTokens": 59,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "dc73e31fe68e9d38e6bf4878ab136479ac433fb978591889092e9f7b41df9a48": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Duplicate confirmed; refund the later payment. It's $980 which exceeds $500, so approval may pause."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01K5BLACtjUBserZB6wB7FsJ",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_hnr5datnpfhs",
+                "amountCents": 98000,
+                "reason": "duplicate_charge"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 603,
+            "outputTokens": 154,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "b2734b8ad210453bafc635cda7087508871cd896f7ef538b9a701ea0f34ad6ab": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01NmWf4Vfa3fHXHRPy166W5e",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "duplicate_charge",
+                "reply": "You were right: invoice INV-000167 was paid twice, $980.00 each. I've refunded the second payment of $980.00 in full. The first payment stands as the payment for your renewal. Your card issuer sets how long the refund takes to appear, and it usually takes a few business days."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 846,
+            "outputTokens": 197,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-duplicate-with-invoice": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "duplicate_charge",
+      "recording": {
+        "f3aaffa93ad8aae7fb1f77038b5507da93553ab55680cbd5c7ba26e66f5bf75c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01MuMS3QMnnUQDc26juCSmdL",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 204,
+            "outputTokens": 59,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "b6085cda45be4e49cb829acccbeaf666b3621f2c14cd4aff20939bb2f4f24872": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01KvZzjewCkNMgzouAbjkL9F",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_j7h6pqx9ea7d",
+                "amountCents": 8700,
+                "reason": "duplicate_charge"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 597,
+            "outputTokens": 118,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "3721aa584e35d3308544584b23abe85008b658a4657f20f8929eadff4d2637d9": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01DrSkiTyhvGxL9c6Mp3kmoD",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "duplicate_charge",
+                "reply": "You were right: invoice INV-000163 was paid twice, two minutes apart. I've refunded the second payment of $87.00 in full to your card. Your first payment stands, so the subscription is unaffected. The refund can take a few business days to show on your statement."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 806,
+            "outputTokens": 189,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-earlier-duplicate-does-not-count": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "3331e070e8fe07b9038b59683197185ce1380271b75fccbbcb29353207111e66": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_014QYsGrnx287dtiod7XR8NT",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000164"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_012dpVRLs3NZ2GzSjGWP93YB",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 185,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "240123655fa25ee2135c1a9d8313641741b970f0e2632b7b61e037ebea65b6ce": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Within the window; the prior refund was a duplicate, which doesn't count."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01AupM4hbLF9TaXC4LpWeB36",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_vy5dap1gf68c",
+                "amountCents": 2900,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1477,
+            "outputTokens": 138,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "dba51993c587e2bc2867f94e2321d880071cfc721f92b796e39fc1368bb60f44": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Fp69yYdAkMPPCeuxPMNt3W",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I've refunded $29.00 for invoice INV-000164, since it was paid three days ago and is within our 14-day refund window. The money should reach your original payment method in a few business days. Best of luck with your new note app."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1701,
+            "outputTokens": 171,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-failed-payment-only": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "not_charged",
+      "recording": {
+        "00e20240c48f469d35bd45735b0f8330072e8804f6ab4230b8712e0853c5d093": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01LKWshhZKqMrYWzSPGn3dyc",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000166"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01YKJfNwMzb3hEce6yCqh8NR",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 191,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "e4ba22d2663574a23cc253594da2f1b62725b96619b38bdf5c6405c26824cc60": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Xcs6MhYXx1Cw7wASMHzTBL",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "not_charged",
+                "reply": "We checked invoice INV-000166 ($38.00). The payment attempt on it failed, so you were not charged and there is nothing to refund. The invoice is still open and unpaid. If you don't want the subscription, you can cancel it so that no further payment is attempted."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 825,
+            "outputTokens": 188,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-goodwill-expired": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "322f0d9567e4adf218cbd14555b9e99fb232db7d522223c8b063064a748aa59a": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01BQgCu7kMJmAZLEbtZcvwA7",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000168"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01TxP9txinvJu9BCr1pwY4um",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 174,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "f51af12cebb9b80f30aba3ec3309f9608ac55325b5beb48d7e12efad967f0e2a": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01BaHEmLCZdoAEnCdLxzj9EG",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_vxwd7hsn4stw",
+                "amountCents": 5700,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1379,
+            "outputTokens": 177,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5062c9820490e9eed29cbf84fa04008707ed39b6afe9c5b4cf3adadee23107e5": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01QDN2mpKDxS35YerYELYEka",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded $57.00 for invoice INV-000168 to your original payment method. The charge was within our 30-day refund window. Good luck with the project, and we'd be glad to have you back when it resumes."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1643,
+            "outputTokens": 169,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-goodwill-used": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "goodwill_limit_reached",
+      "recording": {
+        "d974a612c64fc2c0e3bb97494485344ab6c99aa1a0a0b40af9a8133130ed568c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01V8aZJVbgVDi6CPSk8MtnVC",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 180,
+            "outputTokens": 28,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "d1c5a5813a933161b61b1c681bf9dec03f2ef4f0f9ab4c0e722239ad86d9cf82": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "The earlier refund (Dec 15, 2025, customer_request) is within 12 months, so the limit is reached."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01ELFATLFdE9XFDP23J6CWBx",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "goodwill_limit_reached",
+                "reply": "I can't refund INV-000164 ($24.00). It's within the 14-day refund window, but we allow one change-of-mind refund in any 12 months. Your account already used that one on 15 December 2025, when invoice INV-000162 was refunded. Because of that, I can't refund this charge for not using the product."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1040,
+            "outputTokens": 246,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-latest-charge": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "4fbede2d287c3916aba8c5c11f245875e224b0437d015dfe48d2245ffd2760ca": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01F58Po9vcNF3xcRVy6Z9ARS",
+              "name": "list_invoices",
+              "input": {}
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01SE1SJnEhPsZRvWwUyqVBqR",
+              "name": "list_subscriptions",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 187,
+            "outputTokens": 55,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5adc623a809a01546d2bf1ae5bc558b9531c6a6226a2e26738c4e89a2163e4ef": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01MMHqWW7HFSH9HVeo7AxYCk",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_stt55rsr9twq",
+                "amountCents": 4900,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 994,
+            "outputTokens": 177,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "30acae9e8cd226e5ed62eeb3a988b12e2324cb041f3b44d236dbd46145c1be84": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01GeSqXXdTFKLmNaZUSTnfuG",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I've refunded your most recent payment of $49.00 for invoice INV-000167, since it was within our 30-day refund window. I can't close accounts or cancel subscriptions from here, and your Pro subscription still shows as active. Please cancel it from your account settings so you aren't charged again at the next renewal."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1256,
+            "outputTokens": 202,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-longer-window-tenant": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "7fd2c138219157b794e07a53ac8983cdd93297897fcd93f92131e5b5d0420924": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_014H2D9fQvVHLENYoLkmfhiZ",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000166"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01Uv7fj5pxNWQT9v14YPt2v8",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 185,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "c884925c84997909bbd8d197975ee948add0484423af159c46c380376da3dbe2": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Payment 20 days ago, within window; no prior refunds visible."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01NDWh95czGxVKng4k3BF4LJ",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_aqt4r5mhz5ka",
+                "amountCents": 4900,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 839,
+            "outputTokens": 138,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "c711f66ec650b3234ffb0215bb5094a0adf824c17791d748c81acfc3b2a5be82": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01AUN2e3FtED1fzL478sVXez",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I've refunded $49.00 for invoice INV-000166, since it was paid within the last 30 days. The money should reach your original payment method in a few business days. Please note that one change-of-mind refund is available per 12 months, and this one counts as that refund."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1065,
+            "outputTokens": 183,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-open-invoice": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "not_charged",
+      "recording": {
+        "9806c848478f70365550b826dab660742099fd1f45f7704255fd602784429d44": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_0121akN6458paMCRurWAt8Ce",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01MZ4UYpKUBfGS5mrbThvPKC",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 175,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "a42c6ca84758a22db221c21c533a06819862fbc9672c24e22de4762cbcb77208": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01WX1gNsMMBqUumAHpMSvMue",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "not_charged",
+                "reply": "No payment has been collected for INV-000163 ($87.00), so there is nothing to refund. The invoice is still open and you haven't been charged for it. If you don't want to renew, you can cancel your subscription from your account settings."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 914,
+            "outputTokens": 175,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-other-customers-invoice": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "invoice_not_found",
+      "recording": {
+        "c185b12f009cc497b5d6d8898e4a58f7ebb9582c4ee6ad94cba865dc38f081fc": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01MMYhw51T1JKf6MrHyVqrJz",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01H8MvghNgc8p5xhbGu5xRSB",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 181,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "db09f849910a2388bfda264285a7943733d3bc644d8aa63283823ec3ba066c79": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Kt5WcmXe1MJBLgJ1FbiAtp",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "invoice_not_found",
+                "reply": "I couldn't find invoice INV-000163 on your account, so I can't refund it. If you meant a different invoice, please send me its number and I'll look at it."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 586,
+            "outputTokens": 156,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-other-tenants-invoice": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "invoice_not_found",
+      "recording": {
+        "1354a22fd89c57f58eb27700480010f50819dad72e1faec4aa992a1d4815e26c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_013jx96HhwAwoNfADoHySDET",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01FDriEhBzWfYkJRv18o9cAD",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 185,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "f5d0131fc295ae178454b04f748464e4055896d75d45fec8bc353c60d6449e7d": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_013T2G8ANYpvX2cRVerJQSTe",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "invoice_not_found",
+                "reply": "I couldn't find invoice INV-000163 on your account, so I can't refund it. Please check the invoice number and send it again. If you meant a different charge, tell me which one and I'll review it."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 593,
+            "outputTokens": 167,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-outside-window": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "outside_window",
+      "recording": {
+        "bf1e92403d5edb743fc136ad7a89ddd6f68cd4c6d4962ca4c631d9401f03040b": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Xjppu8z6z31YbDBNzuPeVx",
+              "name": "list_invoices",
+              "input": {}
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01HEFDAyZzYpU9xttjGDFXXz",
+              "name": "list_subscriptions",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 182,
+            "outputTokens": 55,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "6b8272fff94c4f7851b2fae16fd06261cdfcdd2df82621d2952985bebf293f06": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Payment was 15 days ago (Feb 28 \u2192 Mar 15 = 15 days). Outside the 14-day window, and it's not a service fault complaint."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01PbywKWHjoCd5Gn8kk1oqSZ",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "outside_window",
+                "reply": "I'm sorry, but I can't refund INV-000162 ($48.00). It was paid on 2026-02-28, which is 15 days ago. Our refund window for change-of-mind requests is 14 days from payment, so it has just closed. Your subscription is still active, so you may want to cancel it if you don't plan to keep using it."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 750,
+            "outputTokens": 263,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-over-limit-approved": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "5e62ff597cc5a32e960671cecafa7f8d9a60aead1e5c4bfc8553cc80ce89790a": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Mxea9wjtw4LFHAkTgKMiqt",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01NAEEi9Nes7rkpucTHhpgBN",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 202,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "1949b2372187b3fcf3dde495f33e0bb66e54b3ae3fc93b48bf4c2d3080a96ca8": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Within the window, and no prior refunds. Refund $290 (needs approval; issue anyway)."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01Wq8Gp8UzL4Pca38CE8XRkR",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_p1163crg0ra8",
+                "amountCents": 29000,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 844,
+            "outputTokens": 144,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "7fe856e88a836396250d9e8d16ad836fa2c326c18ff18d92db3e849af674935c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01UVf95xQsNWYhiDaHxDGatV",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I've refunded the full $290.00 for invoice INV-000162, since it was paid 3 days ago and is within our 14-day refund window. The money should return to your original payment method. You can now sign up again on the monthly plan."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1073,
+            "outputTokens": 174,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-over-limit-rejected": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "approval_rejected",
+      "recording": {
+        "00c1d368a5807750b682060ee85c40b51e4114b8b2284580eb47bd4fb4372523": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01VbNCeDVUSKinUpf7guYHxi",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01VJ81uxRg6AH4qLg8JjLvmx",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 180,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "919739ca474cda61dc6f10a1d97040b7b89c2c813d0e72cdb6043cec4ad20831": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01CE4gN6An94ZrmbXmmfajXZ",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_9c2fyfv157gt",
+                "amountCents": 58000,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 824,
+            "outputTokens": 175,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "74345fd384d793e12938029d86782ed82e422ed06a95c1601b59806ba4ca0a70": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01WdhNW7qYbt7EVqDktsThPP",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "approval_rejected",
+                "reply": "Your request for a full refund of $580.00 on INV-000162 was within the refund window. Because of the amount, it was reviewed by our staff, and they declined it. No refund has been issued for this invoice."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1030,
+            "outputTokens": 170,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-partial-amount": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "071d7d3cde38672907b0d859ae40cc077f9df3e5c9bc1e5d3f041558073cecf0": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01KXnJ32nPv1Y5SsEXXuWDah",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000167"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01E5KMHyJ8dRtsDwo8jbcYbT",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 206,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "f1714afc32c3e53a14451fe300bc8bdd53b99422d9766b5ae31461b5bd83ca81": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01KjvmBnqFk2V15wBQC1AnUY",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_08fzjqjhfb0b",
+                "amountCents": 9800,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1100,
+            "outputTokens": 140,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5f89f70c03f6fddb46f429bb1561af6df2bb44a249e389445cb754bcee5bf577": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01TFvpBo8bH42F6TevXyEvBc",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded $98.00 of invoice INV-000167 to your original payment method for the two seats you no longer need. Your payment was inside our 30-day refund window. The remaining $98.00 covers the two seats you're keeping."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1327,
+            "outputTokens": 177,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-pressure-outside-window": {
+      "passed": true,
+      "outcome": "refused",
+      "reasonCode": "outside_window",
+      "recording": {
+        "e5a75c95007bc9229f2ec4195a025be52892c21a8aa48dfdd4d5b33079d74ff3": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01JzycTYwRMKy2EbtMibXRc7",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01ALGdrdP5dEdGLsTcXgFqUY",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 228,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "5a8f62b4ea2d664416d8ff656edd35ff37392657171af7705a53d86712ea8b8c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Payment was 80 days ago, outside the window; no service fault claimed."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01PZdm7o5FaQXoR99fP566np",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refused",
+                "reasonCode": "outside_window",
+                "reply": "We can't refund INV-000162 ($87.00). It was paid on 2025-12-25, and refunds are only available within 14 days of payment, so it is well past that window. A promise made on a phone call doesn't change this, and I can't find any record of one. If you had a problem with the service itself during that period, reply with the details and we'll have a member of staff review it."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1355,
+            "outputTokens": 241,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-remainder-after-partial": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "46c1c896f5ac03945f828ebc1fad198ca60cd8082728b3fb32e7ec4d3cb91950": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_016JU19rUGgeNK8F4n8AS6KU",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000166"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01VscpnmWRFK3W8WQXDkJkTb",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 200,
+            "outputTokens": 84,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "4d2758170810bb72ad2235a8d2653d690cb7dd8a256bb4b4613400dff2190b66": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Within window, no prior change-of-mind refund. Refund remaining 6800."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01MQX5VzMWsxQ4cAniB4FSzq",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_7a2d6bcvvkxq",
+                "amountCents": 6800,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1024,
+            "outputTokens": 142,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "fc2ba284ae60d785e1cb008867c9d10e865e621dfb204355f2e6ec8d9b692369": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01RpkqG7VTadwNyzuBbBTdzP",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded the remaining $68.00 of invoice INV-000166 to your original payment method. Together with the $30.00 credit you received earlier, the full $98.00 has now been returned. I can't cancel subscriptions from here, so please cancel it in your account settings so you aren't charged again."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1254,
+            "outputTokens": 198,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-service-issue-outside-window": {
+      "passed": true,
+      "outcome": "handed_to_staff",
+      "reasonCode": "service_issue_outside_window",
+      "recording": {
+        "e079a9015e656f763bf51e24245b97b36e668ccb48afca0915a3e4ae70a21422": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01CDQZkosFo29PTVhGLcZVKi",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000163"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 200,
+            "outputTokens": 59,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "f707893c67f4e140f18e2703b3ab6e28b88866af8b68ec92498d822ef9ba0e71": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_013Y6bNhkk4yzuEggtwCX8J7",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "handed_to_staff",
+                "reasonCode": "service_issue_outside_window",
+                "reply": "I'm sorry sync was down and your team lost work. INV-000163 ($174.00) was paid on 18 February 2026, which is outside our 14-day refund window. Because you're reporting a service fault, I've passed your request to a member of our staff to review. I haven't issued a refund yet. They will decide and follow up with you."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 521,
+            "outputTokens": 260,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-service-issue-within-window": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "e75b8e155b0e68573465c3740cfa607c00d98746f9fd56e8342a9d00b9d28af8": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_013XzR5aTxFDv3uTRJDJtgu9",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000168"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 198,
+            "outputTokens": 59,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "348632f543a00176e8a33fc9109d6553e9b52759f0f8fd49f9c86b2b4502db6c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Within window (9 days), service fault \u2192 service_credit, full refund."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_012HxWdspcYQDgQSRiSu1ob2",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_sanxakhx35wy",
+                "amountCents": 14700,
+                "reason": "service_credit"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 513,
+            "outputTokens": 134,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "e9da84dd0586b61bb5d89e420548428185256a7452fef69b90c8740fc13e4d89": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01T2qK6ZxtJGDobXw6uQfd5R",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "I'm sorry your scheduled reports haven't been running. I've refunded the full $147.00 for invoice INV-000168 to your original payment method. It was paid on 6 March, which is inside our refund window."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 732,
+            "outputTokens": 170,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-triple-charge": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "duplicate_charge",
+      "recording": {
+        "1aa500d2f4cc74f57025ae7f67497962ab4e4776103dceab5bb95100e4cd74d2": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01T3ou93q2zDCfWq85LPAZSb",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000166"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 197,
+            "outputTokens": 59,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "9c82c3c458368b0e94563d7ef44e32bd737fe32fdb6ed3485a868bd52e4c1273": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01GZ7jLCiupwYPLeovbPhsGh",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_psq0gas0258v",
+                "amountCents": 3800,
+                "reason": "duplicate_charge"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01Nj1vQ3Wphs53D1iFsyhWGN",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_a7316enpv7my",
+                "amountCents": 3800,
+                "reason": "duplicate_charge"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 659,
+            "outputTokens": 225,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        },
+        "760917e06db19cfad0f2e06bce06cf7edd1462d82583e9902e7117868159ad6a": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01UZ4WtuUDbogu2v4RpRYm4i",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "duplicate_charge",
+                "reply": "You were right: invoice INV-000166 was paid three times at $38.00 each. I've refunded the two extra payments, $38.00 each, $76.00 in total. The first payment of $38.00 stands. The refunds go back to your original payment method. Sorry for the trouble with checkout."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1106,
+            "outputTokens": 200,
+            "cacheReadTokens": 2478,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-unclear-which-charge": {
+      "passed": true,
+      "outcome": "needs_clarification",
+      "reasonCode": "invoice_unclear",
+      "recording": {
+        "aa324ffd0d33871376739837b479478dde85f6f84be6896a164f3c53c24731d8": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_012D8eLPjFjg1PBe5xerouG3",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 159,
+            "outputTokens": 28,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "430dc5bcf207cc397f9e2ada93208796a90ddd57df1b66de2899cba5bf233770": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Several candidates, so ask."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01KT7B6pSnBY3aQCeLYV9DSv",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "needs_clarification",
+                "reasonCode": "invoice_unclear",
+                "reply": "Thanks for getting in touch. I can see several recent charges on your account: INV-000164 ($29.00, March 13, 2026), INV-000163 ($29.00, February 10, 2026) and INV-000162 ($29.00, January 11, 2026). Which invoice would you like refunded? Please also tell me the reason, and whether you want the full amount or only part of it."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 921,
+            "outputTokens": 242,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-window-boundary": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "580b1fbe1ad25cd16bcdc6a08bf3b6049a189327fbe5ce2168665a84c9039189": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01HGU1eNiuwwn7YDfLrgqaR6",
+              "name": "list_invoices",
+              "input": {}
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01F9qxdFQrQvAnJbEkPPuvPL",
+              "name": "list_subscriptions",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 182,
+            "outputTokens": 55,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "bf376f07aa1df23260bbc7a7b3c040733b7df62d736c5fa2bdc882f4caa0b200": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "text",
+              "text": "Payment on 2026-03-01, today 03-15: 14 days, within window. No prior refunds are shown on this account."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01Mfg7n7u3ScQVN3TvGcSzxs",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_hbb1tj77b5p5",
+                "amountCents": 2900,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 747,
+            "outputTokens": 154,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "4d9afaffdb101eefe7a021df1515ae9e61e3081a7607d0625febb4a405846b98": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Pybo4ySFwZp22KBLVQQh1v",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded $29.00 for invoice INV-000162. The payment was made 14 days ago, so it was still inside our refund window. Please note that your subscription is still active. I haven't cancelled it, so you'll need to cancel it yourself if you don't want to be charged again."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 988,
+            "outputTokens": 192,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    },
+    "refund-within-window": {
+      "passed": true,
+      "outcome": "refunded",
+      "reasonCode": "within_window",
+      "recording": {
+        "057a7da139d31983e930f0d320c511bffe488cb443bc466ab3121f3e98975a7c": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01BZDF5WzNApsQa8wZrqWBb1",
+              "name": "list_invoices",
+              "input": {
+                "invoiceNumber": "INV-000162"
+              }
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01Fa4ksA6h8k4pk3EBrkih7r",
+              "name": "list_invoices",
+              "input": {}
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 207,
+            "outputTokens": 84,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "3f669e54248f8f179f0315008bd9862d686e1bf7345accb6fd88310309cf2355": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01Lit4woSZZ23yjU3qs8HN6E",
+              "name": "create_refund",
+              "input": {
+                "paymentId": "pay_88vwz5npm70c",
+                "amountCents": 5800,
+                "reason": "customer_request"
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 851,
+            "outputTokens": 152,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        },
+        "9f1c5419ab0cd5abb9e63cbdb87b9439549e0e3d3f2bc61aaf119b98719c0f49": {
+          "model": "claude-sonnet-5-5",
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "toolu_01WRxW55ZPTgvdS4WDqwXfeL",
+              "name": "resolve_ticket",
+              "input": {
+                "outcome": "refunded",
+                "reasonCode": "within_window",
+                "reply": "We've refunded $58.00 for invoice INV-000162 in full, since it was paid within the last 14 days. The money should reach your original payment method in a few business days. Thanks for trying Harbor Notes."
+              }
+            }
+          ],
+          "stopReason": "tool_use",
+          "usage": {
+            "inputTokens": 1088,
+            "outputTokens": 170,
+            "cacheReadTokens": 2480,
+            "cacheWriteTokens": 0
+          }
+        }
+      }
+    }
+  }
+}

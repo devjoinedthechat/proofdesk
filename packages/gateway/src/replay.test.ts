@@ -40,6 +40,34 @@ describe("record and replay", () => {
     await expect(replay.complete(request("new"), context)).rejects.toThrow(/No recorded response/);
   });
 
+  it("ignores provider-specific blocks, in the key and in what it stores", async () => {
+    const thinking = {
+      type: "opaque" as const,
+      provider: "p",
+      data: { signature: "changes-every-run" },
+    };
+    const live: ModelRequest = {
+      ...request("a"),
+      messages: [{ role: "assistant", content: [thinking, { type: "text", text: "hi" }] }],
+    };
+    const replayed: ModelRequest = {
+      ...request("a"),
+      messages: [{ role: "assistant", content: [{ type: "text", text: "hi" }] }],
+    };
+    expect(requestKey(live)).toBe(requestKey(replayed));
+
+    const recording: Recording = {};
+    const answer = textResponse("stored");
+    const recorder = createRecordingProvider(
+      new MockProvider([{ ...answer, content: [thinking, ...answer.content] }]),
+      recording,
+    );
+    const passedThrough = await recorder.complete(live, context);
+
+    expect(passedThrough.content).toHaveLength(2);
+    expect(Object.values(recording)[0]?.content).toEqual([{ type: "text", text: "stored" }]);
+  });
+
   it("keys a request by its content, not by the order of its properties", () => {
     const a: ModelRequest = { model: "m", maxTokens: 100, system: "s", messages: [] };
     const b: ModelRequest = { messages: [], system: "s", maxTokens: 100, model: "m" };

@@ -20,6 +20,7 @@
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "@proofdesk/simulator": "workspace:*",
+    "@testcontainers/postgresql": "12.2.1",
     "zod": "4.6.7"
   }
 }

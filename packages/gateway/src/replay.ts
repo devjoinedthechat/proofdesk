@@ -5,8 +5,13 @@ import type { CallContext, ModelProvider, ModelRequest, ModelResponse } from "./
 /** Recorded model responses, keyed by a hash of the request that produced them. */
 export type Recording = Record<string, ModelResponse>;
 
+const isOpaque = (value: unknown) =>
+  typeof value === "object" && value !== null && (value as { type?: unknown }).type === "opaque";
+
 function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
+  // Opaque blocks, such as thinking blocks, differ on every live run and mean
+  // nothing to anyone but their provider. They are left out of the key.
+  if (Array.isArray(value)) return value.filter((item) => !isOpaque(item)).map(canonical);
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
@@ -30,7 +35,10 @@ export function createRecordingProvider(inner: ModelProvider, recording: Recordi
     name: inner.name,
     async complete(request: ModelRequest, context: CallContext) {
       const response = await inner.complete(request, context);
-      recording[requestKey(request)] = response;
+      recording[requestKey(request)] = {
+        ...response,
+        content: response.content.filter((block) => block.type !== "opaque"),
+      };
       return response;
     },
   };
