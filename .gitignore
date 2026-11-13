@@ -1,0 +1,11 @@
+# private planning documents
+.build-plan.md
+.failure-log.md
+
+node_modules/
+coverage/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store

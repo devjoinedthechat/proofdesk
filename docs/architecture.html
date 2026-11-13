@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent stack diagram</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --panel: #171a21;
+    --inner: #1e222b;
+    --line: #2f3542;
+    --text: #e6e8ec;
+    --muted: #9aa3b2;
+    --flow: #aab3c2;
+    --accent: #7aa7ff;
+  }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font-family: -apple-system, "Segoe UI", Inter, sans-serif; padding: 24px 16px 40px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 auto 4px; max-width: 1400px; }
+  p { color: var(--muted); font-size: 14px; margin: 0 auto 20px; max-width: 1400px; }
+  .scroll { overflow-x: auto; max-width: 1400px; margin: 0 auto; }
+  svg { display: block; width: 100%; min-width: 1050px; height: auto; }
+  .box { fill: var(--panel); stroke: var(--line); }
+  .inner { fill: var(--inner); stroke: var(--line); }
+  .group { fill: none; stroke: var(--accent); stroke-opacity: .55; }
+  .t { fill: var(--text); font-size: 14px; font-weight: 600; }
+  .s { fill: var(--muted); font-size: 12px; }
+  .l { fill: var(--muted); font-size: 11.5px; }
+  .g { fill: var(--accent); font-size: 12px; font-weight: 600; }
+  .a { stroke: var(--flow); stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+  .b { stroke: var(--flow); stroke-width: 1.4; fill: none; marker-start: url(#arrow); marker-end: url(#arrow); }
+  .d { stroke: var(--flow); stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrow); }
+  .gr { fill: #f2b84b; }
+  .k { fill: var(--text); font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Production agent reference stack</h1>
+<p>One ticket's path from a signed-in customer to a write in the systems of record, and the loop that feeds failures back into the next release.</p>
+<div class="scroll">
+<svg viewBox="0 0 1400 1220" role="img" aria-label="Architecture diagram of the agent stack">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#aab3c2"/>
+    </marker>
+  </defs>
+
+  <!-- people -->
+  <rect class="box" x="30" y="88" width="160" height="64" rx="8"/>
+  <text class="t" x="110" y="116" text-anchor="middle">Customer</text>
+  <text class="s" x="110" y="134" text-anchor="middle">signed in</text>
+
+  <rect class="box" x="30" y="305" width="160" height="64" rx="8"/>
+  <text class="t" x="110" y="333" text-anchor="middle">Staff</text>
+  <text class="s" x="110" y="351" text-anchor="middle">approver, reviewer</text>
+
+  <!-- edge -->
+  <rect class="box" x="240" y="70" width="190" height="100" rx="8"/>
+  <text class="t" x="335" y="106" text-anchor="middle">Customer portal</text>
+  <text class="s" x="335" y="126" text-anchor="middle">sign-in, ticket in, reply out</text>
+  <text class="s" x="335" y="144" text-anchor="middle">rate limit per tenant</text>
+
+  <rect class="box" x="240" y="290" width="190" height="95" rx="8"/>
+  <text class="t" x="335" y="323" text-anchor="middle">Staff console</text>
+  <text class="s" x="335" y="343" text-anchor="middle">approve, take over, stop</text>
+  <text class="s" x="335" y="361" text-anchor="middle">review failures</text>
+
+  <rect class="box" x="240" y="405" width="190" height="80" rx="8"/>
+  <text class="t" x="335" y="434" text-anchor="middle">Identity provider</text>
+  <text class="k" x="335" y="453" text-anchor="middle">Keycloak</text>
+  <text class="s" x="335" y="471" text-anchor="middle">issues and exchanges tokens</text>
+
+  <path class="b" d="M190,120 H240"/>
+  <path class="b" d="M190,337 H240"/>
+
+  <!-- worker -->
+  <rect class="group" x="490" y="50" width="360" height="612" rx="10"/>
+  <text class="g" x="508" y="76">Durable workflow · Temporal · one per ticket</text>
+
+  <rect class="inner" x="510" y="92" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="116" text-anchor="middle">1 · Triage and identity check</text>
+  <text class="s" x="670" y="134" text-anchor="middle">screens input; ticket and documents stay untrusted</text>
+
+  <rect class="inner" x="510" y="168" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="192" text-anchor="middle">2 · Context assembly</text>
+  <text class="s" x="670" y="210" text-anchor="middle">ticket, documents, memory; cached and trimmed</text>
+
+  <rect class="inner" x="510" y="244" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="268" text-anchor="middle">3 · Agent loop</text>
+  <text class="s" x="670" y="286" text-anchor="middle">turn, time and spend limits; repeats 2 to 5</text>
+
+  <rect class="inner" x="510" y="320" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="344" text-anchor="middle">4 · Policy check · Cedar</text>
+  <text class="s" x="670" y="362" text-anchor="middle">allow, deny, needs approval or hand to staff</text>
+
+  <rect class="inner" x="510" y="396" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="420" text-anchor="middle">5 · Tool call</text>
+  <text class="s" x="670" y="438" text-anchor="middle">schema-checked, scoped token, idempotency key</text>
+
+  <rect class="inner" x="510" y="472" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="496" text-anchor="middle">6 · Reply check, then reply</text>
+  <text class="s" x="670" y="514" text-anchor="middle">blocks data that is not the requester's</text>
+
+  <rect class="inner" x="510" y="548" width="320" height="58" rx="8"/>
+  <text class="t" x="670" y="572" text-anchor="middle">7 · Memory write</text>
+  <text class="s" x="670" y="590" text-anchor="middle">sourced facts only, merged, with expiry</text>
+
+  <text class="l" x="670" y="622" text-anchor="middle">Model and tool calls run as activities.</text>
+  <text class="l" x="670" y="637" text-anchor="middle">A plan change is a saga: the billing write is undone</text>
+  <text class="l" x="670" y="652" text-anchor="middle">if the entitlements write fails.</text>
+
+  <path class="a" d="M670,150 V168"/>
+  <path class="a" d="M670,226 V244"/>
+  <path class="a" d="M670,302 V320"/>
+  <path class="a" d="M670,378 V396"/>
+  <path class="a" d="M670,454 V472"/>
+  <path class="a" d="M670,530 V548"/>
+
+  <path class="b" d="M430,120 H510"/>
+  <text class="l" x="470" y="112" text-anchor="middle">ticket, reply</text>
+  <path class="b" d="M430,349 H510"/>
+  <text class="l" x="470" y="341" text-anchor="middle">approval</text>
+  <path class="b" d="M430,425 H510"/>
+  <text class="l" x="470" y="417" text-anchor="middle">token</text>
+
+  <!-- gateway and providers -->
+  <rect class="box" x="910" y="233" width="200" height="80" rx="8"/>
+  <text class="t" x="1010" y="268" text-anchor="middle">Model gateway</text>
+  <text class="s" x="1010" y="286" text-anchor="middle">budgets, retries, failover</text>
+  <path class="a" d="M830,273 H910"/>
+
+  <rect class="box" x="1170" y="216" width="200" height="46" rx="8"/>
+  <text class="t" x="1270" y="236" text-anchor="middle">Primary model</text>
+  <text class="k" x="1270" y="253" text-anchor="middle">Anthropic</text>
+  <rect class="box" x="1170" y="284" width="200" height="46" rx="8"/>
+  <text class="t" x="1270" y="304" text-anchor="middle">Failover model</text>
+  <text class="s" x="1270" y="321" text-anchor="middle">second provider</text>
+  <path class="a" d="M1110,261 L1170,241"/>
+  <path class="a" d="M1110,285 L1170,305"/>
+
+  <!-- observability -->
+  <rect class="box" x="1170" y="380" width="200" height="120" rx="8"/>
+  <text class="t" x="1270" y="406" text-anchor="middle">Telemetry</text>
+  <text class="k" x="1270" y="425" text-anchor="middle">OpenTelemetry</text>
+  <text class="s" x="1270" y="445" text-anchor="middle">personal data redacted at export</text>
+  <text class="s" x="1270" y="465" text-anchor="middle">Grafana: metrics, cost, alerts</text>
+  <text class="s" x="1270" y="483" text-anchor="middle">Langfuse: prompt-level traces</text>
+  <path class="d" d="M850,440 H1170"/>
+  <text class="l" x="1010" y="432" text-anchor="middle">traces, metrics, logs</text>
+
+  <!-- MCP servers -->
+  <rect class="box" x="490" y="730" width="110" height="70" rx="8"/>
+  <text class="t" x="545" y="761" text-anchor="middle">Billing</text>
+  <text class="s" x="545" y="779" text-anchor="middle">MCP server</text>
+
+  <rect class="box" x="615" y="730" width="110" height="70" rx="8"/>
+  <text class="t" x="670" y="761" text-anchor="middle">Entitlements</text>
+  <text class="s" x="670" y="779" text-anchor="middle">MCP server</text>
+
+  <rect class="box" x="740" y="730" width="110" height="70" rx="8"/>
+  <text class="t" x="795" y="761" text-anchor="middle">Documents</text>
+  <text class="s" x="795" y="779" text-anchor="middle">MCP server</text>
+
+  <path class="a" d="M545,662 V730"/>
+  <path class="a" d="M670,662 V730"/>
+  <path class="a" d="M795,662 V730"/>
+  <text class="l" x="862" y="702">scoped token on every call</text>
+
+  <!-- simulator -->
+  <rect class="box" x="190" y="870" width="240" height="110" rx="8"/>
+  <text class="t" x="310" y="906" text-anchor="middle">Simulated company</text>
+  <text class="s" x="310" y="926" text-anchor="middle">seeded customers, invoices, tickets</text>
+  <text class="s" x="310" y="944" text-anchor="middle">scenarios with known outcomes</text>
+  <path class="a" d="M430,905 H490"/>
+  <text class="l" x="460" y="897" text-anchor="middle">seeds</text>
+
+  <!-- systems of record -->
+  <rect class="box" x="490" y="870" width="110" height="70" rx="8"/>
+  <text class="t" x="545" y="901" text-anchor="middle">Billing</text>
+  <text class="s" x="545" y="919" text-anchor="middle">service</text>
+
+  <rect class="box" x="615" y="870" width="110" height="70" rx="8"/>
+  <text class="t" x="670" y="901" text-anchor="middle">Entitlements</text>
+  <text class="s" x="670" y="919" text-anchor="middle">service</text>
+  <text class="l" x="607" y="962" text-anchor="middle">separate systems of record</text>
+
+  <path class="a" d="M545,800 V870"/>
+  <path class="a" d="M670,800 V870"/>
+  <path class="a" d="M795,800 V870"/>
+
+  <!-- postgres -->
+  <rect class="box" x="740" y="870" width="370" height="110" rx="8"/>
+  <text class="t" x="756" y="896">Data store · Postgres with pgvector</text>
+  <text class="s" x="756" y="914">row-level security by tenant and user</text>
+
+  <rect class="inner" x="756" y="930" width="140" height="36" rx="6"/>
+  <text class="s" x="826" y="952" text-anchor="middle">documents and vectors</text>
+  <rect class="inner" x="906" y="930" width="80" height="36" rx="6"/>
+  <text class="s" x="946" y="952" text-anchor="middle">memory</text>
+  <rect class="inner" x="996" y="930" width="98" height="36" rx="6"/>
+  <text class="s" x="1045" y="952" text-anchor="middle">audit log</text>
+
+  <path class="a" d="M850,577 H1040 V870"/>
+  <text class="l" x="1050" y="640">restricted role:</text>
+  <text class="l" x="1050" y="656">tenant-scoped memory,</text>
+  <text class="l" x="1050" y="672">insert-only audit log</text>
+
+  <!-- ingestion -->
+  <rect class="box" x="1170" y="760" width="200" height="56" rx="8"/>
+  <text class="t" x="1270" y="793" text-anchor="middle">Company documents</text>
+
+  <rect class="box" x="1170" y="870" width="200" height="110" rx="8"/>
+  <text class="t" x="1270" y="906" text-anchor="middle">Ingestion pipeline</text>
+  <text class="s" x="1270" y="926" text-anchor="middle">chunk, embed, tag access,</text>
+  <text class="s" x="1270" y="944" text-anchor="middle">scan, re-index, delete</text>
+
+  <path class="a" d="M1270,816 V870"/>
+  <path class="a" d="M1170,925 H1110"/>
+
+  <!-- guardrail markers -->
+  <rect class="gr" x="510" y="102" width="4" height="38" rx="2"/>
+  <rect class="gr" x="510" y="254" width="4" height="38" rx="2"/>
+  <rect class="gr" x="510" y="330" width="4" height="38" rx="2"/>
+  <rect class="gr" x="510" y="406" width="4" height="38" rx="2"/>
+  <rect class="gr" x="510" y="482" width="4" height="38" rx="2"/>
+  <rect class="gr" x="510" y="558" width="4" height="38" rx="2"/>
+  <rect class="gr" x="240" y="86" width="4" height="68" rx="2"/>
+  <rect class="gr" x="910" y="247" width="4" height="52" rx="2"/>
+  <rect class="gr" x="490" y="744" width="4" height="42" rx="2"/>
+  <rect class="gr" x="615" y="744" width="4" height="42" rx="2"/>
+  <rect class="gr" x="740" y="744" width="4" height="42" rx="2"/>
+  <rect class="gr" x="740" y="884" width="4" height="82" rx="2"/>
+
+  <!-- legend -->
+  <path class="a" d="M200,700 H250"/>
+  <text class="l" x="260" y="704">request and data path</text>
+  <path class="d" d="M200,728 H250"/>
+  <text class="l" x="260" y="732">telemetry, exported by every service</text>
+  <rect class="gr" x="223" y="746" width="4" height="20" rx="2"/>
+  <text class="l" x="260" y="760">guardrail: can stop or change the run</text>
+
+  <!-- feedback loop -->
+  <text class="g" x="910" y="1018">Feedback loop</text>
+
+  <rect class="box" x="1170" y="1030" width="200" height="70" rx="8"/>
+  <text class="t" x="1270" y="1061" text-anchor="middle">Online scoring</text>
+  <text class="s" x="1270" y="1079" text-anchor="middle">sampled live runs</text>
+
+  <rect class="box" x="910" y="1030" width="200" height="70" rx="8"/>
+  <text class="t" x="1010" y="1061" text-anchor="middle">Review queue</text>
+  <text class="s" x="1010" y="1079" text-anchor="middle">staff label the failures</text>
+
+  <rect class="box" x="600" y="1030" width="250" height="70" rx="8"/>
+  <text class="t" x="725" y="1061" text-anchor="middle">Eval suite</text>
+  <text class="s" x="725" y="1079" text-anchor="middle">scenarios, fault tests, adversarial cases</text>
+
+  <rect class="box" x="320" y="1030" width="220" height="70" rx="8"/>
+  <text class="t" x="430" y="1061" text-anchor="middle">Quality gate</text>
+  <text class="s" x="430" y="1079" text-anchor="middle">GitHub Actions, blocks the merge</text>
+
+  <rect class="box" x="30" y="1030" width="230" height="70" rx="8"/>
+  <text class="t" x="145" y="1055" text-anchor="middle">Release controls</text>
+  <text class="s" x="145" y="1073" text-anchor="middle">pinned prompt, policy and model</text>
+  <text class="s" x="145" y="1089" text-anchor="middle">canary split, kill switch</text>
+
+  <path class="a" d="M310,980 V1005 H725 V1030"/>
+  <text class="l" x="520" y="997" text-anchor="middle">expected outcomes</text>
+
+  <path class="d" d="M1370,440 H1388 V1065 H1370"/>
+  <path class="a" d="M1170,1065 H1110"/>
+  <path class="a" d="M910,1065 H850"/>
+  <text class="l" x="880" y="1055" text-anchor="middle">new cases</text>
+  <path class="a" d="M600,1065 H540"/>
+  <path class="a" d="M320,1065 H260"/>
+  <path class="a" d="M145,1030 V620 H490"/>
+  <text class="l" x="318" y="612" text-anchor="middle">new worker build</text>
+
+  <!-- hosting -->
+  <rect class="box" x="30" y="1135" width="1340" height="56" rx="8"/>
+  <text class="t" x="50" y="1168">Runs on</text>
+  <text class="s" x="1350" y="1168" text-anchor="end">Docker Compose locally · one machine deployed, GKE Autopilot optional · self-hosted Temporal · Secret Manager · OpenTofu</text>
+</svg>
+</div>
+</body>
+</html>
