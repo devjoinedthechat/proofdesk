@@ -3,9 +3,12 @@ import { Context } from "@temporalio/activity";
 import { type NativeConnection, Worker } from "@temporalio/worker";
 import type { Activities } from "./activities.ts";
 import type { DeletionActivities } from "./deletion.ts";
+import type { WatchdogActivities } from "./watchdog.ts";
 
 /** Everything a worker can run. Deletion is optional: not every worker is given the means. */
-export type WorkerActivities = Activities & Partial<DeletionActivities>;
+export type WorkerActivities = Activities &
+  Partial<DeletionActivities> &
+  Partial<WatchdogActivities>;
 
 export const TASK_QUEUE = "tickets";
 

@@ -62,6 +62,8 @@ export type ToolRequest = {
   tool: string;
   ticket: TicketFacts;
   agentPaused: boolean;
+  /** True when this one tool is switched off for the tenant. */
+  toolPaused?: boolean;
   /** For create_refund. */
   refund?: {
     amountCents: number;
@@ -89,6 +91,7 @@ const CHANGE_PLAN = "change_plan";
 /** What the model is told when a policy forbids its call, so it can explain the refusal. */
 const FORBIDDEN_BECAUSE: Record<string, string> = {
   "agent-paused": "The agent is paused for this company.",
+  "tool-paused": "This action is switched off for this company for now; staff must handle it.",
   "refund-unknown-payment": "That payment is not on this customer's account.",
   "refund-disputed": "A payment on this invoice is under a bank dispute; staff must handle it.",
   "refund-outside-window": "The payment is older than the refund window.",
@@ -113,7 +116,10 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
   if (problems.length > 0) throw new Error(`Invalid policies:\n${problems.join("\n")}`);
 
   function evaluate(request: ToolRequest, approved: boolean) {
-    const context: Record<string, cedar.CedarValueJson> = { agentPaused: request.agentPaused };
+    const context: Record<string, cedar.CedarValueJson> = {
+      agentPaused: request.agentPaused,
+      toolPaused: request.toolPaused ?? false,
+    };
     if (request.tool === REFUND && request.refund) {
       const { facts, ...refund } = request.refund;
       Object.assign(context, {
@@ -212,6 +218,8 @@ export type PolicyInputs = {
   /** The customer's invoices, fetched from billing by the caller, not supplied by the model. */
   invoices: () => Promise<InvoiceRecords>;
   agentPaused?: () => boolean;
+  /** The tools switched off for this tenant, read from the kill switch. */
+  pausedTools?: () => readonly string[];
   /** What the agent has refunded for this tenant in the last 24 hours, from the system's record. */
   tenantRefundedToday?: () => Promise<number>;
 };
@@ -227,6 +235,7 @@ export async function refundRequest(
     tool: REFUND,
     ticket: inputs.ticket,
     agentPaused: inputs.agentPaused?.() ?? false,
+    toolPaused: inputs.pausedTools?.().includes(REFUND) ?? false,
     refund: {
       amountCents: input.amountCents as number,
       reason: input.reason as string,
@@ -250,6 +259,7 @@ export function policyAuthorizer(policy: ToolPolicy, inputs: PolicyInputs): Auth
       tool: call.tool,
       ticket: inputs.ticket,
       agentPaused: inputs.agentPaused?.() ?? false,
+      toolPaused: inputs.pausedTools?.().includes(call.tool) ?? false,
     };
     const request: ToolRequest =
       call.tool === REFUND

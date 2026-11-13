@@ -203,6 +203,9 @@ importers:
       '@proofdesk/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
+      '@proofdesk/service':
+        specifier: workspace:*
+        version: link:../../packages/service
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -402,6 +405,9 @@ importers:
       '@proofdesk/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@proofdesk/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service

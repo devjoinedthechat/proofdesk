@@ -19,6 +19,14 @@ export {
 } from "./deletion.ts";
 export { createDbLedger } from "./ledger.ts";
 export { TEST_TEMPORAL_ADDRESS_ENV, testTemporalAddress } from "./testing.ts";
+export {
+  assess,
+  createWatchdogActivities,
+  DEFAULT_THRESHOLDS,
+  type HealthRow,
+  type Thresholds,
+  type WatchdogAction,
+} from "./watchdog.ts";
 export { createTicketWorker, TASK_QUEUE, workflowIdFor } from "./worker.ts";
 export {
   approvalDecided,
@@ -26,4 +34,5 @@ export {
   progress,
   type TicketProgress,
   ticketWorkflow,
+  watchdogWorkflow,
 } from "./workflows.ts";

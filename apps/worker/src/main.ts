@@ -21,10 +21,12 @@ import {
 } from "@proofdesk/identity";
 import { createToolPolicy, invoiceRecords } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
+import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
 import { createDeletionActivities, mcpErasers } from "./deletion.ts";
 import { createDbLedger } from "./ledger.ts";
+import { createWatchdogActivities } from "./watchdog.ts";
 import { createTicketWorker } from "./worker.ts";
 
 /**
@@ -189,8 +191,33 @@ async function start() {
     connection: await NativeConnection.connect({ address: env("TEMPORAL_ADDRESS") }),
     namespace: env("TEMPORAL_NAMESPACE"),
     taskQueue: env("TEMPORAL_TASK_QUEUE"),
-    activities: { ...activities, ...deletion },
+    activities: {
+      ...activities,
+      ...deletion,
+      ...createWatchdogActivities({
+        db,
+        clock: () => new Date(),
+        // Until an alerting channel is connected, an alert is a log line, a
+        // row in the alerts table and an audit entry.
+        notify: async (alert) => console.warn("ALERT", JSON.stringify(alert)),
+      }),
+    },
   });
+  // One watchdog for the whole system. Every worker tries to start it, and
+  // the engine keeps the first.
+  const client = new Client({
+    connection: await Connection.connect({ address: env("TEMPORAL_ADDRESS") }),
+    namespace: env("TEMPORAL_NAMESPACE"),
+  });
+  await client.workflow
+    .start("watchdogWorkflow", {
+      args: [{}],
+      taskQueue: env("TEMPORAL_TASK_QUEUE"),
+      workflowId: "watchdog",
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
+    });
   console.log("worker started");
   await worker.run();
 }

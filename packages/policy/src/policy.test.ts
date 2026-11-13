@@ -35,14 +35,16 @@ const facts = (overrides: Partial<RefundFacts> = {}): RefundFacts => ({
 type RefundOverrides = Partial<NonNullable<ToolRequest["refund"]>> & {
   ticket?: ToolRequest["ticket"];
   agentPaused?: boolean;
+  toolPaused?: boolean;
 };
 
 function refund(overrides: RefundOverrides = {}): ToolRequest {
-  const { ticket: ticketOverride, agentPaused, ...rest } = overrides;
+  const { ticket: ticketOverride, agentPaused, toolPaused, ...rest } = overrides;
   return {
     tool: "create_refund",
     ticket: ticketOverride ?? ticket,
     agentPaused: agentPaused ?? false,
+    toolPaused: toolPaused ?? false,
     refund: {
       amountCents: 50_00,
       reason: "customer_request",
@@ -216,6 +218,35 @@ describe("rules enforced on the billing records", () => {
 });
 
 describe("the kill switch", () => {
+  it("denies one paused tool, leaves the others alone, and approval does not help", () => {
+    expect(decide({ toolPaused: true })).toMatchObject({
+      decision: "deny",
+      policies: ["tool-paused"],
+    });
+    expect(decide({ toolPaused: true, approved: true })).toMatchObject({ decision: "deny" });
+    expect(
+      policy.decide({ tool: "list_invoices", ticket, agentPaused: false, toolPaused: false }),
+    ).toMatchObject({ decision: "allow" });
+  });
+
+  it("asks the kill switch about the tool being called, not about any other", async () => {
+    const authorize = policyAuthorizer(policy, {
+      ticket,
+      now: () => NOW,
+      invoices: async () => [],
+      pausedTools: () => ["create_refund"],
+    });
+    expect(await authorize({ tool: "list_invoices", input: {} }, [])).toEqual({
+      decision: "allow",
+    });
+    expect(
+      await authorize(
+        { tool: "create_refund", input: { paymentId: "p", amountCents: 100, reason: "x" } },
+        [],
+      ),
+    ).toMatchObject({ decision: "deny" });
+  });
+
   it("denies everything while the agent is paused, and approval does not help", () => {
     expect(policy.decide({ tool: "list_invoices", ticket, agentPaused: true })).toMatchObject({
       decision: "deny",

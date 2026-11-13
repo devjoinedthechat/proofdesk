@@ -17,6 +17,8 @@ entity Ticket = {
 type Common = {
   // Set by staff to stop the agent from acting, per tenant.
   agentPaused: Bool,
+  // Set by staff, or by the watchdog, to stop this one tool, per tenant.
+  toolPaused: Bool,
 };
 
 action list_invoices, list_subscriptions, search_help_center, get_entitlement appliesTo {
@@ -32,6 +34,7 @@ action create_refund appliesTo {
   resource: Ticket,
   context: {
     agentPaused: Bool,
+    toolPaused: Bool,
     amountCents: Long,
     reason: String,
     // Refunds this ticket has already paid out.
@@ -60,6 +63,7 @@ action change_plan appliesTo {
   resource: Ticket,
   context: {
     agentPaused: Bool,
+    toolPaused: Bool,
     // The number of seats after the change.
     seats: Long,
   },

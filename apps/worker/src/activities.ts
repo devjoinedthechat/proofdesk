@@ -78,7 +78,10 @@ export type ActivityDeps = {
    * result is recorded for staff and metrics; it never decides anything.
    */
   screen?: (ref: TicketRef, ticket: { subject: string; body: string }) => Promise<Screening | null>;
-  /** The kill switch, read at the moment of each tool call. */
+  /**
+   * Replaces the kill switch's storage. By default the switch is read from
+   * the database before every model turn and every tool call.
+   */
   agentPaused?: (tenantId: string) => boolean | Promise<boolean>;
   clock: () => Date;
 };
@@ -203,6 +206,20 @@ export function createActivities(deps: ActivityDeps) {
     );
   }
 
+  /** The kill switch for the ticket's tenant, as it stands right now. */
+  async function controls(ref: TicketRef): Promise<{ agent: boolean; tools: string[] }> {
+    if (deps.agentPaused) return { agent: await deps.agentPaused(ref.tenantId), tools: [] };
+    const rows = await withRowScope(deps.db, scope(ref), (trx) =>
+      trx.selectFrom("agentControls").select("scope").where("paused", "=", true).execute(),
+    );
+    return {
+      agent: rows.some((row) => row.scope === "agent"),
+      tools: rows
+        .filter((row) => row.scope.startsWith("tool:"))
+        .map((row) => row.scope.slice("tool:".length)),
+    };
+  }
+
   async function tenantFacts(ref: TicketRef) {
     return withRowScope(deps.db, scope(ref), async (trx) => {
       const ticket = await trx
@@ -239,7 +256,11 @@ export function createActivities(deps: ActivityDeps) {
         trx
           .insertInto("agentRuns")
           .values({
-            ...ref,
+            // Named one by one: a reference that arrives with extra fields must
+            // not turn them into columns.
+            ticketId: ref.ticketId,
+            tenantId: ref.tenantId,
+            customerId: ref.customerId,
             step: 0,
             state: JSON.stringify(state),
             tools: JSON.stringify(tools),
@@ -270,7 +291,16 @@ export function createActivities(deps: ActivityDeps) {
     async modelTurn(input: { ref: TicketRef; step: number }): Promise<TurnOutput> {
       const { ref } = input;
       const { tenant } = await tenantFacts(ref);
+      const paused = await controls(ref);
       return advance(ref, input.step, async (state, tools) => {
+        // A paused agent does not think either: no model call is made, and
+        // the ticket goes to staff as it stands.
+        if (paused.agent && !state.stopped) {
+          state.stopped = "paused";
+          state.pending = [];
+          await audit(ref, "run_stopped", { cause: "paused", turns: state.turns });
+          return { pending: 0, stopped: true };
+        }
         const { model } = deps.versions;
         const answeredBy = await modelStep(state, {
           model,
@@ -321,7 +351,7 @@ export function createActivities(deps: ActivityDeps) {
     }): Promise<CallOutput> {
       const { ref, step, approval } = input;
       const { ticket, tenant } = await tenantFacts(ref);
-      const agentPaused = (await deps.agentPaused?.(ref.tenantId)) ?? false;
+      const paused = await controls(ref);
       const inputs: PolicyInputs = {
         ticket: {
           id: ticket.id,
@@ -334,7 +364,8 @@ export function createActivities(deps: ActivityDeps) {
           tenantRefundedSince(ref, new Date(deps.clock().getTime() - DAY_MS)),
         now: deps.clock,
         invoices: () => deps.invoices(ref),
-        agentPaused: () => agentPaused,
+        agentPaused: () => paused.agent,
+        pausedTools: () => paused.tools,
       };
       const approvalId = `${ref.ticketId}:${step}`;
 
@@ -361,7 +392,9 @@ export function createActivities(deps: ActivityDeps) {
                 .insertInto("approvals")
                 .values({
                   id: approvalId,
-                  ...ref,
+                  ticketId: ref.ticketId,
+                  tenantId: ref.tenantId,
+                  customerId: ref.customerId,
                   step,
                   tool: next.kind === "tool" ? next.tool : "",
                   summary: JSON.stringify(summary),

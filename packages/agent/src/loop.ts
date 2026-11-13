@@ -27,7 +27,9 @@ export type StopCause =
   | "max_tokens"
   | "no_resolution"
   /** Set from outside the loop, when the model could not be reached at all. */
-  | "model_unavailable";
+  | "model_unavailable"
+  /** Set from outside the loop, when staff or a watchdog paused the agent. */
+  | "paused";
 
 /**
  * Everything about a run that must survive between steps. It is plain data,

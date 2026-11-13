@@ -6,11 +6,13 @@ import {
   ActivityFailure,
   ApplicationFailure,
   condition,
+  continueAsNew,
   defineQuery,
   defineSignal,
   getExternalWorkflowHandle,
   proxyActivities,
   setHandler,
+  sleep,
 } from "@temporalio/workflow";
 import type {
   Activities,
@@ -20,6 +22,7 @@ import type {
   TurnOutput,
 } from "./activities.ts";
 import type { DeletionActivities, DeletionRef, DeletionReport } from "./deletion.ts";
+import type { WatchdogActivities } from "./watchdog.ts";
 
 const { startRun, executeNext, finishRun, stopRun } = proxyActivities<Activities>({
   startToCloseTimeout: "2 minutes",
@@ -172,4 +175,25 @@ export async function deletionWorkflow(
   const report: DeletionReport = { ...elsewhere, records, signInAccounts };
   await finishDeletion({ ref, report });
   return report;
+}
+
+const { watch } = proxyActivities<WatchdogActivities>({
+  startToCloseTimeout: "1 minute",
+  heartbeatTimeout: "10 seconds",
+  retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
+});
+
+/**
+ * Checks on the agent at a fixed interval, for as long as the system runs.
+ * It starts afresh every so often so that its history stays short.
+ */
+export async function watchdogWorkflow(
+  options: { intervalSeconds?: number; rounds?: number } = {},
+): Promise<void> {
+  const rounds = options.rounds ?? 60;
+  for (let round = 0; round < rounds; round++) {
+    await watch();
+    await sleep((options.intervalSeconds ?? 60) * 1000);
+  }
+  await continueAsNew<typeof watchdogWorkflow>(options);
 }

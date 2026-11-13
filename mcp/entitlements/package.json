@@ -13,6 +13,7 @@
     "@proofdesk/entitlements": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/mcp-server": "workspace:*",
+    "@proofdesk/service": "workspace:*",
     "zod": "4.6.7"
   }
 }

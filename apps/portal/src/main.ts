@@ -30,10 +30,13 @@ main(async () => {
     newId: (prefix) => `${prefix}_${randomUUID().replaceAll("-", "")}`,
     // One ticket has one workflow: the workflow id is derived from the ticket
     // id, so starting it twice is refused by the engine.
-    onTicketCreated: async (ref) => {
+    onTicketCreated: async ({ route, ...ref }) => {
       await temporal.workflow.start("ticketWorkflow", {
         args: [ref],
-        taskQueue,
+        // A canary build listens on its own queue. Without one configured,
+        // every ticket goes to the stable build.
+        taskQueue:
+          route === "canary" ? (process.env.TEMPORAL_CANARY_TASK_QUEUE ?? taskQueue) : taskQueue,
         workflowId: workflowId(ref.ticketId),
       });
     },

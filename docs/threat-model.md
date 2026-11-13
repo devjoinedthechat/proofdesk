@@ -51,6 +51,8 @@ So every control below is judged by one question: does it still hold if the mode
 | Tools    | Arguments are constrained to each tool's schema, and results are checked against a declared output         | Yes                               |
 | Runtime  | A ticket whose model cannot be reached goes to staff, with nothing changed                                 | Yes                               |
 | Runtime  | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
+| Runtime  | A kill switch per tenant and per tool, read before every model turn and tool call                          | Yes                               |
+| Runtime  | A watchdog pauses an agent whose replies the guard keeps stopping, and rolls back a worse build            | Yes                               |
 | Deletion | No model takes part; the worker can erase a customer only on a request the portal recorded                 | Yes                               |
 | Prompt   | Ticket text and tool results are declared untrusted                                                        | No                                |
 | Screen   | A small model flags manipulative tickets                                                                   | No                                |

@@ -1,3 +1,5 @@
+import type { ColumnType, Generated } from "kysely";
+
 export type TicketStatus =
   | "open"
   | "waiting_approval"
@@ -119,6 +121,45 @@ export type MemoryRow = {
   expiresAt: Date;
 };
 
+/** Which build handles a ticket. */
+export type TicketRoute = "stable" | "canary";
+
+/** The tickets table as stored: a ticket plus the build it was sent to. */
+export type TicketTable = TicketRow & {
+  route: ColumnType<TicketRoute, TicketRoute | undefined, TicketRoute>;
+};
+
+/** How new tickets are divided between the stable build and a canary. One row. */
+export type RolloutRow = {
+  id: "agent";
+  canaryShare: number;
+  canaryVersion: string | null;
+  reason: string;
+  setBy: string;
+  setAt: Date;
+};
+
+/** Something the watchdog did, or wants a person to look at. Counts only. */
+export type AlertRow = {
+  id: Generated<number>;
+  kind: string;
+  tenantId: string | null;
+  detail: unknown;
+  raisedBy: string;
+  raisedAt: Date;
+};
+
+/** One setting of the kill switch: the whole agent, or one tool, for a tenant. */
+export type AgentControlRow = {
+  tenantId: string;
+  /** `agent`, or `tool:<name>`. */
+  scope: string;
+  paused: boolean;
+  reason: string;
+  setBy: string;
+  setAt: Date;
+};
+
 /** A customer's request to be deleted, and the record that it was done. */
 export type DeletionRequestRow = {
   id: string;
@@ -148,7 +189,7 @@ export type AuditLogRow = {
 export type AppDatabase = {
   tenants: TenantRow;
   customers: CustomerRow;
-  tickets: TicketRow;
+  tickets: TicketTable;
   ticketGrants: TicketGrantRow;
   grantAssertions: GrantAssertionRow;
   auditLog: AuditLogRow;
@@ -157,5 +198,8 @@ export type AppDatabase = {
   spend: SpendRow;
   agentRefunds: AgentRefundRow;
   deletionRequests: DeletionRequestRow;
+  agentControls: AgentControlRow;
+  rollout: RolloutRow;
+  alerts: AlertRow;
   memories: MemoryRow;
 };

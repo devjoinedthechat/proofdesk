@@ -1,4 +1,12 @@
-import { type AppDatabase, type TicketCategory, type TicketRow, withRowScope } from "@proofdesk/db";
+import { createHash } from "node:crypto";
+import {
+  type AppDatabase,
+  appendAudit,
+  type TicketCategory,
+  type TicketRoute,
+  type TicketRow,
+  withRowScope,
+} from "@proofdesk/db";
 import {
   bearerToken,
   CLIENTS,
@@ -21,11 +29,15 @@ export type PortalDeps = {
   signer: GrantSigner;
   clock: () => Date;
   newId: (prefix: string) => string;
-  /** Hands a new ticket to the agent. In production this starts the ticket's workflow. */
+  /**
+   * Hands a new ticket to the agent. In production this starts the ticket's
+   * workflow, on the task queue of the build the ticket was routed to.
+   */
   onTicketCreated?: (ref: {
     ticketId: string;
     tenantId: string;
     customerId: string;
+    route: TicketRoute;
   }) => Promise<void>;
   /** Hands a deletion request to the workflow that carries it out. */
   onDeletionRequested?: (ref: {
@@ -89,6 +101,26 @@ const requestAssertion = z.strictObject({ scope: z.string().min(1).max(100) });
 
 const decideApproval = z.strictObject({ decision: z.enum(["approved", "rejected"]) });
 
+const setControl = z.strictObject({
+  /** Leave out to pause or resume the whole agent. */
+  tool: z
+    .string()
+    .regex(/^[a-z][a-z_]{1,60}$/)
+    .optional(),
+  paused: z.boolean(),
+  reason: z.string().trim().min(1).max(200),
+});
+
+/**
+ * Which build gets a ticket. The ticket's id decides, so the answer is the
+ * same however often it is asked, and a share of N sends N in a hundred
+ * tickets to the canary.
+ */
+export function routeFor(ticketId: string, canarySharePercent: number): TicketRoute {
+  const bucket = createHash("sha256").update(ticketId).digest().readUInt32BE(0) % 100;
+  return bucket < canarySharePercent ? "canary" : "stable";
+}
+
 const toTicket = (row: TicketRow) => ({
   id: row.id,
   category: row.category,
@@ -137,7 +169,76 @@ export function createPortalApp(deps: PortalDeps) {
     return { tenantId: token.tenantId, subject: `staff:${token.subject}` };
   }
 
+  /** A signed-in member of staff who may stop and restart the agent in their own tenant. */
+  async function operator(request: Request) {
+    const token = await authenticate(request);
+    if (
+      !SIGN_IN_CLIENTS.has(token.client) ||
+      !token.scopes.includes(SCOPES.approvals) ||
+      token.staffRole !== "operator" ||
+      !token.tenantId
+    ) {
+      throw new HttpError(403, "forbidden", "This action requires an operator");
+    }
+    return { tenantId: token.tenantId, subject: `staff:${token.subject}` };
+  }
+
   app.get("/.well-known/jwks.json", (c) => c.json(deps.signer.jwks()));
+
+  app.get("/staff/agent-controls", async (c) => {
+    const staff = await operator(c.req.raw);
+    const rows = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+      trx.selectFrom("agentControls").selectAll().orderBy("scope").execute(),
+    );
+    return c.json({
+      controls: rows.map((row) => ({
+        scope: row.scope,
+        paused: row.paused,
+        reason: row.reason,
+        setBy: row.setBy,
+        setAt: row.setAt.toISOString(),
+      })),
+    });
+  });
+
+  // The kill switch. It takes effect at the agent's next model turn or tool
+  // call, including on tickets already in progress and on approved refunds
+  // that have not been paid yet.
+  app.post("/staff/agent-controls", async (c) => {
+    const staff = await operator(c.req.raw);
+    const input = await parseBody(c.req.raw, setControl);
+    const scope = input.tool ? `tool:${input.tool}` : "agent";
+    const now = deps.clock();
+    await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+      trx
+        .insertInto("agentControls")
+        .values({
+          tenantId: staff.tenantId,
+          scope,
+          paused: input.paused,
+          reason: input.reason,
+          setBy: staff.subject,
+          setAt: now,
+        })
+        .onConflict((conflict) =>
+          conflict.columns(["tenantId", "scope"]).doUpdateSet({
+            paused: input.paused,
+            reason: input.reason,
+            setBy: staff.subject,
+            setAt: now,
+          }),
+        )
+        .execute(),
+    );
+    await appendAudit(deps.db, {
+      tenantId: staff.tenantId,
+      at: now,
+      actor: staff.subject,
+      event: input.paused ? "agent_paused" : "agent_resumed",
+      detail: { scope, reason: input.reason },
+    });
+    return c.json({ control: { scope, paused: input.paused } });
+  });
 
   app.get("/staff/approvals", async (c) => {
     const staff = await approver(c.req.raw);
@@ -299,8 +400,17 @@ export function createPortalApp(deps: PortalDeps) {
       reply: null,
       resolvedAt: null,
     };
-    await withRowScope(deps.db, scope, async (trx) => {
-      await trx.insertInto("tickets").values(ticket).execute();
+    const route = await withRowScope(deps.db, scope, async (trx) => {
+      const rollout = await trx
+        .selectFrom("rollout")
+        .select("canaryShare")
+        .where("id", "=", "agent")
+        .executeTakeFirst();
+      const chosen = routeFor(ticket.id, rollout?.canaryShare ?? 0);
+      await trx
+        .insertInto("tickets")
+        .values({ ...ticket, route: chosen })
+        .execute();
       await trx
         .insertInto("ticketGrants")
         .values({
@@ -312,8 +422,9 @@ export function createPortalApp(deps: PortalDeps) {
           revokedAt: null,
         })
         .execute();
+      return chosen;
     });
-    await deps.onTicketCreated?.({ ticketId: ticket.id, ...scope });
+    await deps.onTicketCreated?.({ ticketId: ticket.id, ...scope, route });
     return c.json({ ticket: toTicket(ticket) }, 201);
   });
 

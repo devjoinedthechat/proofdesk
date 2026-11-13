@@ -25,8 +25,10 @@ export type {
   TenantRow,
   TicketCategory,
   TicketGrantRow,
+  TicketRoute,
   TicketRow,
   TicketStatus,
+  TicketTable,
 } from "./schema.ts";
 export { asRole, DB_ROLES, type RowScope, withRowScope } from "./scope.ts";
 export { TEST_POSTGRES_URL_ENV, TEST_ROLE_PASSWORD, testPostgresUrl } from "./testing.ts";
