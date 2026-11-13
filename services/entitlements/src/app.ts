@@ -67,38 +67,98 @@ export function createEntitlementsApp(deps: EntitlementsDeps & { authenticate: A
     requireScope(principal, ENTITLEMENTS_SCOPES.write);
     assertCustomerAccess(principal, customerId);
     const request = await parseBody(c.req.raw, setEntitlementRequest);
+    const key = c.req.header("idempotency-key");
+    if (key === undefined && request.expectedVersion === undefined) {
+      throw new HttpError(
+        400,
+        "version_or_key_required",
+        "Send the version you read, or an Idempotency-Key header",
+      );
+    }
+    const fingerprint = JSON.stringify([customerId, request.planCode, request.seats]);
 
-    return withRowScope(deps.db, rowScopeOf(principal), async (trx) => {
-      // One statement: the version check and the write cannot be separated.
-      const row = await trx
+    const entitlement = await withRowScope(deps.db, rowScopeOf(principal), async (trx) => {
+      // The row lock makes concurrent writers take turns.
+      const current = await trx
+        .selectFrom("entitlements")
+        .selectAll()
+        .where("tenantId", "=", principal.tenantId)
+        .where("customerId", "=", customerId)
+        .forUpdate()
+        .executeTakeFirst();
+
+      if (key !== undefined) {
+        const earlier = await trx
+          .selectFrom("entitlementWrites")
+          .selectAll()
+          .where("tenantId", "=", principal.tenantId)
+          .where("idempotencyKey", "=", key)
+          .executeTakeFirst();
+        if (earlier) {
+          if (earlier.requestFingerprint !== fingerprint) {
+            throw new HttpError(
+              409,
+              "idempotency_key_reused",
+              "This idempotency key was already used for a different write",
+            );
+          }
+          return earlier.result as Entitlement;
+        }
+      }
+
+      if (!current) throw new HttpError(404, "entitlement_not_found", "Entitlement not found");
+      if (current.status !== "active") {
+        throw new HttpError(
+          422,
+          "entitlement_suspended",
+          "A suspended entitlement cannot be changed",
+        );
+      }
+      if (request.expectedVersion !== undefined && request.expectedVersion !== current.version) {
+        throw new HttpError(
+          409,
+          "version_conflict",
+          `Expected version ${request.expectedVersion}, but the entitlement is at version ${current.version}`,
+        );
+      }
+
+      const updated: EntitlementRow = {
+        ...current,
+        planCode: request.planCode,
+        seats: request.seats,
+        version: current.version + 1,
+        updatedAt: deps.clock(),
+        updatedBy: principal.subject,
+      };
+      await trx
         .updateTable("entitlements")
         .set({
-          planCode: request.planCode,
-          seats: request.seats,
-          version: request.expectedVersion + 1,
-          updatedAt: deps.clock(),
-          updatedBy: principal.subject,
+          planCode: updated.planCode,
+          seats: updated.seats,
+          version: updated.version,
+          updatedAt: updated.updatedAt,
+          updatedBy: updated.updatedBy,
         })
         .where("tenantId", "=", principal.tenantId)
         .where("customerId", "=", customerId)
-        .where("version", "=", request.expectedVersion)
-        .returningAll()
-        .executeTakeFirst();
-      if (row) return c.json({ entitlement: toEntitlement(row) });
-
-      const current = await trx
-        .selectFrom("entitlements")
-        .select("version")
-        .where("tenantId", "=", principal.tenantId)
-        .where("customerId", "=", customerId)
-        .executeTakeFirst();
-      if (!current) throw new HttpError(404, "entitlement_not_found", "Entitlement not found");
-      throw new HttpError(
-        409,
-        "version_conflict",
-        `Expected version ${request.expectedVersion}, but the entitlement is at version ${current.version}`,
-      );
+        .execute();
+      const result = toEntitlement(updated);
+      if (key !== undefined) {
+        await trx
+          .insertInto("entitlementWrites")
+          .values({
+            tenantId: principal.tenantId,
+            idempotencyKey: key,
+            customerId,
+            requestFingerprint: fingerprint,
+            result: JSON.stringify(result),
+            createdAt: deps.clock(),
+          })
+          .execute();
+      }
+      return result;
     });
+    return c.json({ entitlement });
   });
 
   return app;

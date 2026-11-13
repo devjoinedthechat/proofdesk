@@ -481,3 +481,151 @@ describe("idempotency", () => {
     expect(await refundCount()).toBe(0);
   });
 });
+
+describe("plan changes", () => {
+  const SUB = "sub_inv_a1";
+  const planner = (customerId = "cus_a1") =>
+    clientFor({ ...agentFor(customerId), scopes: ["billing:read", "billing:plan"] });
+
+  beforeEach(async () => {
+    await db
+      .insertInto("plans")
+      .values([
+        {
+          id: "plan_pro",
+          tenantId: "ten_a",
+          code: "pro",
+          name: "Pro",
+          billingInterval: "month",
+          priceCents: 200_00,
+          currency: "USD",
+        },
+        {
+          id: "plan_year",
+          tenantId: "ten_a",
+          code: "team-annual",
+          name: "Team annual",
+          billingInterval: "year",
+          priceCents: 900_00,
+          currency: "USD",
+        },
+        {
+          id: "plan_other",
+          tenantId: "ten_b",
+          code: "pro",
+          name: "Pro",
+          billingInterval: "month",
+          priceCents: 1,
+          currency: "USD",
+        },
+      ])
+      .execute();
+  });
+
+  const subscription = () =>
+    db
+      .selectFrom("subscriptions")
+      .select(["planId", "seats"])
+      .where("id", "=", SUB)
+      .executeTakeFirstOrThrow();
+
+  it("changes plan and seats and records what was replaced", async () => {
+    const change = await planner().changeSubscription(
+      SUB,
+      { planCode: "pro", seats: 4 },
+      "key-plan-0001",
+    );
+
+    expect(change).toMatchObject({
+      subscriptionId: SUB,
+      from: { planCode: "team", seats: 1 },
+      to: { planCode: "pro", seats: 4 },
+      status: "applied",
+    });
+    expect(await subscription()).toEqual({ planId: "plan_pro", seats: 4 });
+  });
+
+  it("applies a repeated request once", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        planner().changeSubscription(SUB, { planCode: "pro", seats: 4 }, "key-plan-0002"),
+      ),
+    );
+    expect(new Set(results.map((change) => change.id)).size).toBe(1);
+    expect(await db.selectFrom("planChanges").select("id").execute()).toHaveLength(1);
+  });
+
+  it("refuses a plan that does not exist for this tenant, bills on another interval, or changes nothing", async () => {
+    const attempt = (planCode: string, seats: number, key: string) =>
+      planner().changeSubscription(SUB, { planCode, seats }, key);
+
+    await expectApiError(attempt("enterprise", 2, "key-plan-0003"), 422, "plan_not_available");
+    await expectApiError(
+      attempt("team-annual", 2, "key-plan-0004"),
+      422,
+      "interval_change_not_supported",
+    );
+    await expectApiError(attempt("team", 1, "key-plan-0005"), 422, "no_change");
+    expect(await subscription()).toEqual({ planId: "plan_ten_a", seats: 1 });
+  });
+
+  it("needs the plan scope and reaches only the caller's own subscriptions", async () => {
+    await seedInvoice({ id: "inv_a2", customerId: "cus_a2", payments: [{ id: "pay_a2" }] });
+    await expectApiError(
+      clientFor(agentFor("cus_a1")).changeSubscription(
+        SUB,
+        { planCode: "pro", seats: 2 },
+        "key-plan-0006",
+      ),
+      403,
+      "insufficient_scope",
+    );
+    await expectApiError(
+      planner("cus_a2").changeSubscription(SUB, { planCode: "pro", seats: 2 }, "key-plan-0007"),
+      404,
+      "subscription_not_found",
+    );
+    expect(await subscription()).toEqual({ planId: "plan_ten_a", seats: 1 });
+  });
+
+  it("reverts a change exactly, and reverting twice is harmless", async () => {
+    const change = await planner().changeSubscription(
+      SUB,
+      { planCode: "pro", seats: 4 },
+      "key-plan-0008",
+    );
+
+    const first = await planner().revertPlanChange(change.id);
+    const second = await planner().revertPlanChange(change.id);
+
+    expect(first.status).toBe("reverted");
+    expect(second).toEqual(first);
+    expect(await subscription()).toEqual({ planId: "plan_ten_a", seats: 1 });
+  });
+
+  it("refuses to revert once the subscription has been changed again", async () => {
+    const first = await planner().changeSubscription(
+      SUB,
+      { planCode: "pro", seats: 4 },
+      "key-plan-0009",
+    );
+    await planner().changeSubscription(SUB, { planCode: "pro", seats: 9 }, "key-plan-0010");
+
+    await expectApiError(planner().revertPlanChange(first.id), 409, "subscription_changed_since");
+    expect(await subscription()).toEqual({ planId: "plan_pro", seats: 9 });
+  });
+
+  it("lets the service role change a subscription's plan and seats and nothing else", async () => {
+    const inScope = <T>(
+      fn: (
+        trx: Parameters<Parameters<typeof withRowScope<BillingDatabase, T>>[2]>[0],
+      ) => Promise<T>,
+    ) => withRowScope(appDb, { tenantId: "ten_a" }, fn);
+    await expect(
+      inScope((trx) => trx.updateTable("subscriptions").set({ status: "canceled" }).execute()),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      inScope((trx) => trx.updateTable("subscriptions").set({ customerId: "cus_a2" }).execute()),
+    ).rejects.toThrow(/permission denied/);
+  });
+});

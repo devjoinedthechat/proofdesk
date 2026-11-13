@@ -59,7 +59,11 @@ export async function createSecuredHarness(options: { postgresUrl: string; keycl
     grantIssuer: GRANT_ISSUER,
     grantPublicKey: key.publicKeySpki,
     grantKeyId: key.kid,
-    secrets: { worker: "worker-secret", billingMcp: "mcp-secret" },
+    secrets: {
+      worker: "worker-secret",
+      billingMcp: "mcp-secret",
+      entitlementsMcp: "entitlements-mcp-secret",
+    },
     devLogin: true,
     insecureHttp: true,
   });

@@ -7,17 +7,23 @@ import {
   parseBody,
   requireScope,
 } from "@proofdesk/service";
-import { createRefundRequest } from "./api.ts";
+import { changeSubscriptionRequest, createRefundRequest } from "./api.ts";
 import {
   type BillingDeps,
+  changeSubscription,
   createRefund,
   listInvoices,
   listSubscriptions,
+  revertPlanChange,
   rowScopeOf,
 } from "./store.ts";
 
 /** The scopes this service understands. */
-export const BILLING_SCOPES = { read: "billing:read", refund: "billing:refund" } as const;
+export const BILLING_SCOPES = {
+  read: "billing:read",
+  refund: "billing:refund",
+  plan: "billing:plan",
+} as const;
 
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{8,200}$/;
 
@@ -61,6 +67,38 @@ export function createBillingApp(deps: BillingDeps & { authenticate: Authenticat
     const request = await parseBody(c.req.raw, createRefundRequest);
     const { refund, replayed } = await createRefund(deps, principal, request, idempotencyKey);
     return c.json({ refund }, replayed ? 200 : 201);
+  });
+
+  const requireKey = (value: string | undefined) => {
+    if (value === undefined || !IDEMPOTENCY_KEY.test(value)) {
+      throw new HttpError(
+        400,
+        "idempotency_key_required",
+        "This request requires an Idempotency-Key header of 8 to 200 printable characters",
+      );
+    }
+    return value;
+  };
+
+  app.post("/subscriptions/:subscriptionId/change", async (c) => {
+    const principal = c.get("principal");
+    requireScope(principal, BILLING_SCOPES.plan);
+    const key = requireKey(c.req.header("idempotency-key"));
+    const request = await parseBody(c.req.raw, changeSubscriptionRequest);
+    const { change, replayed } = await changeSubscription(
+      deps,
+      principal,
+      c.req.param("subscriptionId"),
+      request,
+      key,
+    );
+    return c.json({ change }, replayed ? 200 : 201);
+  });
+
+  app.post("/plan-changes/:changeId/revert", async (c) => {
+    const principal = c.get("principal");
+    requireScope(principal, BILLING_SCOPES.plan);
+    return c.json({ change: await revertPlanChange(deps, principal, c.req.param("changeId")) });
   });
 
   return app;

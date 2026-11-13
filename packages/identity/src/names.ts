@@ -15,6 +15,10 @@ export const CLIENTS = {
   billingMcp: "billing-mcp",
   /** The billing service, as a token audience. Only the MCP server can obtain it. */
   billingApi: "billing-api",
+  /** The entitlements MCP server. */
+  entitlementsMcp: "entitlements-mcp",
+  /** The entitlements service, as a token audience. Only its MCP server can obtain it. */
+  entitlementsApi: "entitlements-api",
   /** The help-centre search MCP server, as a token audience. */
   documentsMcp: "documents-mcp",
 } as const;
@@ -28,6 +32,9 @@ export const SCOPES = {
   approvals: "approvals",
   billingRead: "billing:read",
   billingRefund: "billing:refund",
+  billingPlan: "billing:plan",
+  entitlementsRead: "entitlements:read",
+  entitlementsWrite: "entitlements:write",
   documentsRead: "documents:read",
 } as const;
 

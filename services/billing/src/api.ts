@@ -64,6 +64,22 @@ export const createRefundRequest = z.strictObject({
   reason: refundReason,
 });
 
+export const changeSubscriptionRequest = z.strictObject({
+  planCode: z.string().min(1),
+  seats: z.number().int().min(1).max(500),
+});
+
+export const planChange = z.object({
+  id: z.string(),
+  subscriptionId: z.string(),
+  from: z.object({ planCode: z.string(), seats: z.number().int() }),
+  to: z.object({ planCode: z.string(), seats: z.number().int() }),
+  status: z.enum(["applied", "reverted"]),
+  createdAt: timestamp,
+});
+
+export const planChangeResult = z.object({ change: planChange });
+
 export const invoiceList = z.object({ invoices: z.array(invoice) });
 export const subscriptionList = z.object({ subscriptions: z.array(subscription) });
 export const refundResult = z.object({ refund });
@@ -73,3 +89,5 @@ export type Payment = z.infer<typeof payment>;
 export type Invoice = z.infer<typeof invoice>;
 export type Subscription = z.infer<typeof subscription>;
 export type CreateRefundRequest = z.infer<typeof createRefundRequest>;
+export type ChangeSubscriptionRequest = z.infer<typeof changeSubscriptionRequest>;
+export type PlanChange = z.infer<typeof planChange>;

@@ -1,0 +1,18 @@
+{
+  "name": "@proofdesk/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@proofdesk/identity": "workspace:*",
+    "@proofdesk/service": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

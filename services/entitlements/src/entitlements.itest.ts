@@ -136,3 +136,44 @@ describe("entitlements", () => {
     });
   });
 });
+
+describe("idempotent writes", () => {
+  it("applies a repeated keyed write once and returns the first result", async () => {
+    const client = clientFor(agentFor("cus_1"));
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        client.setEntitlement("cus_1", { planCode: "team", seats: 5 }, "key-ent-0001"),
+      ),
+    );
+
+    expect(new Set(results.map((result) => result.version))).toEqual(new Set([2]));
+    expect(await client.getEntitlement("cus_1")).toMatchObject({
+      planCode: "team",
+      seats: 5,
+      version: 2,
+    });
+  });
+
+  it("rejects a key reused for a different write", async () => {
+    const client = clientFor(agentFor("cus_1"));
+    await client.setEntitlement("cus_1", { planCode: "team", seats: 5 }, "key-ent-0002");
+    expect(
+      await codeOf(client.setEntitlement("cus_1", { planCode: "team", seats: 6 }, "key-ent-0002")),
+    ).toBe("idempotency_key_reused");
+  });
+
+  it("refuses to change a suspended entitlement", async () => {
+    await db
+      .updateTable("entitlements")
+      .set({ status: "suspended" })
+      .where("tenantId", "=", "ten_a")
+      .execute();
+    const client = clientFor(agentFor("cus_1"));
+    expect(
+      await codeOf(client.setEntitlement("cus_1", { planCode: "team", seats: 5 }, "key-ent-0003")),
+    ).toBe("entitlement_suspended");
+    expect(await codeOf(client.setEntitlement("cus_1", { planCode: "team", seats: 5 }))).toBe(
+      "version_or_key_required",
+    );
+  });
+});

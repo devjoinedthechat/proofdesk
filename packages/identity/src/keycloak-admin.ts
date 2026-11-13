@@ -48,7 +48,7 @@ export type RealmOptions = {
   /** The signer's public key, base64 SPKI. */
   grantPublicKey: string;
   grantKeyId: string;
-  secrets: { worker: string; billingMcp: string };
+  secrets: { worker: string; billingMcp: string; entitlementsMcp: string };
   /** Adds a password sign-in client. For local development and tests only. */
   devLogin?: boolean;
   /** Allows plain HTTP from any address. For local development and tests only. */
@@ -61,6 +61,7 @@ export type RealmOptions = {
  */
 const IDENTITY_SCOPES = ["basic", "proofdesk-identity"];
 const BILLING_API_AUDIENCE = "billing-api-audience";
+const ENTITLEMENTS_API_AUDIENCE = "entitlements-api-audience";
 
 const audienceMapper = (audience: string) => ({
   name: `audience-${audience}`,
@@ -139,6 +140,10 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await scope(SCOPES.approvals, true, [audienceMapper(CLIENTS.portal)]);
   await scope(SCOPES.billingRead, true, [audienceMapper(CLIENTS.billingMcp)]);
   await scope(SCOPES.billingRefund, true, [audienceMapper(CLIENTS.billingMcp)]);
+  await scope(SCOPES.billingPlan, true, [audienceMapper(CLIENTS.billingMcp)]);
+  await scope(SCOPES.entitlementsRead, true, [audienceMapper(CLIENTS.entitlementsMcp)]);
+  await scope(SCOPES.entitlementsWrite, true, [audienceMapper(CLIENTS.entitlementsMcp)]);
+  await scope(ENTITLEMENTS_API_AUDIENCE, false, [audienceMapper(CLIENTS.entitlementsApi)]);
   await scope(SCOPES.documentsRead, true, [audienceMapper(CLIENTS.documentsMcp)]);
 
   await admin.call("POST", `${path}/identity-provider/instances`, {
@@ -195,6 +200,9 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
       SCOPES.grantsIssue,
       SCOPES.billingRead,
       SCOPES.billingRefund,
+      SCOPES.billingPlan,
+      SCOPES.entitlementsRead,
+      SCOPES.entitlementsWrite,
       SCOPES.documentsRead,
     ],
     attributes: {
@@ -207,8 +215,17 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await client({
     clientId: CLIENTS.billingMcp,
     secret: options.secrets.billingMcp,
-    optionalClientScopes: [SCOPES.billingRead, SCOPES.billingRefund],
+    optionalClientScopes: [SCOPES.billingRead, SCOPES.billingRefund, SCOPES.billingPlan],
     defaultClientScopes: [...IDENTITY_SCOPES, BILLING_API_AUDIENCE],
+    attributes: { "standard.token.exchange.enabled": "true", "access.token.lifespan": "60" },
+  });
+
+  await client({ clientId: CLIENTS.entitlementsApi, bearerOnly: true, defaultClientScopes: [] });
+  await client({
+    clientId: CLIENTS.entitlementsMcp,
+    secret: options.secrets.entitlementsMcp,
+    optionalClientScopes: [SCOPES.entitlementsRead, SCOPES.entitlementsWrite],
+    defaultClientScopes: [...IDENTITY_SCOPES, ENTITLEMENTS_API_AUDIENCE],
     attributes: { "standard.token.exchange.enabled": "true", "access.token.lifespan": "60" },
   });
 

@@ -13,8 +13,8 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@proofdesk/billing": "workspace:*",
     "@proofdesk/identity": "workspace:*",
+    "@proofdesk/mcp-server": "workspace:*",
     "@proofdesk/service": "workspace:*",
-    "hono": "4.13.18",
     "zod": "4.6.7"
   },
   "devDependencies": {

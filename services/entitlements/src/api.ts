@@ -12,8 +12,12 @@ export const entitlement = z.object({
 export const setEntitlementRequest = z.strictObject({
   planCode: z.string().min(1),
   seats: z.number().int().positive(),
-  /** The version the caller read. The write is refused if it has moved on. */
-  expectedVersion: z.number().int().positive(),
+  /**
+   * The version the caller read. The write is refused if it has moved on.
+   * Optional when the request carries an idempotency key, which protects
+   * against repeats in a different way.
+   */
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 export const entitlementResult = z.object({ entitlement });

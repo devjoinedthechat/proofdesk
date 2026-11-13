@@ -11,6 +11,16 @@ export type EntitlementRow = {
   updatedBy: string;
 };
 
+export type EntitlementWriteRow = {
+  tenantId: string;
+  idempotencyKey: string;
+  customerId: string;
+  requestFingerprint: string;
+  result: unknown;
+  createdAt: Date;
+};
+
 export type EntitlementsDatabase = {
   entitlements: EntitlementRow;
+  entitlementWrites: EntitlementWriteRow;
 };

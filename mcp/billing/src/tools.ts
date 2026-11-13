@@ -1,35 +1,13 @@
 import type { BillingClient } from "@proofdesk/billing";
 import { SCOPES } from "@proofdesk/identity";
+import { defineTool, type ServiceTool } from "@proofdesk/mcp-server";
 import { z } from "zod";
 
-/**
- * One billing tool: what the model is told, what scope a caller needs, and
- * what it does. The MCP server registers these, and evaluations can run the
- * same definitions against a billing client directly.
- */
-export type BillingTool = {
-  name: string;
-  scope: string;
-  description: string;
-  input: z.ZodObject;
-  /** True when a successful call changes billing records. */
-  writes: boolean;
-  run(billing: BillingClient, customerId: string, args: unknown): Promise<unknown>;
-};
+export type BillingTool = ServiceTool<BillingClient>;
 
-function define<Input extends z.ZodObject>(tool: {
-  name: string;
-  scope: string;
-  description: string;
-  input: Input;
-  writes: boolean;
-  run(billing: BillingClient, customerId: string, args: z.infer<Input>): Promise<unknown>;
-}): BillingTool {
-  return {
-    ...tool,
-    run: (billing, customerId, args) => tool.run(billing, customerId, tool.input.parse(args)),
-  };
-}
+const define = <Input extends z.ZodObject>(
+  tool: Parameters<typeof defineTool<BillingClient, Input>>[0],
+) => defineTool<BillingClient, Input>(tool);
 
 // No tool takes a customer id. The customer is fixed by the caller's
 // credential, so a manipulated model cannot point a tool at someone else.
@@ -81,6 +59,33 @@ export const BILLING_TOOLS: BillingTool[] = [
     writes: true,
     run: async (billing, _customerId, { idempotencyKey, ...request }) => ({
       refund: await billing.createRefund(request, idempotencyKey),
+    }),
+  }),
+  define({
+    name: "change_subscription",
+    scope: SCOPES.billingPlan,
+    description:
+      "Changes the plan or the number of seats of one of the customer's subscriptions, from the next renewal. Repeating a call with the same idempotencyKey returns the first change instead of making another.",
+    input: z.object({
+      subscriptionId: z.string().describe("The subscription to change, from list_subscriptions."),
+      planCode: z.string().describe("The plan to move to, such as team-monthly."),
+      seats: z.number().int().min(1).max(500),
+      idempotencyKey: z.string().min(8).max(200),
+    }),
+    writes: true,
+    run: async (billing, _customerId, { subscriptionId, idempotencyKey, ...request }) => ({
+      change: await billing.changeSubscription(subscriptionId, request, idempotencyKey),
+    }),
+  }),
+  define({
+    name: "revert_subscription_change",
+    scope: SCOPES.billingPlan,
+    description:
+      "Undoes a subscription change, putting the plan and seats back exactly as they were. Safe to repeat.",
+    input: z.object({ changeId: z.string() }),
+    writes: true,
+    run: async (billing, _customerId, { changeId }) => ({
+      change: await billing.revertPlanChange(changeId),
     }),
   }),
 ];

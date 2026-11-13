@@ -2,8 +2,15 @@ import { createHash } from "node:crypto";
 import { type RowScope, withRowScope } from "@proofdesk/db";
 import { HttpError, type Principal } from "@proofdesk/service";
 import type { Kysely, Transaction } from "kysely";
-import type { CreateRefundRequest, Invoice, Refund, Subscription } from "./api.ts";
-import type { BillingDatabase, RefundRow } from "./schema.ts";
+import type {
+  ChangeSubscriptionRequest,
+  CreateRefundRequest,
+  Invoice,
+  PlanChange,
+  Refund,
+  Subscription,
+} from "./api.ts";
+import type { BillingDatabase, PlanChangeRow, RefundRow } from "./schema.ts";
 
 export type BillingDeps = {
   /** A connection as the `billing_app` role, which is subject to row-level security. */
@@ -272,4 +279,177 @@ export async function createRefund(
     }
     return replay(existing, requestFingerprint);
   }
+}
+
+async function toPlanChange(db: Reader, row: PlanChangeRow): Promise<PlanChange> {
+  const plans = await db
+    .selectFrom("plans")
+    .select(["id", "code"])
+    .where("id", "in", [row.fromPlanId, row.toPlanId])
+    .execute();
+  const code = (id: string) => plans.find((plan) => plan.id === id)?.code ?? id;
+  return {
+    id: row.id,
+    subscriptionId: row.subscriptionId,
+    from: { planCode: code(row.fromPlanId), seats: row.fromSeats },
+    to: { planCode: code(row.toPlanId), seats: row.toSeats },
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Changes a subscription's plan or seats, exactly once per idempotency key.
+ * The change takes effect for the next renewal; nothing is charged here.
+ *
+ * Billing enforces what must hold: the subscription is active, the plan
+ * exists for this tenant, and it bills on the same interval. Moving between
+ * monthly and annual means settling the current period, which is not a
+ * change this service makes.
+ */
+export async function changeSubscription(
+  deps: BillingDeps,
+  principal: Principal,
+  subscriptionId: string,
+  request: ChangeSubscriptionRequest,
+  idempotencyKey: string,
+): Promise<{ change: PlanChange; replayed: boolean }> {
+  const requestFingerprint = createHash("sha256")
+    .update(JSON.stringify([subscriptionId, request.planCode, request.seats]))
+    .digest("hex");
+  const scope = rowScopeOf(principal);
+  const byKey = (db: Reader) =>
+    db
+      .selectFrom("planChanges")
+      .selectAll()
+      .where("tenantId", "=", principal.tenantId)
+      .where("idempotencyKey", "=", idempotencyKey)
+      .executeTakeFirst();
+  const replay = async (db: Reader, existing: PlanChangeRow) => {
+    if (existing.requestFingerprint !== requestFingerprint) {
+      throw new HttpError(
+        409,
+        "idempotency_key_reused",
+        "This idempotency key was already used for a different change",
+      );
+    }
+    return { change: await toPlanChange(db, existing), replayed: true };
+  };
+
+  try {
+    return await withRowScope(deps.db, scope, async (trx) => {
+      const subscription = await trx
+        .selectFrom("subscriptions")
+        .selectAll()
+        .where("id", "=", subscriptionId)
+        .where("tenantId", "=", principal.tenantId)
+        .forUpdate()
+        .executeTakeFirst();
+
+      const existing = await byKey(trx);
+      if (existing) return replay(trx, existing);
+      if (!subscription) {
+        throw new HttpError(404, "subscription_not_found", "Subscription not found");
+      }
+      if (subscription.status !== "active") {
+        throw new HttpError(
+          422,
+          "subscription_not_active",
+          `A subscription with status "${subscription.status}" cannot be changed`,
+        );
+      }
+
+      const plans = await trx.selectFrom("plans").selectAll().execute();
+      const current = plans.find((plan) => plan.id === subscription.planId);
+      const target = plans.find((plan) => plan.code === request.planCode);
+      if (!target || !current) {
+        throw new HttpError(422, "plan_not_available", `There is no plan "${request.planCode}"`);
+      }
+      if (target.billingInterval !== current.billingInterval) {
+        throw new HttpError(
+          422,
+          "interval_change_not_supported",
+          "Changing between monthly and annual billing cannot be done here",
+        );
+      }
+      if (target.id === subscription.planId && request.seats === subscription.seats) {
+        throw new HttpError(422, "no_change", "The subscription already has this plan and seats");
+      }
+
+      const row: PlanChangeRow = {
+        id: deps.newId("chg"),
+        tenantId: principal.tenantId,
+        customerId: subscription.customerId,
+        subscriptionId,
+        fromPlanId: subscription.planId,
+        fromSeats: subscription.seats,
+        toPlanId: target.id,
+        toSeats: request.seats,
+        status: "applied",
+        createdBy: principal.subject,
+        createdAt: deps.clock(),
+        revertedAt: null,
+        idempotencyKey,
+        requestFingerprint,
+      };
+      await trx.insertInto("planChanges").values(row).execute();
+      await trx
+        .updateTable("subscriptions")
+        .set({ planId: target.id, seats: request.seats })
+        .where("id", "=", subscriptionId)
+        .execute();
+      return { change: await toPlanChange(trx, row), replayed: false };
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code !== UNIQUE_VIOLATION) throw error;
+    const existing = await withRowScope(deps.db, scope, (trx) => byKey(trx));
+    if (!existing) throw error;
+    return replay(deps.db, existing);
+  }
+}
+
+/**
+ * Undoes a change, putting the subscription back exactly as it was. Undoing
+ * twice is harmless. It is refused if the subscription has been changed again
+ * since, because then "as it was" is no longer the right state.
+ */
+export async function revertPlanChange(
+  deps: BillingDeps,
+  principal: Principal,
+  changeId: string,
+): Promise<PlanChange> {
+  return withRowScope(deps.db, rowScopeOf(principal), async (trx) => {
+    const change = await trx
+      .selectFrom("planChanges")
+      .selectAll()
+      .where("id", "=", changeId)
+      .where("tenantId", "=", principal.tenantId)
+      .forUpdate()
+      .executeTakeFirst();
+    if (!change) throw new HttpError(404, "change_not_found", "Plan change not found");
+    if (change.status === "reverted") return toPlanChange(trx, change);
+
+    const reverted = await trx
+      .updateTable("subscriptions")
+      .set({ planId: change.fromPlanId, seats: change.fromSeats })
+      .where("id", "=", change.subscriptionId)
+      .where("planId", "=", change.toPlanId)
+      .where("seats", "=", change.toSeats)
+      .returning("id")
+      .executeTakeFirst();
+    if (!reverted) {
+      throw new HttpError(
+        409,
+        "subscription_changed_since",
+        "The subscription was changed again after this change and cannot be reverted to it",
+      );
+    }
+    const revertedAt = deps.clock();
+    await trx
+      .updateTable("planChanges")
+      .set({ status: "reverted", revertedAt })
+      .where("id", "=", changeId)
+      .execute();
+    return toPlanChange(trx, { ...change, status: "reverted", revertedAt });
+  });
 }

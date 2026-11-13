@@ -1,8 +1,11 @@
 import { type ClientOptions, callService } from "@proofdesk/service";
 import {
+  type ChangeSubscriptionRequest,
   type CreateRefundRequest,
   type Invoice,
   invoiceList,
+  type PlanChange,
+  planChangeResult,
   type Refund,
   refundResult,
   type Subscription,
@@ -36,6 +39,30 @@ export function createBillingClient(options: ClientOptions) {
         headers: { "idempotency-key": idempotencyKey },
       });
       return result.refund;
+    },
+
+    /** Safe to retry with the same key: the change is applied at most once. */
+    async changeSubscription(
+      subscriptionId: string,
+      request: ChangeSubscriptionRequest,
+      idempotencyKey: string,
+    ): Promise<PlanChange> {
+      const result = await callService(options, planChangeResult, {
+        method: "POST",
+        path: `/subscriptions/${encodeURIComponent(subscriptionId)}/change`,
+        body: request,
+        headers: { "idempotency-key": idempotencyKey },
+      });
+      return result.change;
+    },
+
+    /** Puts the subscription back as it was before the change. Safe to repeat. */
+    async revertPlanChange(changeId: string): Promise<PlanChange> {
+      const result = await callService(options, planChangeResult, {
+        method: "POST",
+        path: `/plan-changes/${encodeURIComponent(changeId)}/revert`,
+      });
+      return result.change;
     },
   };
 }

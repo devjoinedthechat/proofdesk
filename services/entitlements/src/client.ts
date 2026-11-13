@@ -14,11 +14,17 @@ export function createEntitlementsClient(options: ClientOptions) {
       return result.entitlement;
     },
 
-    async setEntitlement(customerId: string, request: SetEntitlementRequest): Promise<Entitlement> {
+    /** With an idempotency key, safe to retry: the write is applied at most once. */
+    async setEntitlement(
+      customerId: string,
+      request: SetEntitlementRequest,
+      idempotencyKey?: string,
+    ): Promise<Entitlement> {
       const result = await callService(options, entitlementResult, {
         method: "PUT",
         path: path(customerId),
         body: request,
+        ...(idempotencyKey ? { headers: { "idempotency-key": idempotencyKey } } : {}),
       });
       return result.entitlement;
     },

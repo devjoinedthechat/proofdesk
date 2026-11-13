@@ -1,9 +1,11 @@
 import { fileURLToPath } from "node:url";
 
 export type {
+  ChangeSubscriptionRequest,
   CreateRefundRequest,
   Invoice,
   Payment,
+  PlanChange,
   Refund,
   Subscription,
 } from "./api.ts";
@@ -16,6 +18,7 @@ export type {
   InvoiceStatus,
   PaymentRow,
   PaymentStatus,
+  PlanChangeRow,
   PlanRow,
   RefundReason,
   RefundRow,

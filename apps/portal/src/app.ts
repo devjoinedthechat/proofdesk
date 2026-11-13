@@ -43,7 +43,13 @@ export type PortalDeps = {
  */
 export const GRANT_SCOPES: Record<TicketCategory, string[]> = {
   refund: [SCOPES.billingRead, SCOPES.billingRefund, SCOPES.documentsRead],
-  plan_change: [SCOPES.billingRead, SCOPES.documentsRead],
+  plan_change: [
+    SCOPES.billingRead,
+    SCOPES.billingPlan,
+    SCOPES.entitlementsRead,
+    SCOPES.entitlementsWrite,
+    SCOPES.documentsRead,
+  ],
   data_deletion: [],
 };
 

@@ -65,10 +65,28 @@ export type RefundRow = {
   requestFingerprint: string;
 };
 
+export type PlanChangeRow = {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  subscriptionId: string;
+  fromPlanId: string;
+  fromSeats: number;
+  toPlanId: string;
+  toSeats: number;
+  status: "applied" | "reverted";
+  createdBy: string;
+  createdAt: Date;
+  revertedAt: Date | null;
+  idempotencyKey: string;
+  requestFingerprint: string;
+};
+
 export type BillingDatabase = {
   plans: PlanRow;
   subscriptions: SubscriptionRow;
   invoices: InvoiceRow;
   payments: PaymentRow;
   refunds: RefundRow;
+  planChanges: PlanChangeRow;
 };
