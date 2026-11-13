@@ -10,6 +10,7 @@ import {
   defineQuery,
   defineSignal,
   getExternalWorkflowHandle,
+  patched,
   proxyActivities,
   setHandler,
   sleep,
@@ -24,7 +25,7 @@ import type {
 import type { DeletionActivities, DeletionRef, DeletionReport } from "./deletion.ts";
 import type { WatchdogActivities } from "./watchdog.ts";
 
-const { startRun, executeNext, finishRun, stopRun } = proxyActivities<Activities>({
+const { startRun, executeNext, finishRun, stopRun, resumeRun } = proxyActivities<Activities>({
   startToCloseTimeout: "2 minutes",
   // Activities report in every few seconds. A worker that goes silent is
   // presumed lost and its activity is given to another, long before the
@@ -70,7 +71,10 @@ const APPROVAL_TIMEOUT = "7 days";
  * Only identifiers and step numbers pass through here. The conversation is in
  * the database, so nothing personal ends up in the workflow history.
  */
-export async function ticketWorkflow(ref: TicketRef): Promise<FinishOutput> {
+export async function ticketWorkflow(
+  ref: TicketRef,
+  options: { followUp?: string } = {},
+): Promise<FinishOutput> {
   const answers = new Map<string, ApprovalAnswer>();
   const status: TicketProgress = { phase: "starting", step: 0 };
   setHandler(progress, () => ({ ...status }));
@@ -79,9 +83,18 @@ export async function ticketWorkflow(ref: TicketRef): Promise<FinishOutput> {
     if (!answers.has(approvalId)) answers.set(approvalId, answer);
   });
 
-  await startRun(ref);
-
   let step = 0;
+  if (options.followUp) {
+    // The customer answered a question. The same conversation carries on
+    // from where it stopped. If this message was already taken in, by an
+    // earlier start of this same work, there is nothing left to do.
+    const resumed = await resumeRun({ ref, messageId: options.followUp });
+    if (!resumed.resumed) return finishRun(ref);
+    step = resumed.step;
+  } else {
+    await startRun(ref);
+  }
+
   let stopped = false;
   while (!stopped) {
     status.phase = "thinking";
@@ -176,8 +189,12 @@ export async function deletionWorkflow(
       // Already finished, or never started. Either way no agent is running.
     }
   }
-  // After the agents have stopped, so that no conversation is still being written.
-  const conversations = await eraseConversations({ ref, ticketIds });
+  // After the agents have stopped, so that no conversation is still being
+  // written. A request that was already running when this step was added
+  // carries on without it, as it was started.
+  const conversations = patched("erase-conversations")
+    ? await eraseConversations({ ref, ticketIds })
+    : 0;
   const elsewhere = await eraseElsewhere(ref);
   const records = await eraseRecords(ref);
   const signInAccounts = await eraseIdentity(ref);
@@ -186,7 +203,7 @@ export async function deletionWorkflow(
   return report;
 }
 
-const { watch } = proxyActivities<WatchdogActivities>({
+const { watch, dispatchPending } = proxyActivities<WatchdogActivities>({
   startToCloseTimeout: "1 minute",
   heartbeatTimeout: "10 seconds",
   retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
@@ -202,6 +219,9 @@ export async function watchdogWorkflow(
   const rounds = options.rounds ?? 60;
   for (let round = 0; round < rounds; round++) {
     await watch();
+    // Added after watchdogs were already running. One that started before
+    // replays its history without this step, and takes it up from then on.
+    if (patched("sweep-outbox")) await dispatchPending();
     await sleep((options.intervalSeconds ?? 60) * 1000);
   }
   await continueAsNew<typeof watchdogWorkflow>(options);

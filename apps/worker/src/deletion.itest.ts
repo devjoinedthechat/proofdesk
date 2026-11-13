@@ -10,6 +10,7 @@ import {
   testPostgresUrl,
   verifyAudit,
 } from "@proofdesk/db";
+import { createDispatch, deletionWorkflowId } from "@proofdesk/dispatch";
 import { createEntitlementsApp } from "@proofdesk/entitlements";
 import { call, invoicesSeen, listInvoices } from "@proofdesk/evals";
 import { MockProvider, type MockStep } from "@proofdesk/gateway";
@@ -295,20 +296,7 @@ beforeAll(async () => {
     clock,
     newId,
     wallClock: () => new Date(Date.now() + minutesLater * 60_000),
-    onTicketCreated: async (ref) => {
-      await client.workflow.start("ticketWorkflow", {
-        args: [ref],
-        taskQueue,
-        workflowId: `ticket-${ref.ticketId}${suffix}`,
-      });
-    },
-    onDeletionRequested: async (ref) => {
-      await client.workflow.start("deletionWorkflow", {
-        args: [ref, { ticketWorkflowSuffix: suffix }],
-        taskQueue,
-        workflowId: `deletion-${ref.requestId}`,
-      });
-    },
+    dispatch: createDispatch(client, { taskQueue, idSuffix: suffix }),
   });
   const billingApp = createBillingApp({
     db: env.serviceDbs.billing,
@@ -567,7 +555,7 @@ describe("the request", () => {
     expect(response.status).toBe(202);
     const { request } = (await response.json()) as { request: { id: string; status: string } };
 
-    report = await client.workflow.getHandle(`deletion-${request.id}`).result();
+    report = await client.workflow.getHandle(deletionWorkflowId(request.id, suffix)).result();
 
     expect(report).toEqual({
       billing: { subscriptionsCanceled: 1, referencesCleared: keptBefore.invoices },
@@ -579,6 +567,8 @@ describe("the request", () => {
         agentRuns: 2,
         approvals: 1,
         memories: 1,
+        // The agent's reply on the ticket it resolved.
+        messages: 1,
         grants: 3,
         grantAssertions: expect.any(Number),
       },
@@ -630,7 +620,7 @@ describe("after the request", () => {
     for (const id of [
       `ticket-${firstTicket}${suffix}`,
       `ticket-${secondTicket}${suffix}`,
-      `deletion-${request.id}`,
+      deletionWorkflowId(request.id, suffix),
     ]) {
       const text = await history(id);
       for (const needle of [customer.email, customer.name, MARK]) {

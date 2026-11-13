@@ -1,4 +1,5 @@
 import { type AppDatabase, appendAudit } from "@proofdesk/db";
+import { type Dispatch, outboxJob } from "@proofdesk/dispatch";
 import type { Telemetry } from "@proofdesk/telemetry";
 import { type Kysely, sql } from "kysely";
 
@@ -97,6 +98,10 @@ export type WatchdogDeps = {
   /** Tells a person. Called once per action taken, never for one already in effect. */
   notify?: (alert: { kind: string; tenantId: string | null; detail: unknown }) => Promise<void>;
   telemetry?: Telemetry;
+  /** Starts a piece of promised work. Without it, the sweeper does nothing. */
+  dispatch?: Dispatch;
+  /** How long a promise may wait before the sweeper takes it up. */
+  overdueSeconds?: number;
 };
 
 const ACTOR = "system:watchdog";
@@ -154,7 +159,43 @@ export function createWatchdogActivities(deps: WatchdogDeps) {
       }
       return taken;
     },
+
+    /**
+     * Starts work the portal promised and did not get to start: a ticket, a
+     * customer's answer or a deletion request recorded just before the portal
+     * stopped, or while the workflow engine could not be reached. Returns how
+     * many it started.
+     */
+    async dispatchPending(): Promise<number> {
+      const { dispatch } = deps;
+      if (!dispatch) return 0;
+      const now = deps.clock();
+      const before = new Date(now.getTime() - (deps.overdueSeconds ?? 15) * 1000);
+      const overdue = await sql<{ id: string; payload: unknown }>`
+        select id, payload from pending_outbox(${before}, 50)
+      `.execute(deps.db);
+
+      let started = 0;
+      for (const row of overdue.rows) {
+        const job = outboxJob.safeParse(row.payload);
+        // A row nobody can read is not retried forever in silence.
+        if (!job.success) {
+          console.error(`Outbox row ${row.id} is not a job this build understands`);
+          continue;
+        }
+        if ((await dispatch(job.data)) !== "started") continue;
+        await sql`select mark_outbox_started(${row.id}, ${now})`.execute(deps.db);
+        deps.telemetry?.count("events", 1, {
+          event: "outbox_swept",
+          "tenant.id": job.data.ref.tenantId,
+        });
+        started += 1;
+      }
+      return started;
+    },
   };
 }
+
+export type { Dispatch };
 
 export type WatchdogActivities = ReturnType<typeof createWatchdogActivities>;

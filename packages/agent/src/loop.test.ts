@@ -9,7 +9,7 @@ import {
 } from "@proofdesk/gateway";
 import { describe, expect, it } from "vitest";
 import { checkResolution, ungroundedAmounts } from "./guards.ts";
-import { type AgentRun, runAgent } from "./loop.ts";
+import { type AgentRun, type AgentState, resumeWith, runAgent } from "./loop.ts";
 import type { AgentTool, ToolCallRecord, Verdict } from "./tools.ts";
 import { withSystemIdempotency } from "./tools.ts";
 
@@ -270,6 +270,53 @@ describe("runAgent", () => {
       "resolve_ticket",
     ]);
     expect(tools.every((tool) => tool.strict === true)).toBe(true);
+  });
+});
+
+describe("resumeWith", () => {
+  const finished = (): AgentState => ({
+    messages: [
+      { role: "user", content: [{ type: "text", text: "the ticket" }] },
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "res", name: "resolve_ticket", input: {} }],
+      },
+      { role: "user", content: [{ type: "tool_result", toolUseId: "res", content: "Recorded." }] },
+    ],
+    toolCalls: [],
+    turns: 1,
+    nudged: true,
+    pending: [],
+    batch: false,
+    results: [],
+    resolution: { outcome: "needs_clarification", reasonCode: "invoice_unclear", reply: "Which?" },
+    stopped: "resolved",
+  });
+
+  it("adds the customer's words to the last user turn and lets the agent take another", () => {
+    const state = finished();
+    expect(resumeWith(state, { id: "msg_1", text: "the second one" })).toBe(true);
+
+    // Turns still alternate: the answer joins the turn that reported the last result.
+    expect(state.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+    expect(state.messages[2]?.content).toEqual([
+      { type: "tool_result", toolUseId: "res", content: "Recorded." },
+      { type: "text", text: "the second one" },
+    ]);
+    expect(state).toMatchObject({ nudged: false, turns: 1, followUps: ["msg_1"] });
+    expect(state.stopped).toBeUndefined();
+    expect(state.resolution).toBeUndefined();
+  });
+
+  it("takes each message in once", () => {
+    const state = finished();
+    resumeWith(state, { id: "msg_1", text: "the second one" });
+    const after = structuredClone(state);
+
+    expect(resumeWith(state, { id: "msg_1", text: "the second one" })).toBe(false);
+    expect(state).toEqual(after);
+    expect(resumeWith(state, { id: "msg_2", text: "and thanks" })).toBe(true);
+    expect(state.followUps).toEqual(["msg_1", "msg_2"]);
   });
 });
 

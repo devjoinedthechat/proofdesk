@@ -167,6 +167,20 @@ const STATUS = {
   refused: ["Declined", "bad"],
 };
 
+const AUTHORS = { agent: "Proofdesk", customer: "You", staff: "Our team" };
+
+/** A ticket's messages after the first, oldest first. */
+function conversation(messages, labels = AUTHORS) {
+  return messages.map((message) =>
+    el(
+      "div",
+      { class: `reply ${message.author}` },
+      el("div", { class: "muted author" }, labels[message.author] ?? message.author),
+      message.body,
+    ),
+  );
+}
+
 function customerView() {
   const list = el("div");
   let timer;
@@ -177,6 +191,7 @@ function customerView() {
       ...(tickets.length === 0 ? [el("p", { class: "muted" }, "No requests yet.")] : []),
       ...tickets.map((ticket) => {
         const [label, tone] = STATUS[ticket.status] ?? [ticket.status, "warn"];
+        const answer = el("textarea", { maxlength: "10000", placeholder: "Your answer" });
         return el(
           "div",
           { class: "item" },
@@ -187,7 +202,23 @@ function customerView() {
             el("span", { class: `pill ${tone}` }, label),
           ),
           el("p", { class: "muted" }, ticket.body),
-          ticket.reply ? el("div", { class: "reply" }, ticket.reply) : null,
+          conversation(ticket.messages),
+          // The agent asked something. Answering carries the same request on.
+          ticket.status === "waiting_customer"
+            ? el(
+                "div",
+                {},
+                answer,
+                el(
+                  "p",
+                  {},
+                  action("Reply", async () => {
+                    await api("POST", `/tickets/${ticket.id}/messages`, { body: answer.value });
+                    await load();
+                  }),
+                ),
+              )
+            : null,
         );
       }),
     );
@@ -299,6 +330,47 @@ const options = (values) => values.map((value) => el("option", { value }, value)
 function approverView() {
   const approvals = el("div");
   const queue = el("div");
+  const handedOver = el("div");
+  const staffLabels = { agent: "Agent", customer: "Customer", staff: "Staff" };
+
+  async function loadHandedOver() {
+    const { tickets } = await api("GET", "/staff/handed-over");
+    handedOver.replaceChildren(
+      ...(tickets.length === 0 ? [el("p", { class: "muted" }, "Nobody is waiting.")] : []),
+      ...tickets.map((ticket) => {
+        const reply = el("textarea", {
+          maxlength: "4000",
+          placeholder: "Your reply to the customer",
+        });
+        const send = (resolution) => async () => {
+          await api("POST", `/staff/tickets/${ticket.id}/reply`, {
+            body: reply.value,
+            resolution,
+          });
+          await loadHandedOver();
+        };
+        return el(
+          "div",
+          { class: "item" },
+          el(
+            "div",
+            { class: "row" },
+            el("strong", {}, ticket.subject),
+            el("span", { class: "pill warn" }, ticket.reasonCode ?? "handed over"),
+          ),
+          el("p", { class: "muted" }, ticket.body),
+          conversation(ticket.messages, staffLabels),
+          reply,
+          el(
+            "p",
+            { class: "row" },
+            action("Reply and resolve", send("resolved"), { class: "primary" }),
+            action("Reply and decline", send("refused"), { class: "danger" }),
+          ),
+        );
+      }),
+    );
+  }
 
   async function loadApprovals() {
     const { approvals: rows } = await api("GET", "/staff/approvals");
@@ -411,6 +483,7 @@ function approverView() {
 
   const fail = (box) => (error) => box.replaceChildren(el("p", { class: "error" }, error.message));
   loadApprovals().catch(fail(approvals));
+  loadHandedOver().catch(fail(handedOver));
   loadQueue().catch(fail(queue));
 
   return [
@@ -431,7 +504,23 @@ function approverView() {
       el(
         "div",
         { class: "row" },
-        el("h2", {}, "Handed over by the agent"),
+        el("h2", {}, "Waiting for a reply from staff"),
+        action("Refresh", loadHandedOver),
+      ),
+      el(
+        "p",
+        { class: "muted" },
+        "The agent passed these on. Your reply goes to the customer and closes the request.",
+      ),
+      handedOver,
+    ),
+    el(
+      "section",
+      {},
+      el(
+        "div",
+        { class: "row" },
+        el("h2", {}, "Review what the agent handed over"),
         action("Refresh", loadQueue),
       ),
       el(

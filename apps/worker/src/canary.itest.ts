@@ -180,13 +180,15 @@ beforeAll(async () => {
     clock: () => env.now,
     // Fixed ids, so which tickets go to the canary is the same on every run.
     newId: (prefix) => `${prefix}_canary_${String(++ticketNumber).padStart(4, "0")}`,
-    onTicketCreated: async ({ route, ...ref }) => {
-      routed.push({ ticketId: ref.ticketId, route });
+    dispatch: async (job) => {
+      if (job.kind !== "ticket") throw new Error("This test only files tickets");
+      routed.push({ ticketId: job.ref.ticketId, route: job.route });
       await client.workflow.start("ticketWorkflow", {
-        args: [ref],
-        taskQueue: queue(route),
-        workflowId: `ticket-${ref.ticketId}-${suffix}`,
+        args: [job.ref],
+        taskQueue: queue(job.route),
+        workflowId: `ticket-${job.ref.ticketId}-${suffix}`,
       });
+      return "started";
     },
   });
 

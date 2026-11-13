@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@proofdesk/db": "workspace:*",
+    "@proofdesk/dispatch": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "@temporalio/client": "1.25.0",

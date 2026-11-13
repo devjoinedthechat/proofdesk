@@ -190,3 +190,15 @@ button:disabled {
 code {
   font-size: 13px;
 }
+
+.reply.customer {
+  border-left-color: var(--muted);
+}
+
+.reply.staff {
+  border-left-color: var(--good);
+}
+
+.author {
+  font-size: 12px;
+}

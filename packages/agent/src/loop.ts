@@ -49,7 +49,32 @@ export type AgentState = {
   results: UserBlock[];
   resolution?: Resolution;
   stopped?: StopCause;
+  /** The customer's later messages that have been added to the conversation, by id. */
+  followUps?: string[];
 };
+
+/**
+ * Carries a finished conversation on with something new the customer said.
+ * Everything so far stays, the last resolution is set aside, and the agent
+ * may take another turn. Each message is added once, however often this is
+ * called with it.
+ */
+export function resumeWith(state: AgentState, message: { id: string; text: string }): boolean {
+  if (state.followUps?.includes(message.id)) return false;
+  const last = state.messages.at(-1);
+  const block = { type: "text" as const, text: message.text };
+  // A conversation alternates turns. The customer's words join the last user
+  // turn when there is one, which is where the previous result was reported.
+  if (last?.role === "user") last.content.push(block);
+  else state.messages.push({ role: "user", content: [block] });
+  state.followUps = [...(state.followUps ?? []), message.id];
+  state.pending = [];
+  state.results = [];
+  state.nudged = false;
+  delete state.resolution;
+  delete state.stopped;
+  return true;
+}
 
 export function initialState(ticket: string): AgentState {
   return {

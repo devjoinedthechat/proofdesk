@@ -32,10 +32,10 @@ import {
   generateCompany,
   KNOWLEDGE_BASE,
   loadWorld,
+  PLAN_CHANGE_SCENARIOS,
   REFUND_SCENARIOS,
   ScenarioBuilder,
   TENANT_SLUGS,
-  type World,
 } from "@proofdesk/simulator";
 import pg from "pg";
 
@@ -55,14 +55,34 @@ const DATABASES = {
 
 /** The tickets the demo files. Each scenario adds one customer with the history it needs. */
 const DEMOS = {
-  refund: "refund-duplicate-with-invoice",
-  approval: "refund-duplicate-over-limit",
+  refund: { scenario: "refund-duplicate-with-invoice" },
+  approval: { scenario: "refund-duplicate-over-limit" },
+  // A ticket that does not say which charge, and the answer given when asked.
+  reply: {
+    scenario: "refund-duplicate-no-invoice",
+    subject: "Refund please",
+    body: "I think something went wrong with my last payment.",
+    answer: "It was charged twice. Please refund the second payment.",
+  },
+  plan: { scenario: "plan-add-seats" },
+  // An account with some history, to be deleted at its owner's request.
+  delete: { scenario: "refund-within-window" },
 } as const;
+
+export type DemoName = keyof typeof DEMOS;
 
 export type DemoFile = {
   demos: Record<
-    keyof typeof DEMOS,
-    { email: string; tenantId: string; subject: string; body: string }
+    DemoName,
+    {
+      email: string;
+      tenantId: string;
+      category: "refund" | "plan_change";
+      subject: string;
+      body: string;
+      /** What the customer says when the agent asks a question. */
+      answer?: string;
+    }
   >;
   staff: Record<string, { approver: string; operator: string }>;
 };
@@ -98,24 +118,39 @@ async function databases() {
 }
 
 /** One demo customer, with the history their ticket is about. */
-function demoFor(base: World, scenarioId: string, now: Date) {
-  const spec = REFUND_SCENARIOS.find((candidate) => candidate.id === scenarioId);
-  if (!spec) throw new Error(`No scenario ${scenarioId}`);
-  const builder = new ScenarioBuilder(base, scenarioId, now);
+function demoFor(builder: ScenarioBuilder, name: DemoName) {
+  const demo: { scenario: string; subject?: string; body?: string; answer?: string } = DEMOS[name];
+  const spec = [...REFUND_SCENARIOS, ...PLAN_CHANGE_SCENARIOS].find(
+    (candidate) => candidate.id === demo.scenario,
+  );
+  if (!spec) throw new Error(`No scenario ${demo.scenario}`);
   const built = spec.build(builder);
-  return { added: builder.added, customer: built.customer, ticket: built.ticket };
+  return {
+    customer: built.customer,
+    ticket: {
+      category:
+        built.ticket.category === "plan_change" ? ("plan_change" as const) : ("refund" as const),
+      subject: demo.subject ?? built.ticket.subject,
+      body: demo.body ?? built.ticket.body,
+      ...(demo.answer ? { answer: demo.answer } : {}),
+    },
+  };
 }
 
 /** The company and the demo customers, dated from now so that refund windows are open. */
 function world(now: Date) {
   const base = generateCompany({ seed: BASE_SEED, now });
-  return {
-    base,
-    demos: {
-      refund: demoFor(base, DEMOS.refund, now),
-      approval: demoFor(base, DEMOS.approval, now),
-    },
+  // One builder for all of them: invoice numbers run on from the company's,
+  // and two demo customers of one company must not be given the same one.
+  const builder = new ScenarioBuilder(base, "local-demos", now);
+  const demos = {
+    refund: demoFor(builder, "refund"),
+    approval: demoFor(builder, "approval"),
+    reply: demoFor(builder, "reply"),
+    plan: demoFor(builder, "plan"),
+    delete: demoFor(builder, "delete"),
   };
+  return { base, demos, added: builder.added };
 }
 
 async function seed(urls: Record<keyof typeof DATABASES, string>) {
@@ -131,11 +166,11 @@ async function seed(urls: Record<keyof typeof DATABASES, string>) {
       return null;
     }
     const now = new Date();
-    const { base, demos } = world(now);
+    const { base, demos, added } = world(now);
     const dbs = { app, billing, entitlements };
     await loadWorld(base, dbs);
     // The demo customers file their own tickets, so none are loaded for them.
-    for (const demo of Object.values(demos)) await loadWorld({ ...demo.added, tickets: [] }, dbs);
+    await loadWorld({ ...added, tickets: [] }, dbs);
 
     let sequence = 0;
     for (const document of KNOWLEDGE_BASE) {
@@ -159,12 +194,7 @@ async function seed(urls: Record<keyof typeof DATABASES, string>) {
       demos: Object.fromEntries(
         Object.entries(demos).map(([name, demo]) => [
           name,
-          {
-            email: demo.customer.email,
-            tenantId: demo.customer.tenantId,
-            subject: demo.ticket.subject,
-            body: demo.ticket.body,
-          },
+          { email: demo.customer.email, tenantId: demo.customer.tenantId, ...demo.ticket },
         ]),
       ) as DemoFile["demos"],
       staff,

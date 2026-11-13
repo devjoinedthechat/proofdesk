@@ -22,14 +22,17 @@ export type {
   CustomerRow,
   GrantAssertionRow,
   MemoryRow,
+  OutboxKind,
   TenantRow,
   TicketCategory,
   TicketGrantRow,
+  TicketMessageRow,
   TicketReviewRow,
   TicketRoute,
   TicketRow,
   TicketStatus,
   TicketTable,
+  WorkflowOutboxRow,
 } from "./schema.ts";
 export { asRole, DB_ROLES, type RowScope, withRowScope } from "./scope.ts";
 export { TEST_POSTGRES_URL_ENV, TEST_ROLE_PASSWORD, testPostgresUrl } from "./testing.ts";

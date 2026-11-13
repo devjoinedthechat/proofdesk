@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { callMcpTool, listMcpTools, PROMPT_VERSION, screenTicket } from "@proofdesk/agent";
 import { type AppDatabase, connect } from "@proofdesk/db";
+import { createDispatch } from "@proofdesk/dispatch";
 import {
   ANTHROPIC_PRICES,
   CLAUDE_FAILOVER,
@@ -209,6 +210,11 @@ async function start() {
         })
       : {};
 
+  const client = new Client({
+    connection: await Connection.connect({ address: env("TEMPORAL_ADDRESS") }),
+    namespace: env("TEMPORAL_NAMESPACE"),
+  });
+
   const worker = await createTicketWorker({
     connection: await NativeConnection.connect({ address: env("TEMPORAL_ADDRESS") }),
     namespace: env("TEMPORAL_NAMESPACE"),
@@ -224,15 +230,16 @@ async function start() {
         // Until an alerting channel is connected, an alert is a log line, a
         // row in the alerts table and an audit entry.
         notify: async (alert) => console.warn("ALERT", JSON.stringify(alert)),
+        // The sweeper starts work the portal recorded and could not start.
+        dispatch: createDispatch(client, {
+          taskQueue: env("TEMPORAL_TASK_QUEUE"),
+          canaryTaskQueue: process.env.TEMPORAL_CANARY_TASK_QUEUE,
+        }),
       }),
     },
   });
   // One watchdog for the whole system. Every worker tries to start it, and
   // the engine keeps the first.
-  const client = new Client({
-    connection: await Connection.connect({ address: env("TEMPORAL_ADDRESS") }),
-    namespace: env("TEMPORAL_NAMESPACE"),
-  });
   await client.workflow
     .start("watchdogWorkflow", {
       args: [{}],

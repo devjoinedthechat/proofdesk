@@ -8,6 +8,7 @@ export {
   type ModelStep,
   modelStep,
   type NextCall,
+  resumeWith,
   runAgent,
   type StopCause,
   settleNext,
@@ -29,6 +30,7 @@ export {
   withPlanChange,
 } from "./plan-change.ts";
 export {
+  followUpMessage,
   MAX_SEATS,
   PROMPT_VERSION,
   planChangePolicyText,

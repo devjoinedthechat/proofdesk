@@ -78,6 +78,11 @@ export type InspectedTicket = {
   /** What the reply guard objected to, if anything. */
   violations: string[];
   versions: Record<string, string>;
+  /**
+   * 0 for the ticket's first answer. Later rounds, after the customer
+   * replied, are recorded under the same trace and not as a second root.
+   */
+  round?: number;
   startedAt: Date;
   endedAt: Date;
 };
@@ -309,6 +314,26 @@ export function startInspection(options: {
     },
 
     ticket(ticket) {
+      if ((ticket.round ?? 0) > 0) {
+        child(
+          ticket.tenantId,
+          ticket.ticketId,
+          `follow-up ${ticket.round}`,
+          {
+            "openinference.span.kind": "AGENT",
+            "output.value": ticket.output,
+            metadata: json({
+              outcome: ticket.outcome,
+              reason: ticket.reason,
+              reply_guard: ticket.violations,
+            }),
+          },
+          ticket.endedAt,
+          ticket.endedAt,
+          ticket.violations.length > 0,
+        );
+        return;
+      }
       const { provider, ids } = pipeline(ticket.tenantId);
       // The root takes the ids every other span of the ticket already points at.
       ids.next = ticketTraceIds(ticket.ticketId);

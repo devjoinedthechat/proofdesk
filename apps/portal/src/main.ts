@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { type AppDatabase, connect } from "@proofdesk/db";
+import { createDispatch, ticketWorkflowId } from "@proofdesk/dispatch";
 import {
   CLIENTS,
   createGrantSigner,
@@ -8,7 +9,7 @@ import {
   type GrantKey,
 } from "@proofdesk/identity";
 import { env, main, serve } from "@proofdesk/service";
-import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
+import { Client, Connection } from "@temporalio/client";
 import { createPortalApp } from "./app.ts";
 import { mountUi } from "./ui.ts";
 
@@ -17,7 +18,6 @@ main(async () => {
   const connection = await Connection.connect({ address: env("TEMPORAL_ADDRESS") });
   const temporal = new Client({ connection, namespace: env("TEMPORAL_NAMESPACE") });
   const taskQueue = env("TEMPORAL_TASK_QUEUE");
-  const workflowId = (ticketId: string) => `ticket-${ticketId}`;
 
   const app = createPortalApp({
     db: connect<AppDatabase>(env("PORTAL_DATABASE_URL")),
@@ -40,32 +40,16 @@ main(async () => {
     }),
     clock: () => new Date(),
     newId: (prefix) => `${prefix}_${randomUUID().replaceAll("-", "")}`,
-    // One ticket has one workflow: the workflow id is derived from the ticket
-    // id, so starting it twice is refused by the engine.
-    onTicketCreated: async ({ route, ...ref }) => {
-      await temporal.workflow.start("ticketWorkflow", {
-        args: [ref],
-        // A canary build listens on its own queue. Without one configured,
-        // every ticket goes to the stable build.
-        taskQueue:
-          route === "canary" ? (process.env.TEMPORAL_CANARY_TASK_QUEUE ?? taskQueue) : taskQueue,
-        workflowId: workflowId(ref.ticketId),
-      });
-    },
-    // One request has one workflow, for the same reason.
-    onDeletionRequested: async (ref) => {
-      await temporal.workflow
-        .start("deletionWorkflow", {
-          args: [ref],
-          taskQueue,
-          workflowId: `deletion-${ref.requestId}`,
-        })
-        .catch((error: unknown) => {
-          if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
-        });
-    },
+    // The portal records each piece of work before trying to start it, so
+    // this may fail without losing anything.
+    dispatch: createDispatch(temporal, {
+      taskQueue,
+      canaryTaskQueue: process.env.TEMPORAL_CANARY_TASK_QUEUE,
+    }),
     decideApproval: async ({ ticketId, ...decision }) => {
-      await temporal.workflow.getHandle(workflowId(ticketId)).signal("approvalDecided", decision);
+      await temporal.workflow
+        .getHandle(ticketWorkflowId(ticketId))
+        .signal("approvalDecided", decision);
     },
   });
   mountUi(app, { issuer, clientId: CLIENTS.portalWeb });

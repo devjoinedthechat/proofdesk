@@ -5,6 +5,7 @@ import {
   changePlan,
   changePlanTool,
   checkResolution,
+  followUpMessage,
   hideIdempotencyKey,
   initialState,
   inspectNext,
@@ -14,6 +15,7 @@ import {
   type NextCall,
   planChangeAvailable,
   refundsMade,
+  resumeWith,
   type Screening,
   settleNext,
   systemPrompt,
@@ -345,6 +347,53 @@ export function createActivities(deps: ActivityDeps) {
     },
 
     /**
+     * Carries a ticket on after the customer answered. The run's conversation
+     * gets the new message, the ticket's last outcome is cleared, and the
+     * agent takes another turn. Returns the step to continue from, and whether
+     * there is anything to do: a message already taken in is not taken twice.
+     */
+    async resumeRun(input: {
+      ref: TicketRef;
+      messageId: string;
+    }): Promise<{ step: number; resumed: boolean }> {
+      const { ref, messageId } = input;
+      const run = await load(ref);
+      const message = await withRowScope(deps.db, scope(ref), (trx) =>
+        trx
+          .selectFrom("ticketMessages")
+          .select(["body", "author"])
+          .where("id", "=", messageId)
+          .where("ticketId", "=", ref.ticketId)
+          .executeTakeFirst(),
+      );
+      if (message?.author !== "customer") {
+        throw new Error(`No customer message ${messageId} on ticket ${ref.ticketId}`);
+      }
+      const resumed = resumeWith(run.state, {
+        id: messageId,
+        text: followUpMessage({ now: deps.clock(), body: message.body }),
+      });
+      if (!resumed) return { step: run.step, resumed: false };
+
+      await withRowScope(deps.db, scope(ref), async (trx) => {
+        await trx
+          .updateTable("agentRuns")
+          .set({ state: JSON.stringify(run.state), updatedAt: deps.clock() })
+          .where("ticketId", "=", ref.ticketId)
+          .where("step", "=", run.step)
+          .execute();
+        // The ticket is open again: its earlier outcome was a question.
+        await trx
+          .updateTable("tickets")
+          .set({ status: "open", outcome: null, reasonCode: null, resolvedAt: null })
+          .where("id", "=", ref.ticketId)
+          .execute();
+      });
+      await audit(ref, "run_resumed", { round: run.state.followUps?.length ?? 1 });
+      return { step: run.step, resumed: true };
+    },
+
+    /**
      * Ends a run that cannot go on because no model answered. The ticket then
      * goes to staff through the ordinary finish, instead of staying open with
      * nobody told.
@@ -567,7 +616,26 @@ export function createActivities(deps: ActivityDeps) {
         // from the ticket or from the model goes into it, so nothing a
         // customer writes can plant a "fact" for next time.
         const { ticket, tenant } = await tenantFacts(ref);
+        const round = state.followUps?.length ?? 0;
+        // The reply joins the ticket's thread. One per round, however often
+        // this step runs.
+        await withRowScope(deps.db, scope(ref), (trx) =>
+          trx
+            .insertInto("ticketMessages")
+            .values({
+              id: `msg_${ref.ticketId}_agent_${round}`,
+              ticketId: ref.ticketId,
+              tenantId: ref.tenantId,
+              customerId: ref.customerId,
+              author: "agent",
+              body: final.reply,
+              createdAt: deps.clock(),
+            })
+            .onConflict((conflict) => conflict.column("id").doNothing())
+            .execute(),
+        );
         deps.inspection?.ticket({
+          round,
           tenantId: ref.tenantId,
           ticketId: ref.ticketId,
           category: ticket.category,

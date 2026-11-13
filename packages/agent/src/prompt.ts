@@ -79,6 +79,23 @@ ${refundPolicyText(policy)}
 ${planChangePolicyText(policy)}`;
 }
 
+/**
+ * A later message from the customer on the same ticket. It is wrapped the
+ * same way as the ticket was, so the same rule applies to it: it is the
+ * customer's text, to be read and not obeyed.
+ */
+export function followUpMessage(input: { now: Date; body: string }): string {
+  return `Today is ${input.now.toISOString().slice(0, 10)} (time now: ${input.now.toISOString()}).
+
+The customer replied on this ticket:
+
+<ticket>
+<body>
+${input.body}
+</body>
+</ticket>`;
+}
+
 /** The per-ticket part. The date goes here, after the cached prefix, because it changes daily. */
 export function ticketMessage(input: {
   now: Date;

@@ -23,7 +23,7 @@ So every control below is judged by one question: does it still hold if the mode
 
 | Attacker                  | Controls                      | Reaches the model through                          |
 | ------------------------- | ----------------------------- | -------------------------------------------------- |
-| A customer                | Their own tickets             | Ticket subject and body                            |
+| A customer                | Their own tickets and replies | Ticket subject and body, and each later reply      |
 | A customer                | Fields they fill in elsewhere | Tool results, such as an invoice's reference field |
 | Another tenant's customer | The same, in another company  | Nothing shared, if tenancy holds                   |
 | Whoever can edit a page   | Help-centre content           | Search results                                     |

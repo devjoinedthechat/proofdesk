@@ -7,6 +7,7 @@ import {
   type TicketRow,
   withRowScope,
 } from "@proofdesk/db";
+import type { Dispatch, OutboxJob } from "@proofdesk/dispatch";
 import {
   bearerToken,
   CLIENTS,
@@ -16,7 +17,7 @@ import {
   type VerifiedToken,
 } from "@proofdesk/identity";
 import { createJsonApp, HttpError, parseBody } from "@proofdesk/service";
-import type { Kysely } from "kysely";
+import type { Kysely, Transaction } from "kysely";
 import { z } from "zod";
 
 export type PortalDeps = {
@@ -30,22 +31,11 @@ export type PortalDeps = {
   clock: () => Date;
   newId: (prefix: string) => string;
   /**
-   * Hands a new ticket to the agent. In production this starts the ticket's
-   * workflow, on the task queue of the build the ticket was routed to.
+   * Hands promised work to the workflow engine: a new ticket, a customer's
+   * answer, a deletion request. The work is recorded before this is called,
+   * so if it fails, or is absent, nothing is lost and a sweeper starts it.
    */
-  onTicketCreated?: (ref: {
-    ticketId: string;
-    tenantId: string;
-    customerId: string;
-    route: TicketRoute;
-  }) => Promise<void>;
-  /** Hands a deletion request to the workflow that carries it out. */
-  onDeletionRequested?: (ref: {
-    requestId: string;
-    ticketId: string;
-    tenantId: string;
-    customerId: string;
-  }) => Promise<void>;
+  dispatch?: Dispatch;
   /** The real time, for judging how old a sign-in is. Defaults to the system clock. */
   wallClock?: () => Date;
   /** Delivers a staff decision to the ticket's workflow. */
@@ -123,6 +113,25 @@ const reviewTicket = z.strictObject({
     .max(10)
     .default([]),
 });
+
+const postMessage = z.strictObject({ body: z.string().trim().min(1).max(10_000) });
+
+const staffReply = z.strictObject({
+  body: z.string().trim().min(1).max(4000),
+  /** How the ticket ends: the request was met, or it was declined. */
+  resolution: z.enum(["resolved", "refused"]),
+});
+
+type ThreadRow = { ticketId: string; author: string; body: string; createdAt: Date };
+/** One ticket's messages after the first, oldest first. */
+const thread = (messages: ThreadRow[], ticketId: string) =>
+  messages
+    .filter((message) => message.ticketId === ticketId)
+    .map((message) => ({
+      author: message.author,
+      body: message.body,
+      createdAt: message.createdAt.toISOString(),
+    }));
 
 const setControl = z.strictObject({
   /** Leave out to pause or resume the whole agent. */
@@ -248,6 +257,50 @@ export function createPortalApp(deps: PortalDeps) {
     return { tenantId: token.tenantId, subject: `staff:${token.subject}` };
   }
 
+  /**
+   * Records work for the workflow engine in the caller's transaction. If the
+   * transaction commits, the work will happen, whatever becomes of this
+   * process afterwards.
+   */
+  async function promise(trx: Transaction<AppDatabase>, job: OutboxJob) {
+    const id = deps.newId("job");
+    await trx
+      .insertInto("workflowOutbox")
+      .values({
+        id,
+        kind: job.kind,
+        tenantId: job.ref.tenantId,
+        customerId: job.ref.customerId,
+        ticketId: job.ref.ticketId,
+        payload: JSON.stringify(job),
+        createdAt: deps.clock(),
+        startedAt: null,
+      })
+      .execute();
+    return { id, job };
+  }
+
+  /**
+   * Tries to start promised work right away. A failure here is not the
+   * caller's problem: the work is on record, and the sweeper will start it.
+   */
+  async function handOver(promised: { id: string; job: OutboxJob }): Promise<void> {
+    if (!deps.dispatch) return;
+    try {
+      if ((await deps.dispatch(promised.job)) !== "started") return;
+      const { ref } = promised.job;
+      await withRowScope(deps.db, { tenantId: ref.tenantId, customerId: ref.customerId }, (trx) =>
+        trx
+          .updateTable("workflowOutbox")
+          .set({ startedAt: deps.clock() })
+          .where("id", "=", promised.id)
+          .execute(),
+      );
+    } catch (error) {
+      console.warn("Could not start a workflow now; the sweeper will.", error);
+    }
+  }
+
   app.get("/.well-known/jwks.json", (c) => c.json(deps.signer.jwks()));
 
   // Tickets the agent gave up on, waiting for a person to say what should
@@ -340,6 +393,90 @@ export function createPortalApp(deps: PortalDeps) {
       },
     });
     return c.json({ reviewed: true }, 201);
+  });
+
+  // Tickets the agent passed to staff and nobody has answered yet.
+  app.get("/staff/handed-over", async (c) => {
+    const staff = await approver(c.req.raw);
+    const { rows, messages } = await withRowScope(
+      deps.db,
+      { tenantId: staff.tenantId },
+      async (trx) => ({
+        rows: await trx
+          .selectFrom("tickets")
+          .select(["id", "category", "subject", "body", "reasonCode", "resolvedAt"])
+          .where("status", "=", "handed_to_staff")
+          .where("category", "<>", "data_deletion")
+          .orderBy("resolvedAt")
+          .execute(),
+        messages: await trx
+          .selectFrom("ticketMessages")
+          .select(["ticketId", "author", "body", "createdAt"])
+          .orderBy("seq")
+          .execute(),
+      }),
+    );
+    return c.json({
+      tickets: rows.map((row) => ({
+        id: row.id,
+        category: row.category,
+        subject: row.subject,
+        body: row.body,
+        reasonCode: row.reasonCode,
+        handedOverAt: row.resolvedAt?.toISOString() ?? null,
+        messages: thread(messages, row.id),
+      })),
+    });
+  });
+
+  // A member of staff answers the customer and closes the ticket. What the
+  // agent did stays on record as it was: the outcome is not rewritten.
+  app.post("/staff/tickets/:ticketId/reply", async (c) => {
+    const staff = await approver(c.req.raw);
+    const input = await parseBody(c.req.raw, staffReply);
+    const ticketId = c.req.param("ticketId");
+    const now = deps.clock();
+
+    await withRowScope(deps.db, { tenantId: staff.tenantId }, async (trx) => {
+      const closed = await trx
+        .updateTable("tickets")
+        .set({ status: input.resolution, reply: input.body })
+        .where("id", "=", ticketId)
+        .where("status", "=", "handed_to_staff")
+        .returning(["id", "customerId"])
+        .executeTakeFirst();
+      if (!closed) {
+        const exists = await trx
+          .selectFrom("tickets")
+          .select("id")
+          .where("id", "=", ticketId)
+          .executeTakeFirst();
+        if (!exists) throw new HttpError(404, "ticket_not_found", "Ticket not found");
+        throw new HttpError(409, "not_with_staff", "This ticket is not waiting for staff");
+      }
+      await trx
+        .insertInto("ticketMessages")
+        .values({
+          id: deps.newId("msg"),
+          ticketId,
+          tenantId: staff.tenantId,
+          customerId: closed.customerId,
+          author: "staff",
+          body: input.body,
+          createdAt: now,
+        })
+        .execute();
+    });
+    await appendAudit(deps.db, {
+      tenantId: staff.tenantId,
+      ticketId,
+      at: now,
+      actor: staff.subject,
+      event: "staff_replied",
+      // That a person answered, and how it ended. Never what they wrote.
+      detail: { resolution: input.resolution },
+    });
+    return c.json({ replied: true }, 201);
   });
 
   app.get("/staff/agent-controls", async (c) => {
@@ -480,7 +617,9 @@ export function createPortalApp(deps: PortalDeps) {
         .select(["id", "ticketId"])
         .where("status", "=", "requested")
         .executeTakeFirst();
-      if (open) return { requestId: open.id, ticketId: open.ticketId, created: false };
+      // A repeat creates nothing. If the first request's workflow has not
+      // started, the sweeper is already responsible for it.
+      if (open) return { requestId: open.id, promised: undefined };
 
       // From this moment no agent may act for the customer on any ticket.
       await trx
@@ -530,15 +669,16 @@ export function createPortalApp(deps: PortalDeps) {
           erased: null,
         })
         .execute();
-      return { requestId, ticketId, created: true };
+      return {
+        requestId,
+        promised: await promise(trx, {
+          kind: "deletion",
+          ref: { requestId, ticketId, ...scope },
+        }),
+      };
     });
 
-    // Also on a repeat, so a request whose workflow failed to start is picked up.
-    await deps.onDeletionRequested?.({
-      requestId: outcome.requestId,
-      ticketId: outcome.ticketId,
-      ...scope,
-    });
+    if (outcome.promised) await handOver(outcome.promised);
     return c.json({ request: { id: outcome.requestId, status: "requested" } }, 202);
   });
 
@@ -561,7 +701,7 @@ export function createPortalApp(deps: PortalDeps) {
       reply: null,
       resolvedAt: null,
     };
-    const route = await withRowScope(deps.db, scope, async (trx) => {
+    const job = await withRowScope(deps.db, scope, async (trx) => {
       const rollout = await trx
         .selectFrom("rollout")
         .select("canaryShare")
@@ -583,18 +723,78 @@ export function createPortalApp(deps: PortalDeps) {
           revokedAt: null,
         })
         .execute();
-      return chosen;
+      return promise(trx, {
+        kind: "ticket",
+        ref: { ticketId: ticket.id, ...scope },
+        route: chosen,
+      });
     });
-    await deps.onTicketCreated?.({ ticketId: ticket.id, ...scope, route });
+    await handOver(job);
     return c.json({ ticket: toTicket(ticket) }, 201);
   });
 
   app.get("/tickets", async (c) => {
     const { token: _token, ...scope } = await customer(c.req.raw);
-    const rows = await withRowScope(deps.db, scope, (trx) =>
-      trx.selectFrom("tickets").selectAll().orderBy("createdAt", "desc").orderBy("id").execute(),
-    );
-    return c.json({ tickets: rows.map(toTicket) });
+    const { rows, messages } = await withRowScope(deps.db, scope, async (trx) => ({
+      rows: await trx
+        .selectFrom("tickets")
+        .selectAll()
+        .where("category", "<>", "data_deletion")
+        .orderBy("createdAt", "desc")
+        .orderBy("id")
+        .execute(),
+      messages: await trx
+        .selectFrom("ticketMessages")
+        .select(["ticketId", "author", "body", "createdAt"])
+        .orderBy("seq")
+        .execute(),
+    }));
+    return c.json({
+      tickets: rows.map((row) => ({ ...toTicket(row), messages: thread(messages, row.id) })),
+    });
+  });
+
+  // The customer answers a question the agent asked. The agent then carries
+  // on with the same ticket, with everything said so far.
+  app.post("/tickets/:ticketId/messages", async (c) => {
+    const { token: _token, ...scope } = await customer(c.req.raw);
+    const { body } = await parseBody(c.req.raw, postMessage);
+    const ticketId = c.req.param("ticketId");
+    const now = deps.clock();
+
+    const promised = await withRowScope(deps.db, scope, async (trx) => {
+      // Only a ticket that is waiting for the customer takes a reply. The
+      // update is what claims it: of two replies sent at once, one wins.
+      const reopened = await trx
+        .updateTable("tickets")
+        .set({ status: "open" })
+        .where("id", "=", ticketId)
+        .where("status", "=", "waiting_customer")
+        .returning(["id", "route"])
+        .executeTakeFirst();
+      if (!reopened) {
+        const exists = await trx
+          .selectFrom("tickets")
+          .select("id")
+          .where("id", "=", ticketId)
+          .executeTakeFirst();
+        if (!exists) throw new HttpError(404, "ticket_not_found", "Ticket not found");
+        throw new HttpError(409, "not_waiting_for_you", "This ticket is not waiting for a reply");
+      }
+      const messageId = deps.newId("msg");
+      await trx
+        .insertInto("ticketMessages")
+        .values({ id: messageId, ticketId, ...scope, author: "customer", body, createdAt: now })
+        .execute();
+      return promise(trx, {
+        kind: "follow_up",
+        ref: { ticketId, ...scope },
+        route: reopened.route,
+        messageId,
+      });
+    });
+    await handOver(promised);
+    return c.json({ accepted: true }, 202);
   });
 
   // A customer can withdraw the agent's authority at any time.

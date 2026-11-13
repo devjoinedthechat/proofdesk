@@ -149,6 +149,34 @@ export type AlertRow = {
   raisedAt: Date;
 };
 
+/** One message in a ticket's conversation after the first. */
+export type TicketMessageRow = {
+  id: string;
+  /** The order messages were written in. Set by the database. */
+  seq: Generated<number>;
+  ticketId: string;
+  tenantId: string;
+  customerId: string;
+  author: "customer" | "agent" | "staff";
+  body: string;
+  createdAt: Date;
+};
+
+export type OutboxKind = "ticket" | "follow_up" | "deletion";
+
+/** Work promised to the workflow engine and not yet handed over. */
+export type WorkflowOutboxRow = {
+  id: string;
+  kind: OutboxKind;
+  tenantId: string;
+  customerId: string;
+  ticketId: string;
+  /** What the workflow is started with: identifiers only. */
+  payload: unknown;
+  createdAt: Date;
+  startedAt: Date | null;
+};
+
 /** A member of staff's verdict on a ticket the agent handed over. */
 export type TicketReviewRow = {
   ticketId: string;
@@ -213,6 +241,8 @@ export type AppDatabase = {
   deletionRequests: DeletionRequestRow;
   agentControls: AgentControlRow;
   ticketReviews: TicketReviewRow;
+  ticketMessages: TicketMessageRow;
+  workflowOutbox: WorkflowOutboxRow;
   rollout: RolloutRow;
   alerts: AlertRow;
   memories: MemoryRow;

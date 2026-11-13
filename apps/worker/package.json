@@ -12,6 +12,7 @@
   "dependencies": {
     "@proofdesk/agent": "workspace:*",
     "@proofdesk/db": "workspace:*",
+    "@proofdesk/dispatch": "workspace:*",
     "@proofdesk/gateway": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/policy": "workspace:*",
