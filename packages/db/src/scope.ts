@@ -7,6 +7,8 @@ export const DB_ROLES = {
   worker: "worker_app",
   billing: "billing_app",
   entitlements: "entitlements_app",
+  documents: "documents_app",
+  documentsIngest: "documents_ingest",
 } as const;
 
 export type RowScope = {

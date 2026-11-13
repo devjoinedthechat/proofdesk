@@ -3,12 +3,16 @@ export { CATALOG, TENANT_SLUGS, type TenantSlug } from "./catalog.ts";
 export {
   BASE_SEED,
   baseWorld,
+  createDocumentsEnv,
   createSimEnv,
+  DOCUMENTS_TEMPLATE,
+  type DocumentsEnv,
   prepareTemplates,
   type SimEnv,
   TEMPLATES,
 } from "./environment.ts";
 export { type GenerateOptions, generateCompany } from "./generate.ts";
+export { KNOWLEDGE_BASE, type KnowledgeDocument } from "./knowledge.ts";
 export { type Databases, loadWorld } from "./load.ts";
 export { createOracle } from "./oracle.ts";
 export {

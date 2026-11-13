@@ -12,6 +12,7 @@
   "dependencies": {
     "@proofdesk/billing": "workspace:*",
     "@proofdesk/db": "workspace:*",
+    "@proofdesk/documents": "workspace:*",
     "@proofdesk/entitlements": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "hono": "4.13.18",

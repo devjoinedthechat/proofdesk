@@ -18,13 +18,21 @@ import {
   TEST_ROLE_PASSWORD,
 } from "@proofdesk/db";
 import {
+  createHashEmbedder,
+  DOCUMENTS_MIGRATIONS_DIR,
+  type DocumentsDatabase,
+  ingestDocument,
+} from "@proofdesk/documents";
+import {
   createEntitlementsApp,
   createEntitlementsClient,
   ENTITLEMENTS_MIGRATIONS_DIR,
   type EntitlementsDatabase,
 } from "@proofdesk/entitlements";
 import type { Authenticate, Principal } from "@proofdesk/service";
+import { CATALOG } from "./catalog.ts";
 import { generateCompany } from "./generate.ts";
+import { KNOWLEDGE_BASE } from "./knowledge.ts";
 import { type Databases, loadWorld } from "./load.ts";
 import { SIM_NOW, type World } from "./world.ts";
 
@@ -90,7 +98,65 @@ export async function prepareTemplates(adminUrl: string): Promise<void> {
     // A template with an open connection cannot be copied.
     await close(dbs);
   }
+
+  // The knowledge base: migrated, then filled through the real ingestion
+  // pipeline with the stand-in embedder.
+  const documentsUrl = await createDatabase(adminUrl, DOCUMENTS_TEMPLATE);
+  await migrate(documentsUrl, DOCUMENTS_MIGRATIONS_DIR);
+  const ingest = connect<DocumentsDatabase>(
+    asRole(documentsUrl, DB_ROLES.documentsIngest, SIM_ROLE_PASSWORD),
+    { maxConnections: 1 },
+  );
+  try {
+    let sequence = 0;
+    for (const document of KNOWLEDGE_BASE) {
+      await ingestDocument(
+        {
+          db: ingest,
+          embedder: createHashEmbedder(),
+          clock: () => SIM_NOW,
+          newId: (prefix) => `${prefix}_kb${String(++sequence).padStart(3, "0")}`,
+        },
+        { ...document, tenantId: CATALOG[document.tenant].tenant.id },
+      );
+    }
+  } finally {
+    await ingest.destroy();
+  }
 }
+
+/** The template holding the knowledge base, already chunked, embedded and indexed. */
+export const DOCUMENTS_TEMPLATE = "tpl_documents";
+
+/**
+ * A private copy of the knowledge base, with one connection for searching and
+ * one for ingestion, each as its own restricted role.
+ */
+export async function createDocumentsEnv(adminUrl: string) {
+  const name = `sim_${randomBytes(6).toString("hex")}_documents`;
+  const url = await createDatabase(adminUrl, name, { template: DOCUMENTS_TEMPLATE });
+  const search = connect<DocumentsDatabase>(asRole(url, DB_ROLES.documents, SIM_ROLE_PASSWORD), {
+    maxConnections: 3,
+  });
+  const ingest = connect<DocumentsDatabase>(
+    asRole(url, DB_ROLES.documentsIngest, SIM_ROLE_PASSWORD),
+    { maxConnections: 2 },
+  );
+  const owner = connect<DocumentsDatabase>(url, { maxConnections: 2 });
+  return {
+    url,
+    search,
+    ingest,
+    owner,
+    embedder: createHashEmbedder(),
+    async dispose() {
+      await Promise.all([search.destroy(), ingest.destroy(), owner.destroy()]);
+      await dropDatabase(adminUrl, name);
+    },
+  };
+}
+
+export type DocumentsEnv = Awaited<ReturnType<typeof createDocumentsEnv>>;
 
 const PRINCIPAL_HEADER = "x-sim-principal";
 
