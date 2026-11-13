@@ -4,7 +4,7 @@ import * as cedar from "@cedar-policy/cedar-wasm/nodejs";
 import { type Authorize, refundsMade } from "@proofdesk/agent";
 import { type InvoiceRecords, type RefundFacts, refundFacts } from "./facts.ts";
 
-export { type InvoiceRecords, type RefundFacts, refundFacts } from "./facts.ts";
+export { type InvoiceRecords, invoiceRecords, type RefundFacts, refundFacts } from "./facts.ts";
 
 const POLICY_DIR = fileURLToPath(new URL("../policies", import.meta.url));
 

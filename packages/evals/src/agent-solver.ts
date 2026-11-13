@@ -6,6 +6,7 @@ import {
   systemPrompt,
   type TenantPolicy,
   ticketMessage,
+  ungroundedAmounts,
   withPlanChange,
   withSystemIdempotency,
 } from "@proofdesk/agent";
@@ -104,7 +105,7 @@ export type AgentSolverOptions = {
   /** Builds the system prompt. Defaults to the production prompt. */
   system?: (policy: TenantPolicy) => string;
   /** Called with the full result of each run, for metrics. */
-  onResult?: (result: AgentResult, violations: string[]) => void;
+  onResult?: (result: AgentResult, violations: string[], unsourcedAmounts: string[]) => void;
   /** Where the agent's tools come from. Defaults to the simulation's billing client. */
   tools?: (context: SolverContext) => Promise<AgentTool[]> | AgentTool[];
 };
@@ -123,17 +124,23 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       ...directHelpCenterTool(context),
     ];
 
+    const system = (options.system ?? systemPrompt)({
+      tenantName: tenant.name,
+      currency: tenant.currency,
+      refundWindowDays: tenant.refundWindowDays,
+      refundApprovalLimitCents: tenant.refundApprovalLimitCents,
+    });
+    const ticketText = ticketMessage({
+      now: context.now,
+      subject: ticket.subject,
+      body: ticket.body,
+    });
     const result = await runAgent({
       model: options.model,
       gateway: options.gateway,
       context: { tenantId: tenant.id, ticketId: ticket.id },
-      system: (options.system ?? systemPrompt)({
-        tenantName: tenant.name,
-        currency: tenant.currency,
-        refundWindowDays: tenant.refundWindowDays,
-        refundApprovalLimitCents: tenant.refundApprovalLimitCents,
-      }),
-      ticket: ticketMessage({ now: context.now, subject: ticket.subject, body: ticket.body }),
+      system,
+      ticket: ticketText,
       tools: withPlanChange(tools, ticket.id).map((tool) => withSystemIdempotency(tool, ticket.id)),
       authorize: policyAuthorizer(options.policy ?? productionPolicy, {
         ticket: {
@@ -174,7 +181,14 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
     const violations = result.resolution
       ? checkResolution(result.resolution, result.toolCalls)
       : [];
-    options.onResult?.(result, violations);
+    // Measured, not enforced: amounts in the reply that the agent was never shown.
+    const unsourced = result.resolution
+      ? ungroundedAmounts(result.resolution.reply, {
+          texts: [system, ticketText],
+          toolCalls: result.toolCalls,
+        })
+      : [];
+    options.onResult?.(result, violations, unsourced);
     if (!result.resolution) return handOver(`agent_${result.stopped}`);
     return violations[0] ? handOver(`guard_${violations[0]}`) : result.resolution;
   };

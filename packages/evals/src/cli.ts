@@ -44,6 +44,7 @@ const { values } = parseArgs({
     "min-pass-rate": { type: "string" },
     suite: { type: "string", default: "refund" },
     policy: { type: "string", default: "production" },
+    outage: { type: "string" },
   },
 });
 
@@ -78,6 +79,16 @@ const POLICIES: Record<string, () => ToolPolicy> = {
 const policyName = values.policy ?? "production";
 const buildPolicy = POLICIES[policyName] ?? fail(`Unknown policy "${policyName}"`);
 
+// "--outage claude-sonnet-5-5:0.4" makes 40% of the calls to that model fail
+// as overloaded, so those turns are answered by its backup model instead.
+const [outageModel, outageRate] = values.outage?.split(":") ?? [];
+const outage =
+  outageModel && Number(outageRate) > 0 && Number(outageRate) <= 1
+    ? { model: outageModel, rate: Number(outageRate) }
+    : values.outage
+      ? fail("--outage takes a model and a share, such as claude-sonnet-5-5:0.4")
+      : undefined;
+
 const postgres = await new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17").start();
 try {
   await prepareTemplates(postgres.getConnectionUri());
@@ -98,6 +109,7 @@ try {
       : {}),
     ...(promptName && promptSystem ? { prompt: { name: promptName, system: promptSystem } } : {}),
     ...(recordings ? { recordings } : {}),
+    ...(outage ? { outage } : {}),
     suite: { name: suiteName, specs: suiteSpecs },
     policy: { name: policyName, policy: buildPolicy() },
     onProgress(done, total, record) {

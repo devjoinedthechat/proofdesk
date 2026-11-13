@@ -42,7 +42,8 @@ export type IngestResult = {
 export type IngestDeps = {
   /** Connection as `documents_ingest`. */
   db: Kysely<DocumentsDatabase>;
-  embedder: Embedder;
+  /** Without one, chunks are indexed for full-text search only. */
+  embedder?: Embedder;
   clock: () => Date;
   newId: (prefix: string) => string;
   /** Skips the scan. Only for tests that need a poisoned document in the index. */
@@ -50,7 +51,8 @@ export type IngestDeps = {
 };
 
 /**
- * Takes one document through the pipeline: scan, chunk, embed, write.
+ * Takes one document through the pipeline: scan, chunk, embed if an embedder
+ * is configured, write.
  *
  * - Unchanged content is skipped, so re-running an import is free.
  * - Changed content replaces the old chunks in one transaction: a search
@@ -91,7 +93,7 @@ export async function ingestDocument(deps: IngestDeps, input: IngestInput): Prom
 
   const chunks = status === "active" ? chunkMarkdown(input.title, input.markdown) : [];
   // Embedding happens outside the transaction: it is the slow, fallible step.
-  const vectors = await deps.embedder.embed(
+  const vectors = await deps.embedder?.embed(
     chunks.map((chunk) => `${chunk.heading}\n\n${chunk.body}`),
     "document",
   );
@@ -145,8 +147,8 @@ export async function ingestDocument(deps: IngestDeps, input: IngestInput): Prom
             ordinal: chunk.ordinal,
             heading: chunk.heading,
             body: chunk.body,
-            embedding: toVectorLiteral(vectors[index] ?? []),
-            embeddingModel: deps.embedder.model,
+            embedding: vectors ? toVectorLiteral(vectors[index] ?? []) : null,
+            embeddingModel: deps.embedder?.model ?? null,
           })),
         )
         .execute();
@@ -192,7 +194,10 @@ export type SearchOptions = {
   audience: Audience;
   query: string;
   limit?: number;
-  /** Which signals to rank by. Hybrid is the default; the others exist to be measured. */
+  /**
+   * Which signals to rank by. The default is full-text when no embedder is
+   * configured and hybrid when one is.
+   */
   mode?: "hybrid" | "vector" | "fulltext";
   /**
    * Lets the vector index keep scanning when the access filter discards most
@@ -206,23 +211,29 @@ const CANDIDATES = 20;
 const RRF_K = 60;
 
 /**
- * Searches by meaning and by exact words, and merges the two rankings.
+ * Searches the chunks a caller may see. With no embedder this is full-text
+ * search. With one, it searches by meaning and by exact words and merges the
+ * two rankings.
  *
  * The access rule is not a step before or after this. The query runs as a
  * role under row-level security, in a transaction scoped to one tenant and
  * audience, so a chunk the caller may not see is never a candidate.
  */
 export async function searchDocuments(
-  deps: { db: Kysely<DocumentsDatabase>; embedder: Embedder },
+  deps: { db: Kysely<DocumentsDatabase>; embedder?: Embedder },
   options: SearchOptions,
 ): Promise<SearchHit[]> {
-  const mode = options.mode ?? "hybrid";
+  const mode = options.mode ?? (deps.embedder ? "hybrid" : "fulltext");
   const limit = Math.min(Math.max(options.limit ?? 5, 1), 10);
-  const [vector] = mode === "fulltext" ? [[]] : await deps.embedder.embed([options.query], "query");
+  if (mode !== "fulltext" && !deps.embedder) {
+    throw new Error(`Search mode "${mode}" needs an embedder, and none is configured`);
+  }
+  const [vector] =
+    mode === "fulltext" ? [[]] : ((await deps.embedder?.embed([options.query], "query")) ?? []);
   const literal = toVectorLiteral(vector ?? []);
 
   return withDocumentScope(deps.db, options, async (trx) => {
-    if (options.iterativeScan !== false) {
+    if (mode !== "fulltext" && options.iterativeScan !== false) {
       await sql`set local hnsw.iterative_scan = relaxed_order`.execute(trx);
     }
     const byVector =

@@ -56,16 +56,16 @@ export function createDocumentsMcpApp(deps: DocumentsMcpDeps) {
         {
           description: SEARCH_TOOL.description,
           inputSchema: SEARCH_TOOL.input.shape,
+          outputSchema: SEARCH_TOOL.output.shape,
           annotations: { readOnlyHint: true },
         },
-        async (args: unknown) => ({
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(await runSearch(deps, { tenantId, audience }, args)),
-            },
-          ],
-        }),
+        async (args: unknown) => {
+          const result = await runSearch(deps, { tenantId, audience }, args);
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result) }],
+            structuredContent: result,
+          };
+        },
       );
     }
     const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true });

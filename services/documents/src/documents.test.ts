@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chunkMarkdown } from "./chunk.ts";
-import { createHashEmbedder, createVoyageEmbedder, EMBEDDING_DIMENSIONS } from "./embedder.ts";
+import { createHashEmbedder, EMBEDDING_DIMENSIONS } from "./embedder.ts";
 import { scanDocument } from "./scan.ts";
 
 const cosine = (a: number[], b: number[]) =>
@@ -72,37 +72,6 @@ describe("the stand-in embedder", () => {
       "query",
     );
     expect(cosine(query ?? [], near ?? [])).toBeGreaterThan(cosine(query ?? [], far ?? []));
-  });
-});
-
-describe("the Voyage embedder", () => {
-  it("sends the documented request and returns vectors in input order", async () => {
-    let sent: { url: string; body: Record<string, unknown>; auth: string | null } | undefined;
-    const embedder = createVoyageEmbedder({
-      apiKey: "test-key",
-      fetch: (async (url: string, init: RequestInit) => {
-        sent = {
-          url,
-          body: JSON.parse(String(init.body)),
-          auth: new Headers(init.headers).get("authorization"),
-        };
-        return new Response(
-          JSON.stringify({
-            data: [
-              { index: 1, embedding: [2] },
-              { index: 0, embedding: [1] },
-            ],
-          }),
-        );
-      }) as typeof fetch,
-    });
-
-    expect(await embedder.embed(["a", "b"], "query")).toEqual([[1], [2]]);
-    expect(sent).toEqual({
-      url: "https://api.voyageai.com/v1/embeddings",
-      auth: "Bearer test-key",
-      body: { input: ["a", "b"], model: "voyage-3.5", input_type: "query", output_dimension: 1024 },
-    });
   });
 });
 

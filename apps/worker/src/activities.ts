@@ -240,8 +240,9 @@ export function createActivities(deps: ActivityDeps) {
       const { ref } = input;
       const { tenant } = await tenantFacts(ref);
       return advance(ref, input.step, async (state, tools) => {
-        await modelStep(state, {
-          model: deps.versions.model,
+        const { model } = deps.versions;
+        const answeredBy = await modelStep(state, {
+          model,
           gateway: deps.gateway,
           context: { tenantId: ref.tenantId, ticketId: ref.ticketId },
           system: systemPrompt({
@@ -253,7 +254,26 @@ export function createActivities(deps: ActivityDeps) {
           tools: toolsShown(tools),
           ...(deps.effort ? { effort: deps.effort } : {}),
         });
+        // A turn answered by a model other than the configured one, after a
+        // failover, is on the record: it is part of who decided what.
+        if (answeredBy && answeredBy !== model && !answeredBy.startsWith(`${model}-`)) {
+          await audit(ref, "answered_by_other_model", { configured: model, answeredBy });
+        }
         return { pending: state.pending.length, stopped: state.stopped !== undefined };
+      });
+    },
+
+    /**
+     * Ends a run that cannot go on because no model answered. The ticket then
+     * goes to staff through the ordinary finish, instead of staying open with
+     * nobody told.
+     */
+    async stopRun(input: { ref: TicketRef; step: number }): Promise<void> {
+      const { ref } = input;
+      await advance(ref, input.step, async (state) => {
+        state.stopped = "model_unavailable";
+        await audit(ref, "run_stopped", { cause: "model_unavailable", turns: state.turns });
+        return null;
       });
     },
 

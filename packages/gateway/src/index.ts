@@ -1,5 +1,6 @@
-export { createAnthropicProvider } from "./anthropic.ts";
+export { CLAUDE_FAILOVER, createAnthropicProvider } from "./anthropic.ts";
 export { ProviderError, type ProviderErrorKind } from "./errors.ts";
+export { createFaultInjector, modelOutage } from "./faults.ts";
 export {
   BudgetExceededError,
   type CallRecord,

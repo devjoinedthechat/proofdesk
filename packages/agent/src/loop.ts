@@ -25,7 +25,9 @@ export type StopCause =
   | "budget"
   | "refusal"
   | "max_tokens"
-  | "no_resolution";
+  | "no_resolution"
+  /** Set from outside the loop, when the model could not be reached at all. */
+  | "model_unavailable";
 
 /**
  * Everything about a run that must survive between steps. It is plain data,
@@ -81,12 +83,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
 /**
  * One model call. Afterwards the state either has tool calls pending, or the
  * run has stopped, or (after a reminder) it is ready for another model call.
+ *
+ * Returns the model that answered, which is not always the one asked for, or
+ * nothing when no call was made.
  */
-export async function modelStep(state: AgentState, step: ModelStep): Promise<void> {
-  if (state.stopped || state.pending.length > 0) return;
+export async function modelStep(state: AgentState, step: ModelStep): Promise<string | undefined> {
+  if (state.stopped || state.pending.length > 0) return undefined;
   if (state.turns >= (step.maxTurns ?? 12)) {
     state.stopped = "turn_limit";
-    return;
+    return undefined;
   }
 
   let response: Awaited<ReturnType<ModelProvider["complete"]>>;
@@ -96,7 +101,9 @@ export async function modelStep(state: AgentState, step: ModelStep): Promise<voi
         model: step.model,
         system: step.system,
         messages: state.messages,
-        tools: [...step.tools, resolveTool],
+        // Every tool is strict: the model's arguments are constrained to the
+        // tool's schema as they are generated, not only checked afterwards.
+        tools: [...step.tools.map((tool) => ({ ...tool, strict: true })), resolveTool],
         maxTokens: step.maxTokens ?? 8000,
         ...(step.effort ? { effort: step.effort } : {}),
       },
@@ -105,7 +112,7 @@ export async function modelStep(state: AgentState, step: ModelStep): Promise<voi
   } catch (caught) {
     if (!(caught instanceof BudgetExceededError)) throw caught;
     state.stopped = "budget";
-    return;
+    return undefined;
   }
   state.turns += 1;
   state.messages.push({ role: "assistant", content: response.content });
@@ -113,7 +120,7 @@ export async function modelStep(state: AgentState, step: ModelStep): Promise<voi
   // A refusal or a cut-off response is never acted on, even if it contains tool calls.
   if (response.stopReason === "refusal" || response.stopReason === "max_tokens") {
     state.stopped = response.stopReason;
-    return;
+    return response.model;
   }
 
   const calls = response.content.filter((block) => block.type === "tool_use");
@@ -121,13 +128,13 @@ export async function modelStep(state: AgentState, step: ModelStep): Promise<voi
     state.pending = calls;
     state.batch = calls.length > 1;
     state.results = [];
-    return;
+    return response.model;
   }
 
   // The model stopped without resolving. Remind it once, then give up.
   if (state.nudged) {
     state.stopped = "no_resolution";
-    return;
+    return response.model;
   }
   state.nudged = true;
   state.messages.push({
@@ -139,6 +146,7 @@ export async function modelStep(state: AgentState, step: ModelStep): Promise<voi
       },
     ],
   });
+  return response.model;
 }
 
 /** What the next pending tool call needs before it can be settled. */

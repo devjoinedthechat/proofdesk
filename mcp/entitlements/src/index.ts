@@ -1,4 +1,8 @@
-import { createEntitlementsClient, type EntitlementsClient } from "@proofdesk/entitlements";
+import {
+  createEntitlementsClient,
+  type EntitlementsClient,
+  entitlementResult,
+} from "@proofdesk/entitlements";
 import { CLIENTS, SCOPES, type TokenClient, type TokenVerifier } from "@proofdesk/identity";
 import { createServiceMcpApp, defineTool, type ServiceTool } from "@proofdesk/mcp-server";
 import { z } from "zod";
@@ -10,6 +14,7 @@ export const ENTITLEMENTS_TOOLS: ServiceTool<EntitlementsClient>[] = [
     description:
       "Shows what the customer's workspace is currently entitled to: plan, seats and whether access is active.",
     input: z.object({}),
+    output: entitlementResult,
     writes: false,
     run: async (client: EntitlementsClient, customerId) => ({
       entitlement: await client.getEntitlement(customerId),
@@ -25,6 +30,7 @@ export const ENTITLEMENTS_TOOLS: ServiceTool<EntitlementsClient>[] = [
       seats: z.number().int().min(1).max(500),
       idempotencyKey: z.string().min(8).max(200),
     }),
+    output: entitlementResult,
     writes: true,
     run: async (client: EntitlementsClient, customerId, { idempotencyKey, ...request }) => ({
       entitlement: await client.setEntitlement(customerId, request, idempotencyKey),

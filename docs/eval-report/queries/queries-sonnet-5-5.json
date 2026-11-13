@@ -1,0 +1,814 @@
+{
+  "model": "claude-sonnet-5-5",
+  "measuredAt": "2026-11-13T18:18:08.063Z",
+  "shown": 4,
+  "maxTurns": 3,
+  "costMicros": 103050,
+  "summary": {
+    "questions": 28,
+    "question": 21,
+    "plainFirstTurn": 28,
+    "plainWithin3Turns": 28,
+    "plainSearches": 50,
+    "shippedFirstTurn": 28,
+    "shippedWithin3Turns": 28,
+    "shippedSearches": 53
+  },
+  "rows": [
+    {
+      "question": "How many business days does a card refund take to show on my statement?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "how long does a card refund take to appear on statement business days",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund card statement business days how long",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "When will I get my money back?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "how long does a refund take to arrive",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "refund timing processing time",
+          "rank": 2
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund time arrive how long money back processing days",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund policy eligibility request",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "question": "My card expired, where does the refund go?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "refund to expired card where does refund go",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund card closed or replaced",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund expired card closed card where does refund go",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund original payment method card replaced new card bank",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Why is my large reimbursement taking longer than usual?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "large refund taking longer than usual",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "how long does a refund take to arrive",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund reimbursement taking longer delay large amount review processing time",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "how long does a refund take to arrive",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "How do I cancel my subscription?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "how to cancel my subscription",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "cancel subscription cancellation end plan",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Will I lose what I wrote if I stop paying?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "what happens to my notes if I stop paying or cancel subscription",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "downgrade to free plan data retention",
+          "rank": null
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "cancel subscription notes deleted data access after downgrade stop paying",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "expired payment failed free plan export notes retention",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Does Harbor Notes support SAML?",
+      "wording": "exact",
+      "audience": "public",
+      "questionRank": 5,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "SAML single sign-on support",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "SSO authentication enterprise plan",
+          "rank": 5
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "SAML SSO single sign-on identity provider",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "SAML authentication enterprise Okta Azure",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Can my company log in through our identity provider on the Team tier?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": 4,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "single sign-on SSO identity provider Team plan",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "SAML login plan availability",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "SSO single sign-on SAML identity provider Team plan",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "Team tier plan includes features Okta Azure login",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "What does the Starter plan cost per seat?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "Starter plan price per seat",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "Starter plan price per seat cost pricing",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "I see two invoices a month apart, is that a duplicate?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "two invoices a month apart duplicate charge",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "billing cycle monthly invoice when am I charged",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "invoice billing monthly charge duplicate charged twice",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "billing cycle renewal monthly subscription invoice",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "My bank app shows a pending transaction that later vanished. Was I billed twice?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "pending transaction disappeared from bank statement charged twice",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "authorization hold pending charge",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "pending transaction authorization hold disappeared charge billed twice duplicate",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "billing payment failed retry card verification charge",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "When are added seats charged?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "when are added seats charged",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "add seats billing proration",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "added seats charged billing add seat proration",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "add users team members additional seats charge when",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Where can I add a purchase order number to an invoice?",
+      "wording": "exact",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "add purchase order number to invoice",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "PO number on invoice billing details",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "purchase order PO number invoice",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "invoice details billing information custom field reference",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "My pages are not showing up on my phone.",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "pages not showing up on phone mobile app",
+          "rank": null
+        },
+        {
+          "turn": 1,
+          "query": "notes not syncing between devices",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "pages not showing phone mobile sync missing notes",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "sync devices app not appearing troubleshooting",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Can I get credit for an outage?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "service credit for outage",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "downtime SLA compensation",
+          "rank": null
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "outage credit downtime service interruption SLA compensation",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "service credit outage refund unavailable",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "question": "Who can approve a refund outside the published window?",
+      "wording": "shared",
+      "audience": "internal",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "who can approve a refund outside the refund window",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund exception policy approval",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund outside window exception approve approval",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund policy window days eligible late refund request manager",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Where do I send a customer who says they will take us to court?",
+      "wording": "paraphrase",
+      "audience": "internal",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "customer threatens legal action or court",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "legal department contact escalation",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "legal threat lawsuit court sue legal team escalate",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "escalation complaint legal action solicitor attorney contact",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Can I refund a payment that is under a bank dispute?",
+      "wording": "shared",
+      "audience": "internal",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "refund payment under bank dispute chargeback",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund policy",
+          "rank": 5
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund payment bank dispute chargeback",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "disputed payment refund policy",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "How long does a card refund take?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "how long does a refund to card take",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "card refund how long take days processing arrive",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund timeline credit card debit bank statement business days",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Where can I see whether my money was sent back?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "check refund status where to see if refund was sent",
+          "rank": 2
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "refund status check money sent back",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "refund track billing history invoice refunded",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Can I pause my plan instead of cancelling?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "pause my plan instead of cancelling",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "pause subscription",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "pause plan subscription suspend hold cancel",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "pause account freeze downgrade temporarily",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "How long do you hold on to my dashboards after I leave?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "how long are dashboards retained after cancelling account",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "data retention after account deletion or cancellation",
+          "rank": 2
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "data retention after cancellation dashboards deleted account closed",
+          "rank": 2
+        },
+        {
+          "turn": 1,
+          "query": "delete account data how long kept days cancel subscription export dashboards",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "question": "Which plan includes scheduled reports?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "scheduled reports plan",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "scheduled reports plan includes",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "plans comparison features report scheduling automated email reports",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "Is there API access?",
+      "wording": "exact",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "API access",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "API keys and developer documentation",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "API access developer key token integration",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "API plan includes webhooks REST",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "question": "My weekly email with the numbers never came.",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "weekly email report not received",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "weekly summary email schedule and settings",
+          "rank": 2
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "weekly email report not received summary digest",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "weekly email missing spam notification settings schedule",
+          "rank": 2
+        }
+      ]
+    },
+    {
+      "question": "Are prices shown with tax?",
+      "wording": "shared",
+      "audience": "public",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "Are prices shown with tax included?",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "VAT sales tax on pricing and invoices",
+          "rank": 1
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "prices tax VAT sales tax included exclusive",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "pricing taxes checkout invoice billing",
+          "rank": 1
+        }
+      ]
+    },
+    {
+      "question": "I was billed again four weeks after the first time, is that an error?",
+      "wording": "paraphrase",
+      "audience": "public",
+      "questionRank": null,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "billing cycle: why was I charged again four weeks after first charge",
+          "rank": 4
+        },
+        {
+          "turn": 1,
+          "query": "billing frequency monthly vs every 4 weeks renewal date",
+          "rank": 2
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "billing cycle billed again charge every four weeks monthly renewal",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "duplicate charge billed twice unexpected charge",
+          "rank": 5
+        }
+      ]
+    },
+    {
+      "question": "Should I approve a double charge on an annual renewal?",
+      "wording": "shared",
+      "audience": "internal",
+      "questionRank": 1,
+      "plain": [
+        {
+          "turn": 1,
+          "query": "double charge on annual renewal refund",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund policy duplicate charge",
+          "rank": 5
+        }
+      ],
+      "shipped": [
+        {
+          "turn": 1,
+          "query": "double charge annual renewal refund duplicate charged twice",
+          "rank": 1
+        },
+        {
+          "turn": 1,
+          "query": "refund policy annual plan renewal",
+          "rank": 3
+        }
+      ]
+    }
+  ]
+}

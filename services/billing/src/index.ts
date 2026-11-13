@@ -9,6 +9,14 @@ export type {
   Refund,
   Subscription,
 } from "./api.ts";
+export {
+  invoiceList,
+  planChange,
+  planChangeResult,
+  refund,
+  refundResult,
+  subscriptionList,
+} from "./api.ts";
 export { BILLING_SCOPES, createBillingApp } from "./app.ts";
 export { type BillingClient, createBillingClient } from "./client.ts";
 export type {

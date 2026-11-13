@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  createHashEmbedder,
   type DocumentsDatabase,
   EMBEDDING_DIMENSIONS,
   searchDocuments,
@@ -21,15 +20,16 @@ import { type Kysely, sql } from "kysely";
 //
 //   node packages/evals/src/retrieval-eval.ts
 //
-// Part 1 scores search quality on questions with known answers, per ranking
-// mode. It uses the stand-in embedder, so its vector numbers describe word
-// overlap, not what a real embedding model would do.
+// Part 1 scores the search as it runs, full-text, on questions with known
+// answers, each sent to the search word for word. What a model-written query
+// adds is measured separately, by query-eval.ts.
 //
-// Part 2 does not depend on the embedder at all. It asks what happens to the
-// vector index when access rules hide almost everything it finds.
+// Part 2 is about the vector path, which is built and not switched on. It
+// asks what happens to a vector index when access rules hide almost
+// everything it finds. It uses synthetic vectors and needs no embedding model.
 
 const OUT = fileURLToPath(new URL("../../../docs/eval-report/retrieval.json", import.meta.url));
-const MODES = ["hybrid", "vector", "fulltext"] as const;
+const MODES = ["fulltext"] as const;
 
 async function quality(env: Awaited<ReturnType<typeof createDocumentsEnv>>) {
   const sources = new Map(
@@ -43,7 +43,7 @@ async function quality(env: Awaited<ReturnType<typeof createDocumentsEnv>>) {
     const ranks: Record<string, number | null> = {};
     for (const mode of MODES) {
       const hits = await searchDocuments(
-        { db: env.search, embedder: env.embedder },
+        { db: env.search },
         { tenantId, audience: item.audience, query: item.question, limit: 10, mode },
       );
       const index = hits.findIndex(
@@ -227,7 +227,6 @@ try {
     for (const share of [0.5, 0.1, 0.01]) filteredRecall.push(await filtered(env, share));
 
     const output = {
-      embedder: createHashEmbedder().model,
       measuredAt: new Date().toISOString(),
       questions,
       filteredRecall,

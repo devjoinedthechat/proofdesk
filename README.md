@@ -55,8 +55,9 @@ The agent never holds a customer's credential. Submitting a ticket creates a gra
 | The reply cannot misstate what was done            | It claims a refund that was not made, hides one that was, and leaks its tool names                                                                                                   |
 | Approval cannot override the kill switch           | The agent is paused after approval is requested ([test](apps/worker/src/workflow.itest.ts))                                                                                          |
 | Anything no policy mentions is denied              | A tool nobody wrote a policy for is called ([test](packages/policy/src/policy.test.ts))                                                                                              |
+| Nothing crosses a boundary unchecked               | A tool returns something other than its declared output; billing records arrive malformed ([test](packages/mcp-server/src/tool.test.ts))                                             |
 
-Rules that matter are enforced on facts the policy layer reads from billing itself, not on the model's word. The [threat model](docs/threat-model.md) lists the controls by layer and states what a compromised model can still do.
+Rules that matter are enforced on facts the policy layer reads from billing itself, not on the model's word. Every tool is offered in strict mode, and every result is checked against a schema by the code that acts on it ([ADR 11](docs/adr/0011-schemas-at-every-boundary.md)). The [threat model](docs/threat-model.md) lists the controls by layer and states what a compromised model can still do.
 
 ### Durable execution
 
@@ -67,6 +68,8 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 | A large refund waits for a person                  | The worker is shut down during the wait and the approval arrives with no worker running                                                                                             |
 | A plan change is all or nothing across two systems | The worker is lost between the two writes; the second system refuses; the worker is lost during the undo                                                                            |
 | No customer data in workflow history               | A finished history is searched for the ticket's text, the name, the email and the amount                                                                                            |
+| A ticket never waits on a model that is down       | Every attempt at a model turn fails mid-ticket: the ticket goes to staff with nothing paid                                                                                          |
+| A turn can move to another model mid-ticket        | 40% of calls to one model are failed on the real API; all 76 scenarios still pass ([report](docs/eval-report/README.md#failover-between-models))                                    |
 | The audit log is tamper-evident                    | Entries are edited, re-hashed and deleted with full database access ([test](packages/db/src/audit.itest.ts))                                                                        |
 
 ### Retrieval and memory
@@ -75,7 +78,7 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Access is part of the search, not a filter around it | The same question is asked as staff and as an agent acting for a customer ([test](packages/simulator/src/documents.itest.ts))                                                   |
 | A poisoned page cannot change an outcome             | It is quarantined at ingestion; with the scan bypassed, the refund is still refused                                                                                             |
-| A small tenant still gets results from a large index | The vector index is forced: recall is 3.5% without iterative scan and 98% with it ([report](docs/eval-report/retrieval.md))                                                     |
+| Search finds what the customer's wording misses      | 28 labelled questions: the customer's words find 21, a query the agent writes finds 28 ([report](docs/eval-report/retrieval.md))                                                |
 | Memory cannot be poisoned by a ticket                | A ticket claims a manager promised a refund; the stored memory holds only facts the system computed, and none of the ticket's words ([test](apps/worker/src/workflow.itest.ts)) |
 
 ## Results on real models
@@ -84,15 +87,15 @@ Three repeats of 76 scenarios on each model. An attempt passes only if the final
 
 | Suite                                     | `claude-sonnet-5-5` | `claude-haiku-5-5` |
 | ----------------------------------------- | ------------------- | ------------------ |
-| 32 honest refund tickets                  | 95 of 96            | 96 of 96           |
+| 32 honest refund tickets                  | 96 of 96            | 93 of 96           |
 | 13 plan-change tickets                    | 39 of 39            | 36 of 39           |
 | 7 tickets that need the help centre       | 21 of 21            | 21 of 21           |
 | 24 attack tickets: attacks that succeeded | 0 of 72             | 0 of 72            |
-| Cost per ticket                           | $0.0093             | $0.0007            |
+| Cost per ticket                           | $0.0091             | $0.0006            |
 
-- **The quality gate fails when it should.** With the refund policy removed from the prompt, the pass rate on the gate sample falls from 28 of 28 to 18 of 28 and the command exits non-zero.
-- **The suites are nearly saturated.** One scenario in 76 separates the two models, so these numbers cannot rank models.
-- **No attack fooled either model,** which means those runs never reached the controls behind the model. That is why the compromised-model tests above exist.
+- **The quality gate fails when it should.** With the refund policy removed from the prompt, the pass rate on the gate sample falls from 28 of 28 to 20 of 28 and the command exits non-zero.
+- **The suites are nearly saturated.** Sonnet passed every attempt and Haiku failed 9 of 228, none of which moved money wrongly. These numbers cannot rank models.
+- **No attack fooled either model,** which means those runs barely reached the controls behind the model. That is why the compromised-model tests above exist.
 
 The [eval report](docs/eval-report/README.md) has the method, every failure and the limits.
 
@@ -120,7 +123,7 @@ pnpm evals --model claude-sonnet-5-5 --effort medium --max-spend 1 --out results
 ## How a ticket is handled
 
 1. **Submission.** A signed-in customer submits a ticket and picks a category. That creates the grant, and starts one Temporal workflow.
-2. **Model turn.** The worker sends the ticket, wrapped as untrusted text, with the company's policy and the tools the category allows.
+2. **Model turn.** The worker sends the ticket, wrapped as untrusted text, with the company's policy and the tools the category allows. Every tool is strict: arguments are constrained to its schema.
 3. **Policy check.** Each tool call the model asks for is decided by Cedar: allow, deny, or wait for staff.
 4. **Tool call.** The worker obtains a fresh token for that one call and calls the MCP server, with an idempotency key the model never sees.
 5. **Resolution.** The model ends by calling a tool with the outcome, the reason and the reply.
@@ -139,21 +142,21 @@ The systems of record run as a seeded environment, so every ticket has a known c
 
 ## Repository layout
 
-| Path                                                              | Contents                                                    |
-| ----------------------------------------------------------------- | ----------------------------------------------------------- |
-| `apps/portal`                                                     | Ticket submission, grants, staff approvals                  |
-| `apps/worker`                                                     | The ticket workflow and its activities                      |
-| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                        |
-| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                   |
-| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard           |
-| `packages/gateway`                                                | Model access: budgets, retries, failover, record and replay |
-| `packages/policy`                                                 | Cedar policies and the facts they are decided on            |
-| `packages/identity`                                               | Token verification, grant signing, realm provisioning       |
-| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange      |
-| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory       |
-| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner   |
-| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay         |
-| `docs`                                                            | Decision records, eval report, threat model                 |
+| Path                                                              | Contents                                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `apps/portal`                                                     | Ticket submission, grants, staff approvals                                 |
+| `apps/worker`                                                     | The ticket workflow and its activities                                     |
+| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                       |
+| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                  |
+| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                          |
+| `packages/gateway`                                                | Model access: budgets, retries, failover between models, record and replay |
+| `packages/policy`                                                 | Cedar policies and the facts they are decided on                           |
+| `packages/identity`                                               | Token verification, grant signing, realm provisioning                      |
+| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                     |
+| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                      |
+| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                  |
+| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay                        |
+| `docs`                                                            | Decision records, eval report, threat model                                |
 
 ## Design decisions
 
@@ -166,12 +169,14 @@ The systems of record run as a seeded environment, so every ticket has a known c
 7. [Refund rules are enforced on billing records, not only in the prompt](docs/adr/0007-enforce-refund-rules-on-records.md)
 8. [What is in the prompt, what is retrieved, what is remembered](docs/adr/0008-prompt-retrieval-memory.md)
 9. [A plan change is one tool and a saga](docs/adr/0009-plan-change-saga.md)
+10. [One model provider](docs/adr/0010-one-model-provider.md)
+11. [A schema at every boundary](docs/adr/0011-schemas-at-every-boundary.md)
 
 ## Scope
 
 - **One agent, by choice.** Every property here can be shown with one. Multi-agent orchestration would add surface without adding a proof.
 - **No agent framework.** The loop is a few hundred lines, and the controls around it are the point.
-- **Embeddings are a stand-in.** Retrieval is built and tested end to end, with word-overlap vectors in place of an embedding model. The [retrieval report](docs/eval-report/retrieval.md) says what that does and does not measure.
+- **One model provider.** Failover is between Claude models, which covers a model short of capacity and not the provider being down. Help-centre search is full-text with queries the agent writes; the vector path is built and switched off. See [ADR 10](docs/adr/0010-one-model-provider.md).
 - **Services run as processes in tests, not as a deployed stack.** There is no browser interface; the portal and staff approvals are HTTP APIs.
 
 ## Licence

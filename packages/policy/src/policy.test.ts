@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createToolPolicy,
   type InvoiceRecords,
+  invoiceRecords,
   loadPolicies,
   policyAuthorizer,
   RECORD_BASED_POLICIES,
@@ -240,6 +241,34 @@ describe("without the record-based rules", () => {
   it("allows what only the prompt forbids", () => {
     expect(weak.decide(refund({ facts: facts({ daysSincePayment: 300 }) })).decision).toBe("allow");
     expect(weak.decide(refund({ facts: facts({ invoiceDisputed: true }) })).decision).toBe("allow");
+  });
+});
+
+describe("invoiceRecords", () => {
+  const payment = {
+    id: "pay_1",
+    status: "succeeded",
+    createdAt: "2026-11-01T00:00:00.000Z",
+    amountCents: 87_00,
+    refundedCents: 0,
+    refunds: [],
+  };
+
+  it("accepts billing records and ignores the fields policy does not use", () => {
+    const parsed = invoiceRecords.parse([{ number: "INV-1", payments: [payment] }]);
+    expect(parsed).toEqual([{ payments: [payment] }]);
+  });
+
+  it("refuses records policy could not decide on", () => {
+    for (const broken of [
+      undefined,
+      [{ payments: [{ ...payment, amountCents: "87.00" }] }],
+      [{ payments: [{ ...payment, createdAt: "yesterday" }] }],
+      [{ payments: [{ ...payment, refunds: undefined }] }],
+      [{}],
+    ]) {
+      expect(invoiceRecords.safeParse(broken).success).toBe(false);
+    }
   });
 });
 

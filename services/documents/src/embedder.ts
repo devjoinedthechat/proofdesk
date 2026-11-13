@@ -21,11 +21,12 @@ export function tokenize(text: string): string[] {
 }
 
 /**
- * A stand-in embedder with no model behind it: words and word pairs are hashed
- * into a fixed-size vector. Texts that share words land near each other, and
- * that is all it knows. It is deterministic, free and offline, which makes it
- * right for tests and for measuring the index. It is not a measure of how
- * well a real embedding model would retrieve.
+ * A test double with no model behind it: words and word pairs are hashed into
+ * a fixed-size vector. Texts that share words land near each other, and that
+ * is all it knows. It is deterministic, free and offline, which makes it right
+ * for testing the vector path and for measuring the index. It is never used to
+ * answer a real search, and it says nothing about how an embedding model
+ * would retrieve.
  */
 export function createHashEmbedder(): Embedder {
   function vector(text: string): number[] {
@@ -44,37 +45,6 @@ export function createHashEmbedder(): Embedder {
   return {
     model: "hash-1024",
     embed: async (texts) => texts.map(vector),
-  };
-}
-
-/**
- * Voyage AI embeddings. Untested here: no Voyage key was available when this
- * was written, so only its request shape is checked, against a fake endpoint.
- */
-export function createVoyageEmbedder(options: {
-  apiKey: string;
-  model?: string;
-  fetch?: typeof fetch;
-}): Embedder {
-  const model = options.model ?? "voyage-3.5";
-  const send = options.fetch ?? fetch;
-  return {
-    model,
-    async embed(texts, kind) {
-      const response = await send("https://api.voyageai.com/v1/embeddings", {
-        method: "POST",
-        headers: { authorization: `Bearer ${options.apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          input: texts,
-          model,
-          input_type: kind,
-          output_dimension: EMBEDDING_DIMENSIONS,
-        }),
-      });
-      if (!response.ok) throw new Error(`Voyage embeddings failed with status ${response.status}`);
-      const body = (await response.json()) as { data: { index: number; embedding: number[] }[] };
-      return [...body.data].sort((a, b) => a.index - b.index).map((item) => item.embedding);
-    },
   };
 }
 

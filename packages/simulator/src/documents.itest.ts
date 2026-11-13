@@ -17,7 +17,7 @@ let env: DocumentsEnv;
 let sequence = 0;
 
 const search = (tenantId: string, audience: "public" | "internal", query: string, limit = 5) =>
-  searchDocuments({ db: env.search, embedder: env.embedder }, { tenantId, audience, query, limit });
+  searchDocuments({ db: env.search }, { tenantId, audience, query, limit });
 
 const ingest = (
   input: {
@@ -32,7 +32,6 @@ const ingest = (
   ingestDocument(
     {
       db: env.ingest,
-      embedder: env.embedder,
       clock: () => SIM_NOW,
       newId: (prefix) => `${prefix}_t${++sequence}`,
       ...options,
@@ -68,12 +67,57 @@ describe("the seeded knowledge base", () => {
     expect(top?.body).toContain("5 to 10 business days");
   });
 
-  it("finds an exact term through full-text search", async () => {
-    const hits = await searchDocuments(
-      { db: env.search, embedder: env.embedder },
-      { tenantId: HARBOR, audience: "public", query: "SAML", mode: "fulltext" },
-    );
+  it("finds an exact term", async () => {
+    const hits = await search(HARBOR, "public", "SAML");
     expect(hits[0]?.body).toContain("SAML");
+  });
+});
+
+describe("the vector path", () => {
+  it("is off without an embedder: chunks are stored with no embedding and found by their words", async () => {
+    const { documentId } = await ingest({
+      title: "Data export",
+      sourceUri: "help/export",
+      markdown: "## Formats\n\nExport notes as Markdown or PDF.",
+    });
+
+    const stored = await env.owner
+      .selectFrom("chunks")
+      .select(["embedding", "embeddingModel"])
+      .where("documentId", "=", documentId)
+      .execute();
+    expect(stored).toEqual([{ embedding: null, embeddingModel: null }]);
+    expect((await search(HARBOR, "public", "export as PDF"))[0]?.documentId).toBe(documentId);
+    await expect(
+      searchDocuments(
+        { db: env.search },
+        { tenantId: HARBOR, audience: "public", query: "export", mode: "vector" },
+      ),
+    ).rejects.toThrow(/needs an embedder/);
+  });
+
+  it("ranks by vectors and by words together once an embedder is configured", async () => {
+    const withVectors = { db: env.search, embedder: env.embedder };
+    const question = "how long until the refund shows on my card statement";
+
+    for (const mode of ["vector", "hybrid"] as const) {
+      const [top] = await searchDocuments(withVectors, {
+        tenantId: HARBOR,
+        audience: "public",
+        query: question,
+        mode,
+      });
+      expect(top?.body).toContain("5 to 10 business days");
+    }
+    // The access rule holds on the vector path too.
+    const asCustomer = await searchDocuments(withVectors, {
+      tenantId: HARBOR,
+      audience: "public",
+      query: "who can approve a refund outside the published window",
+      mode: "vector",
+      limit: 10,
+    });
+    expect(asCustomer.every((hit) => hit.visibility === "public")).toBe(true);
   });
 });
 

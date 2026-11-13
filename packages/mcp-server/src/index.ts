@@ -14,23 +14,45 @@ export type ServiceTool<Client> = {
   scope: string;
   description: string;
   input: z.ZodObject;
+  /** The shape of a successful result. */
+  output: z.ZodObject;
   /** True when a successful call changes records. */
   writes: boolean;
-  run(client: Client, customerId: string, args: unknown): Promise<unknown>;
+  run(client: Client, customerId: string, args: unknown): Promise<Record<string, unknown>>;
 };
 
-/** Declares a tool with typed arguments. The arguments are validated before `run` is called. */
-export function defineTool<Client, Input extends z.ZodObject>(tool: {
+/** Thrown when a tool produced a result that does not match its declared output. */
+export class ToolOutputError extends Error {
+  override readonly name = "ToolOutputError";
+}
+
+/**
+ * Declares a tool with a typed input and output. The arguments are validated
+ * before `run` is called and the result is validated before it is returned,
+ * so a caller never has to guess at either shape.
+ */
+export function defineTool<Client, Input extends z.ZodObject, Output extends z.ZodObject>(tool: {
   name: string;
   scope: string;
   description: string;
   input: Input;
+  output: Output;
   writes: boolean;
-  run(client: Client, customerId: string, args: z.infer<Input>): Promise<unknown>;
+  run(client: Client, customerId: string, args: z.infer<Input>): Promise<z.infer<Output>>;
 }): ServiceTool<Client> {
   return {
     ...tool,
-    run: (client, customerId, args) => tool.run(client, customerId, tool.input.parse(args)),
+    async run(client, customerId, args) {
+      const result = await tool.run(client, customerId, tool.input.parse(args));
+      const checked = tool.output.safeParse(result);
+      if (!checked.success) {
+        throw new ToolOutputError(
+          `Tool "${tool.name}" returned a result that does not match its output schema: ${checked.error.issues[0]?.message ?? "invalid"}`,
+        );
+      }
+      // The result is returned as it was, so its text does not depend on the schema.
+      return result as Record<string, unknown>;
+    },
   };
 }
 
@@ -54,8 +76,11 @@ export type ServiceMcpOptions<Client> = {
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource";
 
-const ok = (value: unknown): CallToolResult => ({
+// The result goes out twice: as structured content for clients that read the
+// output schema, and as the same JSON in text for those that do not.
+const ok = (value: Record<string, unknown>): CallToolResult => ({
   content: [{ type: "text", text: JSON.stringify(value) }],
+  structuredContent: value,
 });
 
 const failed = (code: string, message: string): CallToolResult => ({
@@ -114,6 +139,7 @@ export function createServiceMcpApp<Client>(options: ServiceMcpOptions<Client>) 
         {
           description: tool.description,
           inputSchema: tool.input.shape,
+          outputSchema: tool.output.shape,
           annotations: tool.writes
             ? { readOnlyHint: false, destructiveHint: true, idempotentHint: true }
             : { readOnlyHint: true },

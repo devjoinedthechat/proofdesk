@@ -1,14 +1,26 @@
-/** The parts of a customer's billing records that refund policy depends on. */
-export type InvoiceRecords = {
-  payments: {
-    id: string;
-    status: string;
-    createdAt: string;
-    amountCents: number;
-    refundedCents: number;
-    refunds: { reason: string; createdAt: string }[];
-  }[];
-}[];
+import { z } from "zod";
+
+/**
+ * The parts of a customer's billing records that refund policy depends on.
+ * Records read from another system are checked against this before a
+ * decision is made on them: a policy must not decide on a malformed record.
+ */
+export const invoiceRecords = z.array(
+  z.object({
+    payments: z.array(
+      z.object({
+        id: z.string(),
+        status: z.string(),
+        createdAt: z.iso.datetime(),
+        amountCents: z.number().int(),
+        refundedCents: z.number().int(),
+        refunds: z.array(z.object({ reason: z.string(), createdAt: z.iso.datetime() })),
+      }),
+    ),
+  }),
+);
+
+export type InvoiceRecords = z.infer<typeof invoiceRecords>;
 
 export type RefundFacts = {
   paymentFound: boolean;

@@ -40,7 +40,11 @@ export type ToolDefinition = {
   description: string;
   /** JSON Schema for the tool input. */
   inputSchema: Record<string, unknown>;
-  /** Ask the provider to guarantee the input matches the schema, where supported. */
+  /**
+   * Ask the provider to guarantee the input matches the schema, where
+   * supported. A provider may enforce only part of a schema, so the tool's
+   * owner still validates what it receives.
+   */
   strict?: boolean;
 };
 

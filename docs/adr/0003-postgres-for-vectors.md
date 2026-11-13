@@ -1,6 +1,6 @@
 # 3. Postgres for vectors
 
-Status: accepted, 2026-11-13
+Status: accepted, 2026-11-13. Amended by [ADR 10](0010-one-model-provider.md): no embedding model is configured, so search is full-text today and the vector column is empty. The reasons below are why the vector path, when switched on, stays in Postgres.
 
 ## Context
 

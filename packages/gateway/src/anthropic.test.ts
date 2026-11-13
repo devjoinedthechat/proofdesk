@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { createAnthropicProvider } from "./anthropic.ts";
+import { createAnthropicProvider, toStrictSchema } from "./anthropic.ts";
 import { ProviderError } from "./errors.ts";
 import type { CallContext, ModelRequest } from "./types.ts";
 
@@ -79,7 +79,81 @@ const request: ModelRequest = {
   ],
 };
 
+describe("toStrictSchema", () => {
+  it("closes every object and drops the constraints strict mode cannot enforce", () => {
+    const schema = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: {
+        amountCents: { type: "integer", exclusiveMinimum: 0, description: "In cents." },
+        // A property may be named like a keyword. It is still a property.
+        minimum: { type: "string", minLength: 2, maxLength: 300 },
+        lines: {
+          type: "array",
+          minItems: 1,
+          items: { type: "object", properties: { seats: { type: "integer", maximum: 500 } } },
+        },
+        reason: { type: "string", enum: ["duplicate_charge", "customer_request"] },
+      },
+      required: ["amountCents"],
+    };
+
+    expect(toStrictSchema(schema)).toEqual({
+      type: "object",
+      properties: {
+        amountCents: { type: "integer", description: "In cents." },
+        minimum: { type: "string" },
+        lines: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { seats: { type: "integer" } },
+            additionalProperties: false,
+          },
+        },
+        reason: { type: "string", enum: ["duplicate_charge", "customer_request"] },
+      },
+      required: ["amountCents"],
+      additionalProperties: false,
+    });
+    // The caller's schema is not changed: its owner still validates against all of it.
+    expect(schema.properties.amountCents).toHaveProperty("exclusiveMinimum", 0);
+  });
+});
+
 describe("createAnthropicProvider", () => {
+  it("sends a strict tool's schema in strict form and any other tool's as it is", async () => {
+    const { provider, calls } = fakeApi(() => json(message()));
+    const inputSchema = {
+      type: "object",
+      properties: { seats: { type: "integer", minimum: 1 } },
+    };
+    await provider.complete(
+      {
+        ...request,
+        tools: [
+          { name: "strict_tool", description: "", inputSchema, strict: true },
+          { name: "plain_tool", description: "", inputSchema },
+        ],
+      },
+      context,
+    );
+
+    expect(calls[0]?.body).toHaveProperty("tools", [
+      {
+        name: "strict_tool",
+        description: "",
+        strict: true,
+        input_schema: {
+          type: "object",
+          properties: { seats: { type: "integer" } },
+          additionalProperties: false,
+        },
+      },
+      { name: "plain_tool", description: "", input_schema: inputSchema },
+    ]);
+  });
+
   it("sends the request in the Messages API shape", async () => {
     const { provider, calls } = fakeApi(() => json(message()));
     await provider.complete(request, context);

@@ -3,15 +3,23 @@
 // replays this function from its history after a crash.
 
 import {
+  ActivityFailure,
+  ApplicationFailure,
   condition,
   defineQuery,
   defineSignal,
   proxyActivities,
   setHandler,
 } from "@temporalio/workflow";
-import type { Activities, ApprovalAnswer, FinishOutput, TicketRef } from "./activities.ts";
+import type {
+  Activities,
+  ApprovalAnswer,
+  FinishOutput,
+  TicketRef,
+  TurnOutput,
+} from "./activities.ts";
 
-const { startRun, executeNext, finishRun } = proxyActivities<Activities>({
+const { startRun, executeNext, finishRun, stopRun } = proxyActivities<Activities>({
   startToCloseTimeout: "2 minutes",
   // Activities report in every few seconds. A worker that goes silent is
   // presumed lost and its activity is given to another, long before the
@@ -28,6 +36,12 @@ const { modelTurn } = proxyActivities<Activities>({
   heartbeatTimeout: "30 seconds",
   retry: { initialInterval: "5 seconds", backoffCoefficient: 2, maximumAttempts: 4 },
 });
+
+/** True when an activity failed because the model provider did, and for no other reason. */
+const isModelFailure = (error: unknown) =>
+  error instanceof ActivityFailure &&
+  error.cause instanceof ApplicationFailure &&
+  error.cause.type === "ProviderError";
 
 export const approvalDecided =
   defineSignal<[{ approvalId: string } & ApprovalAnswer]>("approvalDecided");
@@ -67,7 +81,17 @@ export async function ticketWorkflow(ref: TicketRef): Promise<FinishOutput> {
   while (!stopped) {
     status.phase = "thinking";
     status.step = step;
-    const turn = await modelTurn({ ref, step });
+    let turn: TurnOutput;
+    try {
+      turn = await modelTurn({ ref, step });
+    } catch (error) {
+      // The model could not be reached after the gateway's retries, its
+      // failover and this activity's own attempts. A person takes the ticket.
+      // Any other failure is a fault in this system and stays loud.
+      if (!isModelFailure(error)) throw error;
+      await stopRun({ ref, step });
+      break;
+    }
     step += 1;
     stopped = turn.stopped;
 

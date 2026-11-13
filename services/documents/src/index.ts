@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 export { type Chunk, chunkMarkdown } from "./chunk.ts";
 export {
   createHashEmbedder,
-  createVoyageEmbedder,
   EMBEDDING_DIMENSIONS,
   type Embedder,
   tokenize,

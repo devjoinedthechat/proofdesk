@@ -3,8 +3,10 @@ import { callMcpTool, listMcpTools, screenTicket } from "@proofdesk/agent";
 import { type AppDatabase, connect } from "@proofdesk/db";
 import {
   ANTHROPIC_PRICES,
+  CLAUDE_FAILOVER,
   createAnthropicProvider,
   createGateway,
+  type GatewayRoute,
   type ModelProvider,
   type PriceTable,
 } from "@proofdesk/gateway";
@@ -15,7 +17,7 @@ import {
   SCOPES,
   TokenError,
 } from "@proofdesk/identity";
-import { createToolPolicy, type InvoiceRecords } from "@proofdesk/policy";
+import { createToolPolicy, invoiceRecords } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
@@ -23,25 +25,36 @@ import { createDbLedger } from "./ledger.ts";
 import { createTicketWorker } from "./worker.ts";
 
 /**
- * The model provider. By default this is Anthropic. MODEL_PROVIDER_MODULE can
+ * The model routes. By default this is Anthropic. MODEL_PROVIDER_MODULE can
  * name a module that exports another provider and its prices, which is how a
  * second provider is plugged in and how tests run without a model.
  */
-async function loadProvider(): Promise<{ provider: ModelProvider; prices: PriceTable }> {
+async function loadProvider(): Promise<{
+  routes: [GatewayRoute, ...GatewayRoute[]];
+  prices: PriceTable;
+}> {
   const path = process.env.MODEL_PROVIDER_MODULE;
-  if (!path) return { provider: createAnthropicProvider(), prices: ANTHROPIC_PRICES };
+  if (!path) {
+    const provider = createAnthropicProvider();
+    // When one Claude model stays overloaded or rate-limited, the turn goes
+    // to another. This does not help if the API itself cannot be reached.
+    return {
+      routes: [{ provider }, { provider, models: CLAUDE_FAILOVER }],
+      prices: ANTHROPIC_PRICES,
+    };
+  }
   const module = (await import(pathToFileURL(path).href)) as {
     default: ModelProvider;
     prices: PriceTable;
   };
-  return { provider: module.default, prices: module.prices };
+  return { routes: [{ provider: module.default }], prices: module.prices };
 }
 
 async function start() {
   const db = connect<AppDatabase>(env("WORKER_DATABASE_URL"));
-  const { provider, prices } = await loadProvider();
+  const { routes, prices } = await loadProvider();
   const gateway = createGateway({
-    routes: [{ provider }],
+    routes,
     prices,
     ledger: createDbLedger(db),
     limits: {
@@ -106,7 +119,7 @@ async function start() {
         {},
       );
       if (result.isError) throw new Error(`Could not read invoices for policy: ${result.content}`);
-      return (JSON.parse(result.content) as { invoices: InvoiceRecords }).invoices;
+      return invoiceRecords.parse((JSON.parse(result.content) as { invoices?: unknown }).invoices);
     },
     tools: {
       async list(ref) {

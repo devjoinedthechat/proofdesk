@@ -1,11 +1,14 @@
 import { PROMPT_VERSION, type TenantPolicy } from "@proofdesk/agent";
 import {
   type CallRecord,
+  CLAUDE_FAILOVER,
+  createFaultInjector,
   createGateway,
   createMemoryLedger,
   createRecordingProvider,
   type Effort,
   type ModelProvider,
+  modelOutage,
   type PriceTable,
   type Recording,
 } from "@proofdesk/gateway";
@@ -33,11 +36,15 @@ export type RunRecord = {
   /** How the agent loop ended, before any guard turned it into a hand-over. */
   stopped: string;
   violations: string[];
+  /** Money amounts in the reply that the agent was never shown. Measured, not enforced. */
+  unsourcedAmounts?: string[];
   turns: number;
   toolCalls: { tool: string; verdict: string; failed: boolean; error?: string }[];
   /** Present for attack scenarios. */
   attack?: { class: string; technique: string; succeeded: boolean };
   modelCalls: number;
+  /** Present for runs with an injected outage: model calls answered, by model. */
+  answeredBy?: Record<string, number>;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -58,6 +65,8 @@ export type EvalResults = {
   suite: string;
   /** Which policy set was enforced. */
   policy: string;
+  /** Present when calls to one model were made to fail, to exercise failover. */
+  outage?: { model: string; rate: number; backup: string };
   startedAt: string;
   repeats: number;
   scenarios: number;
@@ -87,6 +96,11 @@ export type EvalOptions = {
   policy?: { name: string; policy: ToolPolicy };
   /** A different system prompt, for measuring what a prompt change does. */
   prompt?: { name: string; system: (policy: TenantPolicy) => string };
+  /**
+   * Makes a share of the calls to one model fail as overloaded, with failover
+   * to another Claude model switched on. The failing calls are never sent.
+   */
+  outage?: { model: string; rate: number };
   /** Filled with every model response of repeat 1, for replay tests. */
   recordings?: Record<string, Recording>;
   onProgress?: (done: number, total: number, record: RunRecord) => void;
@@ -116,13 +130,20 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
   async function attempt(scenario: Scenario, repeat: number): Promise<RunRecord> {
     const calls: CallRecord[] = [];
     const recording: Recording = {};
-    const provider =
+    const recorded =
       repeat === 1 && options.recordings
         ? createRecordingProvider(options.provider, recording)
         : options.provider;
+    const provider = options.outage
+      ? createFaultInjector(recorded, modelOutage({ ...options.outage, seed: repeat }))
+      : recorded;
     // A gateway per attempt: its ledger is this attempt's budget and nothing else.
     const gateway = createGateway({
-      routes: [{ provider }],
+      routes: options.outage
+        ? [{ provider }, { provider, models: CLAUDE_FAILOVER }]
+        : [{ provider }],
+      // The injected failures are instant, so waiting between retries tests nothing.
+      ...(options.outage ? { baseDelayMs: 1 } : {}),
       prices: options.prices,
       ledger: createMemoryLedger(),
       limits: {
@@ -158,9 +179,10 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
       ...(options.effort ? { effort: options.effort } : {}),
       ...(options.prompt ? { system: options.prompt.system } : {}),
       ...(options.policy ? { policy: options.policy.policy } : {}),
-      onResult(result, violations) {
+      onResult(result, violations, unsourcedAmounts) {
         record.stopped = result.stopped;
         record.violations = violations;
+        record.unsourcedAmounts = unsourcedAmounts;
         record.turns = result.turns;
         record.toolCalls = result.toolCalls.map((call) => ({
           tool: call.tool,
@@ -199,6 +221,10 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
     for (const call of calls) {
       if (!call.usage) continue;
       record.modelCalls += 1;
+      if (options.outage) {
+        record.answeredBy ??= {};
+        record.answeredBy[call.sentModel] = (record.answeredBy[call.sentModel] ?? 0) + 1;
+      }
       record.inputTokens += call.usage.inputTokens;
       record.outputTokens += call.usage.outputTokens;
       record.cacheReadTokens += call.usage.cacheReadTokens;
@@ -236,6 +262,9 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
     promptVersion: PROMPT_VERSION,
     suite: options.suite?.name ?? "refund",
     policy: options.policy?.name ?? "production",
+    ...(options.outage
+      ? { outage: { ...options.outage, backup: CLAUDE_FAILOVER[options.outage.model] ?? "none" } }
+      : {}),
     startedAt,
     repeats: options.repeats,
     scenarios: scenarios.length,

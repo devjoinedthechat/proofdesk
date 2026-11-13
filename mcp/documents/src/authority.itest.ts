@@ -154,7 +154,6 @@ beforeAll(async () => {
   });
   mcpApp = createDocumentsMcpApp({
     db: documents.search,
-    embedder: documents.embedder,
     verify: createTokenVerifier({ issuer, audience: CLIENTS.documentsMcp }),
     resourceUrl: MCP,
     issuer,
@@ -185,8 +184,8 @@ describe("help-centre search behind real tokens", () => {
       "how long does a card refund take",
     );
 
-    // With the stand-in embedder the best passage is not always ranked first,
-    // so the check is that it is among the few returned.
+    // The best passage is not always ranked first, so the check is that it
+    // is among the few returned.
     const texts = (result: typeof harbor) =>
       result.passages.map((passage) => passage.text).join(" ");
     expect(texts(harbor)).toContain("5 to 10 business days");

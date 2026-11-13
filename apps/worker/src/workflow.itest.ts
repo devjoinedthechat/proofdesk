@@ -11,7 +11,7 @@ import {
   verifyAudit,
 } from "@proofdesk/db";
 import { call, invoicesSeen, listInvoices, refundLastPayment, resolveWith } from "@proofdesk/evals";
-import { MockProvider, type MockStep } from "@proofdesk/gateway";
+import { MockProvider, type MockStep, type ModelResponse, ProviderError } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
 import { ENTITLEMENTS_TOOLS } from "@proofdesk/mcp-entitlements";
 import { createToolPolicy } from "@proofdesk/policy";
@@ -596,6 +596,63 @@ describe("activities applied twice", () => {
     await expect(run.activities.modelTurn({ ref: run.ref, step: 3 })).rejects.toThrow(
       /before step 0/,
     );
+  }, 60_000);
+});
+
+describe("a model that cannot be reached", () => {
+  it("hands the ticket to staff with nothing paid, and says so in the audit log", async () => {
+    const down = () => new ProviderError("mock", "unavailable", "connection refused");
+    const run = await setup(scenario("refund-duplicate-with-invoice"), [
+      listInvoices(),
+      // Every attempt of the second model turn fails.
+      down(),
+      down(),
+      down(),
+      down(),
+    ]);
+    await run.startWorker();
+
+    const outcome = await (await run.start()).result();
+
+    expect(outcome).toEqual({
+      outcome: "handed_to_staff",
+      reasonCode: "agent_model_unavailable",
+    });
+    expect(await run.ticket()).toMatchObject({
+      status: "handed_to_staff",
+      reply: expect.stringContaining("our team"),
+    });
+    expect(await run.refunds()).toEqual([]);
+    expect(run.provider.remaining).toBe(0);
+    expect((await run.audit()).map((entry) => entry.event)).toEqual([
+      "run_started",
+      "tool_call",
+      "run_stopped",
+      "run_finished",
+    ]);
+    expect(await verifyAudit(run.env.dbs.app)).toEqual([]);
+  }, 120_000);
+});
+
+describe("a turn answered by another model", () => {
+  it("is written to the audit log, and a dated name of the configured model is not", async () => {
+    const run = await setup(scenario("refund-duplicate-with-invoice"), [
+      { ...(listInvoices() as ModelResponse), model: "backup-model" },
+      { ...(listInvoices() as ModelResponse), model: "mock-model-20261101" },
+    ]);
+    const { activities, ref } = run;
+    await activities.startRun(ref);
+
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.modelTurn({ ref, step: 2 });
+
+    const entries = (await run.audit()).filter(
+      (entry) => entry.event === "answered_by_other_model",
+    );
+    expect(entries.map((entry) => JSON.parse(entry.detail))).toEqual([
+      { configured: "mock-model", answeredBy: "backup-model" },
+    ]);
   }, 60_000);
 });
 

@@ -100,7 +100,8 @@ export async function prepareTemplates(adminUrl: string): Promise<void> {
   }
 
   // The knowledge base: migrated, then filled through the real ingestion
-  // pipeline with the stand-in embedder.
+  // pipeline. The test-double embedder fills the vector column so the vector
+  // path can be tested; searches made for the agent do not use it.
   const documentsUrl = await createDatabase(adminUrl, DOCUMENTS_TEMPLATE);
   await migrate(documentsUrl, DOCUMENTS_MIGRATIONS_DIR);
   const ingest = connect<DocumentsDatabase>(
@@ -148,6 +149,7 @@ export async function createDocumentsEnv(adminUrl: string) {
     search,
     ingest,
     owner,
+    /** A test double, for tests of the vector path. The agent's searches are full-text. */
     embedder: createHashEmbedder(),
     async dispose() {
       await Promise.all([search.destroy(), ingest.destroy(), owner.destroy()]);

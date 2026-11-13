@@ -8,7 +8,7 @@ import {
   toolUseResponse,
 } from "@proofdesk/gateway";
 import { describe, expect, it } from "vitest";
-import { checkResolution } from "./guards.ts";
+import { checkResolution, ungroundedAmounts } from "./guards.ts";
 import { type AgentRun, runAgent } from "./loop.ts";
 import type { AgentTool, ToolCallRecord, Verdict } from "./tools.ts";
 import { withSystemIdempotency } from "./tools.ts";
@@ -258,6 +258,19 @@ describe("runAgent", () => {
 
     expect(provider.calls[1]?.request.messages[1]?.content[0]).toEqual(thinking);
   });
+
+  it("offers every tool as strict", async () => {
+    const { run, provider } = setup([resolve()]);
+    await runAgent(run);
+
+    const tools = provider.calls[0]?.request.tools ?? [];
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "list_invoices",
+      "create_refund",
+      "resolve_ticket",
+    ]);
+    expect(tools.every((tool) => tool.strict === true)).toBe(true);
+  });
 });
 
 describe("withSystemIdempotency", () => {
@@ -297,6 +310,60 @@ describe("withSystemIdempotency", () => {
     expect(seen[0]?.idempotencyKey).toBe(seen[1]?.idempotencyKey);
     expect(seen[0]?.idempotencyKey).not.toBe(seen[2]?.idempotencyKey);
     expect(String(seen[0]?.idempotencyKey).startsWith("tkt_1:create_refund:")).toBe(true);
+  });
+});
+
+describe("ungroundedAmounts", () => {
+  const invoices: ToolCallRecord = {
+    tool: "list_invoices",
+    input: {},
+    verdict: "allow",
+    outcome: {
+      isError: false,
+      content: JSON.stringify({
+        invoices: [{ amountCents: 87_00, payments: [{ amountCents: 1_234_50 }] }],
+      }),
+    },
+  };
+  const given = {
+    texts: ["Refunds above $200 need approval.", "I was charged 58 dollars, or $58."],
+    toolCalls: [invoices],
+  };
+
+  it("accepts amounts from the instructions, the ticket and tool results", () => {
+    expect(
+      ungroundedAmounts(
+        "Your $87.00 charge and the $1,234.50 payment are under the $200 limit. You wrote $58.",
+        given,
+      ),
+    ).toEqual([]);
+  });
+
+  it("accepts an amount written out inside a tool result's text", () => {
+    const passage: ToolCallRecord = {
+      tool: "search_help_center",
+      input: {},
+      verdict: "allow",
+      outcome: {
+        isError: false,
+        content: JSON.stringify({ passages: [{ text: "Business costs $50 per seat." }] }),
+      },
+    };
+    expect(
+      ungroundedAmounts("Business is $50 per seat.", { texts: [], toolCalls: [passage] }),
+    ).toEqual([]);
+  });
+
+  it("reports an amount that appears nowhere", () => {
+    expect(ungroundedAmounts("I have credited $95.00 and will add €10 next month.", given)).toEqual(
+      ["95.00", "10.00"],
+    );
+  });
+
+  it("ignores numbers that are not money", () => {
+    expect(
+      ungroundedAmounts("It takes 5 to 10 business days, by 14 November 2026.", given),
+    ).toEqual([]);
   });
 });
 

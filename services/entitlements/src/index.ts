@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 export type { Entitlement, SetEntitlementRequest } from "./api.ts";
+export { entitlement, entitlementResult } from "./api.ts";
 export { createEntitlementsApp, ENTITLEMENTS_SCOPES, type EntitlementsDeps } from "./app.ts";
 export { createEntitlementsClient, type EntitlementsClient } from "./client.ts";
 export type { EntitlementRow, EntitlementStatus, EntitlementsDatabase } from "./schema.ts";

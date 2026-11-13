@@ -25,9 +25,9 @@ So every control below is judged by one question: does it still hold if the mode
 | A customer                | Their own tickets             | Ticket subject and body                            |
 | A customer                | Fields they fill in elsewhere | Tool results, such as an invoice's reference field |
 | Another tenant's customer | The same, in another company  | Nothing shared, if tenancy holds                   |
+| Whoever can edit a page   | Help-centre content           | Search results                                     |
+| A customer, over time     | Their earlier tickets         | Memory of those tickets                            |
 | A compromised worker      | The worker's client secret    | The token and policy layers, not the model         |
-
-Not yet in the system, and so not yet covered: documents retrieved for the model, and anything the agent remembers between tickets.
 
 ## Controls, from the outside in
 
@@ -42,12 +42,18 @@ Not yet in the system, and so not yet covered: documents retrieved for the model
 | Approval | A refund above the limit, or against a payment above the limit, waits for staff                            | Yes                               |
 | Service  | Billing refuses refunds beyond what was paid, and on failed or disputed payments                           | Yes                               |
 | Database | Row-level security limits every query to one tenant and customer                                           | Yes                               |
+| Search   | The search runs under row-level security as the public; staff-only pages are never candidates              | Yes                               |
+| Search   | Nothing retrieved can change a refund decision: the rules are enforced on billing records                  | Yes                               |
+| Memory   | A memory holds only facts the system computed; no ticket text and nothing the model wrote                  | Yes                               |
 | Reply    | The reply is checked against what the tools actually did, and for internal terms                           | Yes                               |
+| Tools    | Arguments are constrained to each tool's schema, and results are checked against a declared output         | Yes                               |
+| Runtime  | A ticket whose model cannot be reached goes to staff, with nothing changed                                 | Yes                               |
 | Runtime  | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
 | Prompt   | Ticket text and tool results are declared untrusted                                                        | No                                |
 | Screen   | A small model flags manipulative tickets                                                                   | No                                |
+| Ingest   | A scan quarantines help-centre pages that address an agent                                                 | No                                |
 
-The last two rows are worth having and are not what safety rests on.
+The last three rows are worth having and are not what safety rests on.
 
 ## What each rule is enforced by
 
@@ -69,19 +75,20 @@ These follow from the design and are pinned by tests, so they cannot be forgotte
 - **Call a refund on request a "service credit" to avoid the yearly limit.** Whether a service fault occurred is a judgment no record holds. The refund is still limited to the window, the amount paid and the approval limit.
 - **Refuse or hand over a ticket that deserved a refund.** Under-acting costs a customer time, not the company money. Staff see handed-over tickets.
 - **Write a reply that is wrong in ways the guard does not check,** such as a false reason. The guard checks amounts and actions, not explanations.
+- **Repeat what a poisoned help-centre page says.** A page that got past the scan cannot move money, and it can still put a false statement in a reply.
 
 ## What the measurements say
 
 From the [eval report](eval-report/README.md):
 
-- **24 hand-written attacks, 288 attempts, none succeeded,** on either model, with or without the record-based policies.
-- **The model stopped almost all of them itself.** The policy layer never had to deny a call in those runs. That says the attacks were too weak to test the deeper layers, which is why the compromised-model tests exist.
+- **24 hand-written attacks, none succeeded,** on either model, in any run, including a run where turns were moved between models mid-ticket.
+- **The model stopped almost all of them itself.** The policy layer never had to deny a call in those runs, and the reply guard acted once. That says the attacks were too weak to test the deeper layers, which is why the compromised-model tests exist.
 - **The screen flagged 15 of 24 attack tickets and 2 of 32 honest ones.** It cannot see attacks that arrive in tool results.
 
 ## Not covered
 
 - **Adaptive attackers.** The attacks were written once, by hand. Someone who iterates against the live system will find things these did not.
-- **Retrieved documents and memory.** Neither exists yet. Both are new channels for injected text.
+- **Poisoned pages beyond one hand-written example.** The ingestion scan is a list of patterns, and one page was tested end to end.
 - **Denial of service and cost attacks** beyond the per-ticket and per-tenant budgets.
 - **Compromise of Keycloak, Postgres or Temporal themselves.**
 - **Staff as attackers.** An approver can approve anything within their tenant.

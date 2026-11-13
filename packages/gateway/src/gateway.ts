@@ -39,6 +39,9 @@ export function createMemoryLedger(): SpendLedger {
 export type CallRecord = {
   provider: string;
   requestedModel: string;
+  /** The model the call was sent to, which differs from the request on a backup route. */
+  sentModel: string;
+  /** The model that answered, as the provider named it. */
   model?: string;
   attempt: number;
   latencyMs: number;
@@ -51,8 +54,9 @@ export type CallRecord = {
 export type GatewayRoute = {
   provider: ModelProvider;
   /**
-   * For a backup provider: which of its models stands in for each requested
-   * model. A requested model with no entry is not sent to this provider.
+   * For a backup route: which of its models stands in for each requested
+   * model. A requested model with no entry is not sent to this route. A
+   * backup may be another provider, or the same provider with other models.
    */
   models?: Record<string, string>;
 };
@@ -63,7 +67,7 @@ export type GatewayOptions = {
   prices: PriceTable;
   ledger: SpendLedger;
   limits: { perTicketMicros: number; perTenantMicros: number };
-  /** Attempts per provider, including the first. */
+  /** Attempts per route, including the first. */
   maxAttempts?: number;
   baseDelayMs?: number;
   onCall?: (record: CallRecord) => void;
@@ -88,7 +92,7 @@ const defaultSleep = (ms: number, signal?: AbortSignal) =>
 /**
  * The one door to the model. Every call is checked against the ticket's and
  * the tenant's budget, retried on transient failures, moved to a backup
- * provider if the primary stays down, priced, and recorded.
+ * route if the primary stays down, priced, and recorded.
  */
 export function createGateway(options: GatewayOptions): ModelProvider {
   const maxAttempts = options.maxAttempts ?? 3;
@@ -138,6 +142,7 @@ export function createGateway(options: GatewayOptions): ModelProvider {
           const record: CallRecord = {
             provider: route.provider.name,
             requestedModel: request.model,
+            sentModel: model,
             attempt,
             latencyMs: 0,
             context,

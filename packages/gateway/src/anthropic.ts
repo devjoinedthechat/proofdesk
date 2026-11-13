@@ -26,6 +26,58 @@ const STOP_REASONS: Partial<Record<string, StopReason>> = {
 const SERVER_FALLBACK = /^claude-(sonnet-5-5|opus-5|fable-5-1)/;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
+/**
+ * Which Claude model stands in for another that is overloaded or rate-limited,
+ * for use as a second gateway route on the same provider.
+ *
+ * This covers one model being short of capacity. It does not cover the API
+ * itself being unreachable: both routes go to the same place.
+ */
+export const CLAUDE_FAILOVER: Record<string, string> = {
+  "claude-opus-5-5": "claude-sonnet-5-5",
+  "claude-sonnet-5-5": "claude-haiku-5-5",
+  "claude-haiku-5-5": "claude-sonnet-5-5",
+};
+
+/** JSON Schema keywords the API's strict mode does not accept. */
+const NOT_IN_STRICT_MODE = [
+  "$schema",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
+];
+
+/**
+ * A tool's input schema in the form strict mode accepts: every object closed
+ * to extra properties, and the constraints the API cannot enforce removed.
+ * Those constraints still hold. The tool's owner validates its input against
+ * the full schema, so a value this lets through is refused there.
+ */
+export function toStrictSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toStrictSchema);
+  if (typeof schema !== "object" || schema === null) return schema;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (NOT_IN_STRICT_MODE.includes(key)) continue;
+    // The names under "properties" are the tool's own, not schema keywords.
+    result[key] =
+      key === "properties" && typeof value === "object" && value !== null
+        ? Object.fromEntries(
+            Object.entries(value).map(([name, property]) => [name, toStrictSchema(property)]),
+          )
+        : toStrictSchema(value);
+  }
+  if (result.type === "object") result.additionalProperties = false;
+  return result;
+}
+
 function toMessages(messages: Message[], provider: string): Anthropic.Beta.BetaMessageParam[] {
   return messages.map((message): Anthropic.Beta.BetaMessageParam => {
     if (message.role === "user") {
@@ -49,7 +101,11 @@ function toMessages(messages: Message[], provider: string): Anthropic.Beta.BetaM
       else if (block.type === "tool_use") {
         content.push({ type: "tool_use", id: block.id, name: block.name, input: block.input });
       } else if (block.provider === provider) {
-        // Thinking blocks and the like go back exactly as they arrived.
+        // Thinking blocks and the like go back exactly as they arrived, also
+        // when a different Claude model now reads the conversation. The API
+        // leaves out thinking the current model cannot read. Removing it here
+        // would lose it for good when the conversation returns to the model
+        // that wrote it.
         content.push(block.data as Anthropic.Beta.BetaContentBlockParam);
       }
     }
@@ -108,7 +164,9 @@ export function createAnthropicProvider(
               tools: request.tools.map((tool) => ({
                 name: tool.name,
                 description: tool.description,
-                input_schema: tool.inputSchema as Anthropic.Beta.BetaTool.InputSchema,
+                input_schema: (tool.strict
+                  ? toStrictSchema(tool.inputSchema)
+                  : tool.inputSchema) as Anthropic.Beta.BetaTool.InputSchema,
                 ...(tool.strict ? { strict: true } : {}),
               })),
             }

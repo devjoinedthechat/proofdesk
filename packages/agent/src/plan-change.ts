@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@proofdesk/gateway";
+import { z } from "zod";
 import { type AgentTool, type ToolOutcome, withIdempotencyKey } from "./tools.ts";
 
 export const CHANGE_PLAN_TOOL = "change_plan";
@@ -45,13 +46,41 @@ export const changePlanTool: ToolDefinition = {
 
 type CallTool = (tool: string, input: Record<string, unknown>) => Promise<ToolOutcome>;
 
-const parse = (outcome: ToolOutcome): Record<string, unknown> => {
+/** What the saga needs from billing's answer. Anything else is a broken tool. */
+const billingAnswer = z.object({
+  change: z.looseObject({
+    id: z.string(),
+    status: z.enum(["applied", "reverted"]),
+    to: z.object({ planCode: z.string(), seats: z.number().int() }),
+  }),
+});
+const entitlementAnswer = z.object({ entitlement: z.looseObject({}) });
+
+/** The code of a service's refusal, or a general word when it gave none. */
+function refusalCode(outcome: ToolOutcome): string {
   try {
-    return JSON.parse(outcome.content) as Record<string, unknown>;
+    const parsed = z
+      .object({ error: z.object({ code: z.string() }) })
+      .safeParse(JSON.parse(outcome.content));
+    return parsed.success ? parsed.data.error.code : "refused";
   } catch {
-    return {};
+    return "refused";
   }
-};
+}
+
+function parse<Schema extends z.ZodType>(schema: Schema, outcome: ToolOutcome, from: string) {
+  let value: unknown;
+  try {
+    value = JSON.parse(outcome.content);
+  } catch {
+    value = undefined;
+  }
+  const parsed = schema.safeParse(value);
+  // A thrown error makes the caller retry, and the retry is safe: every step
+  // of the saga is idempotent.
+  if (!parsed.success) throw new Error(`${from} returned a result the saga cannot read`);
+  return parsed.data;
+}
 
 /**
  * A plan change touches two systems: billing, and the entitlements that
@@ -75,10 +104,7 @@ export async function changePlan(
 ): Promise<ToolOutcome> {
   const billing = await call(PLAN_CHANGE_PARTS.change, { ...input, idempotencyKey });
   if (billing.isError) return billing;
-  const change = parse(billing).change as
-    | { id: string; status: string; to: { planCode: string; seats: number } }
-    | undefined;
-  if (!change) throw new Error("The billing service returned no change");
+  const { change } = parse(billingAnswer, billing, "The billing service");
 
   const rolledBack = (reason: string): ToolOutcome => ({
     isError: true,
@@ -100,7 +126,10 @@ export async function changePlan(
   if (!entitlement.isError) {
     return {
       isError: false,
-      content: JSON.stringify({ change, entitlement: parse(entitlement).entitlement }),
+      content: JSON.stringify({
+        change,
+        entitlement: parse(entitlementAnswer, entitlement, "The entitlements service").entitlement,
+      }),
     };
   }
 
@@ -111,8 +140,7 @@ export async function changePlan(
     // the step fail loudly and be retried.
     throw new Error(`Plan change ${change.id} could not be undone: ${undone.content}`);
   }
-  const error = parse(entitlement).error as { code?: string } | undefined;
-  return rolledBack(error?.code ?? "refused");
+  return rolledBack(refusalCode(entitlement));
 }
 
 /**

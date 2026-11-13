@@ -1,4 +1,4 @@
-export { checkResolution, refundsMade } from "./guards.ts";
+export { checkResolution, refundsMade, ungroundedAmounts } from "./guards.ts";
 export {
   type AgentResult,
   type AgentRun,

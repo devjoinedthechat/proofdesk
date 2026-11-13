@@ -27,7 +27,8 @@ Nothing retrieved can change a refund decision. A help-centre page is reference 
 
 - **Access is part of the query.** Each chunk carries its tenant and visibility, and the search runs under row-level security. A filter applied after ranking can be forgotten; a row the role cannot see cannot be ranked.
 - **An agent acting for a customer searches as the public.** Staff-only pages are for staff. If the agent could read them, a customer could ask it to quote them.
-- **Hybrid ranking.** Vector similarity finds paraphrases; full-text finds exact terms such as plan names and invoice numbers. The two rankings are merged.
+- **Full-text ranking, with queries the agent writes.** The search matches words. The tool says so, and the agent writes search words instead of repeating the customer's sentence. See [ADR 10](0010-one-model-provider.md).
+- **A vector path that is off.** With an embedder configured, the same query also ranks by vector similarity and merges the two rankings. None is configured.
 - **Ingestion scans for text aimed at an agent** and quarantines what it flags. This is a filter for obvious poison, not a guarantee, which is why a poisoned page that gets through still cannot change an outcome.
 
 ## Memory
@@ -40,6 +41,5 @@ The cost is that the agent remembers little. It does not remember preferences, t
 
 ## Not decided
 
-- **A real embedding model.** Everything is built behind an interface and measured with a stand-in. The quality numbers are a floor.
 - **Staff search.** The search supports an internal audience, and no staff-facing surface uses it yet.
 - **Memory that the customer can see and correct.** A person should be able to read what an agent remembers about them.

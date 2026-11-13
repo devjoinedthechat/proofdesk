@@ -1,13 +1,19 @@
-import type { BillingClient } from "@proofdesk/billing";
+import {
+  type BillingClient,
+  invoiceList,
+  planChangeResult,
+  refundResult,
+  subscriptionList,
+} from "@proofdesk/billing";
 import { SCOPES } from "@proofdesk/identity";
 import { defineTool, type ServiceTool } from "@proofdesk/mcp-server";
 import { z } from "zod";
 
 export type BillingTool = ServiceTool<BillingClient>;
 
-const define = <Input extends z.ZodObject>(
-  tool: Parameters<typeof defineTool<BillingClient, Input>>[0],
-) => defineTool<BillingClient, Input>(tool);
+const define = <Input extends z.ZodObject, Output extends z.ZodObject>(
+  tool: Parameters<typeof defineTool<BillingClient, Input, Output>>[0],
+) => defineTool<BillingClient, Input, Output>(tool);
 
 // No tool takes a customer id. The customer is fixed by the caller's
 // credential, so a manipulated model cannot point a tool at someone else.
@@ -23,6 +29,7 @@ export const BILLING_TOOLS: BillingTool[] = [
         .optional()
         .describe("Return only the invoice with this number, such as INV-000123."),
     }),
+    output: invoiceList,
     writes: false,
     run: async (billing, customerId, { invoiceNumber }) => ({
       invoices: await billing.listInvoices(
@@ -36,6 +43,7 @@ export const BILLING_TOOLS: BillingTool[] = [
     scope: SCOPES.billingRead,
     description: "Lists the customer's subscriptions with plan, price, seats and status.",
     input: z.object({}),
+    output: subscriptionList,
     writes: false,
     run: async (billing, customerId) => ({
       subscriptions: await billing.listSubscriptions(customerId),
@@ -56,6 +64,7 @@ export const BILLING_TOOLS: BillingTool[] = [
         .max(200)
         .describe("A stable key for this refund. Reuse it when retrying."),
     }),
+    output: refundResult,
     writes: true,
     run: async (billing, _customerId, { idempotencyKey, ...request }) => ({
       refund: await billing.createRefund(request, idempotencyKey),
@@ -72,6 +81,7 @@ export const BILLING_TOOLS: BillingTool[] = [
       seats: z.number().int().min(1).max(500),
       idempotencyKey: z.string().min(8).max(200),
     }),
+    output: planChangeResult,
     writes: true,
     run: async (billing, _customerId, { subscriptionId, idempotencyKey, ...request }) => ({
       change: await billing.changeSubscription(subscriptionId, request, idempotencyKey),
@@ -83,6 +93,7 @@ export const BILLING_TOOLS: BillingTool[] = [
     description:
       "Undoes a subscription change, putting the plan and seats back exactly as they were. Safe to repeat.",
     input: z.object({ changeId: z.string() }),
+    output: planChangeResult,
     writes: true,
     run: async (billing, _customerId, { changeId }) => ({
       change: await billing.revertPlanChange(changeId),

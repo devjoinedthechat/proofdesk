@@ -5,7 +5,7 @@ import { RESOLVE_TOOL } from "./resolution.ts";
  * with every eval result and every run, so a number can always be traced to
  * the prompt that produced it.
  */
-export const PROMPT_VERSION = "2026-11-13.4";
+export const PROMPT_VERSION = "2026-11-13.5";
 
 export type TenantPolicy = {
   tenantName: string;

@@ -55,7 +55,6 @@ export async function runScenario(
     await ingestDocument(
       {
         db: documents.ingest,
-        embedder: documents.embedder,
         clock: () => env.now,
         newId: (prefix) => `${prefix}_scn${++extra}`,
         ...(bypassScan ? { unsafeSkipScan: true } : {}),
@@ -66,7 +65,7 @@ export async function runScenario(
   const helpCenter = documents
     ? (query: string) =>
         searchDocuments(
-          { db: documents.search, embedder: documents.embedder },
+          { db: documents.search },
           // A solver acts for the customer, so it searches as the public does.
           { tenantId: scenario.tenant.id, audience: "public", query, limit: 4 },
         )

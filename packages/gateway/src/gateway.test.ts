@@ -139,6 +139,44 @@ describe("createGateway", () => {
     expect(await ledger.spent("ticket:tenant-a:ticket-1")).toBe(1_500);
   });
 
+  it("moves to another model of the same provider, with the conversation unchanged", async () => {
+    const thinking = { type: "opaque" as const, provider: "one", data: { signature: "abc" } };
+    const conversation: ModelRequest = {
+      ...request,
+      messages: [
+        ...request.messages,
+        { role: "assistant", content: [thinking, { type: "text", text: "Let me check." }] },
+        { role: "user", content: [{ type: "text", text: "Thanks." }] },
+      ],
+    };
+    const provider = new MockProvider(
+      [down(), down("rate_limited"), down(), answer("from the other model", "backup-model")],
+      "one",
+    );
+    const records: CallRecord[] = [];
+    const gateway = createGateway({
+      routes: [{ provider }, { provider, models: { "main-model": "backup-model" } }],
+      prices,
+      ledger: createMemoryLedger(),
+      limits: { perTicketMicros: 50_000, perTenantMicros: 1_000_000 },
+      onCall: (record) => records.push(record),
+      sleep: async () => {},
+    });
+
+    const response = await gateway.complete(conversation, context);
+
+    expect(response.model).toBe("backup-model");
+    expect(records.map((record) => record.sentModel)).toEqual([
+      "main-model",
+      "main-model",
+      "main-model",
+      "backup-model",
+    ]);
+    // Nothing is removed for the other model: what it cannot read is for the
+    // provider to leave out, and the history must be intact for the way back.
+    expect(provider.calls[3]?.request).toEqual({ ...conversation, model: "backup-model" });
+  });
+
   it("fails with the last error when every provider is down", async () => {
     const { gateway } = setup([down(), down(), down()], [down(), down(), down("rate_limited")]);
     await expect(gateway.complete(request, context)).rejects.toMatchObject({
