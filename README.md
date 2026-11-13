@@ -69,15 +69,16 @@ Each row was also checked from the other side: with the control removed, the tes
 
 Each ticket is one Temporal workflow. A worker can stop at any point and another continues from the same step.
 
-| Claim                                          | Test that tries to break it                                                                                      |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| A refund is issued exactly once                | The refund activity fails twice after billing has paid; the tool runs three times and one refund exists          |
-| A repeated or overlapping step changes nothing | The same activity is run twice, and two attempts of one step are run at once                                     |
-| A large refund waits for a person              | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes |
-| Approval cannot override the kill switch       | The agent is paused after the request; the approved refund is still denied                                       |
-| The model's account is not trusted             | A run that claims a refund it never made is handed to staff                                                      |
-| No customer data in workflow history           | The finished history is searched for the ticket text, name, email and amount                                     |
-| The audit log is tamper-evident                | Entries are edited, re-hashed and deleted with full database access                                              |
+| Claim                                          | Test that tries to break it                                                                                                                                                                        |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A refund is issued exactly once                | With every service running as its own process, the worker is sent `SIGKILL` at the moment billing has paid. A second worker repeats the call; billing answers 201, then 200, and one refund exists |
+| A repeated or overlapping step changes nothing | The same activity is run twice, and two attempts of one step are run at once                                                                                                                       |
+| A large refund waits for a person              | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes                                                                                   |
+| Only that tenant's staff can approve           | Another company's approver gets an empty list and a 404; the customer gets a 403                                                                                                                   |
+| Approval cannot override the kill switch       | The agent is paused after the request; the approved refund is still denied                                                                                                                         |
+| The model's account is not trusted             | A run that claims a refund it never made is handed to staff                                                                                                                                        |
+| No customer data in workflow history           | The finished history is searched for the ticket text, name, email and amount                                                                                                                       |
+| The audit log is tamper-evident                | Entries are edited, re-hashed and deleted with full database access                                                                                                                                |
 
 These run with a scripted stand-in for the model. They test the system around the model, not the model's judgment.
 
