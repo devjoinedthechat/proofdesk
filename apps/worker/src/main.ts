@@ -79,6 +79,7 @@ async function start() {
   const toolTokens = createToolTokenSource({
     worker: createTokenClient({
       issuer: env("KEYCLOAK_ISSUER"),
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
       clientId: CLIENTS.worker,
       clientSecret: env("WORKER_CLIENT_SECRET"),
     }),

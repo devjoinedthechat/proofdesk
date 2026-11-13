@@ -5,9 +5,14 @@ import { createEntitlementsMcpApp } from "./index.ts";
 main(async () => {
   const issuer = env("KEYCLOAK_ISSUER");
   const app = createEntitlementsMcpApp({
-    verify: createTokenVerifier({ issuer, audience: CLIENTS.entitlementsMcp }),
+    verify: createTokenVerifier({
+      issuer,
+      audience: CLIENTS.entitlementsMcp,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
+    }),
     tokens: createTokenClient({
       issuer,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
       clientId: CLIENTS.entitlementsMcp,
       clientSecret: env("ENTITLEMENTS_MCP_CLIENT_SECRET"),
     }),

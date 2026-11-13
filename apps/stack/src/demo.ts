@@ -10,18 +10,23 @@ import type { DemoFile } from "./provision.ts";
 //   refund    a duplicate charge; the agent refunds it
 //   approval  a duplicate charge above the approval limit; the refund waits
 //             until a member of staff approves it, which this script then does
+//   pause     an operator pauses the agent; the next ticket goes straight to
+//             staff with no model call; the operator resumes it
 
 const which = process.argv[2] ?? "refund";
-if (which !== "refund" && which !== "approval") {
-  console.error("Usage: demo [refund|approval]");
+if (which !== "refund" && which !== "approval" && which !== "pause") {
+  console.error("Usage: demo [refund|approval|pause]");
   process.exit(2);
 }
 const { demos, staff } = JSON.parse(
   readFileSync(join(env("STATE_DIR"), "demo.json"), "utf8"),
 ) as DemoFile;
-const demo = demos[which];
+// The pause demo uses the approval demo's customer and company.
+const demo = demos[which === "pause" ? "approval" : which];
 const portal = env("PORTAL_URL");
-const issuer = env("KEYCLOAK_ISSUER");
+// Signs in where Keycloak can be reached from here, which inside the stack's
+// network is not its public address.
+const issuer = process.env.KEYCLOAK_BACKCHANNEL_URL ?? env("KEYCLOAK_ISSUER");
 const password = env("DEMO_PASSWORD");
 
 async function signIn(email: string): Promise<string> {
@@ -54,6 +59,16 @@ async function call<T>(method: string, path: string, token: string, body?: unkno
 
 type Ticket = { id: string; status: string; reply: string | null };
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const operator = staff[demo.tenantId]?.operator;
+if (which === "pause") {
+  if (!operator) throw new Error("No operator is set up for this company");
+  await call("POST", "/staff/agent-controls", await signIn(operator), {
+    paused: true,
+    reason: "Demonstrating the kill switch",
+  });
+  console.log(`${operator} paused the agent for this company.\n`);
+}
 
 const customer = await signIn(demo.email);
 console.log(`Signed in as ${demo.email}\n`);
@@ -108,4 +123,12 @@ for (;;) {
     console.log(`Reply:  ${current.reply}`);
     break;
   }
+}
+
+if (which === "pause" && operator) {
+  await call("POST", "/staff/agent-controls", await signIn(operator), {
+    paused: false,
+    reason: "Demonstration over",
+  });
+  console.log(`\n${operator} resumed the agent.`);
 }

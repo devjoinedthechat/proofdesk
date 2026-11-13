@@ -10,6 +10,7 @@ import {
 import { env, main, serve } from "@proofdesk/service";
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { createPortalApp } from "./app.ts";
+import { mountUi } from "./ui.ts";
 
 main(async () => {
   const issuer = env("KEYCLOAK_ISSUER");
@@ -21,7 +22,11 @@ main(async () => {
   const app = createPortalApp({
     db: connect<AppDatabase>(env("PORTAL_DATABASE_URL")),
     grantsDb: connect<AppDatabase>(env("GRANTS_DATABASE_URL")),
-    verify: createTokenVerifier({ issuer, audience: CLIENTS.portal }),
+    verify: createTokenVerifier({
+      issuer,
+      audience: CLIENTS.portal,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
+    }),
     signer: await createGrantSigner({
       issuer: env("GRANT_ISSUER"),
       audience: issuer,
@@ -63,5 +68,6 @@ main(async () => {
       await temporal.workflow.getHandle(workflowId(ticketId)).signal("approvalDecided", decision);
     },
   });
+  mountUi(app, { issuer, clientId: CLIENTS.portalWeb });
   return serve(app, { port: Number(env("PORT")) });
 });

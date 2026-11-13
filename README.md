@@ -144,6 +144,7 @@ pnpm test:unit    # only the tests that need no Docker
 pnpm local:up            # build one image, provision, start every service
 pnpm local:demo          # file a duplicate-charge ticket and print the reply
 pnpm local:demo approval # a refund above the limit: waits for staff, is approved, is paid
+pnpm local:demo pause    # an operator pauses the agent; the next ticket goes to staff
 pnpm local:down          # stop, keeping the data (local:reset deletes it)
 ```
 
@@ -151,7 +152,25 @@ pnpm local:down          # stop, keeping the data (local:reset deletes it)
 
 The demo signs in at Keycloak as a customer, submits a ticket to the portal and waits. Everything in between is the real path: a grant, a workflow, a fresh token per tool call, policy, billing.
 
-Grafana is at `http://localhost:3001/d/proofdesk`, with a dashboard of what the agent did, what it cost and what stopped it, and a trace per ticket.
+Four screens are then available:
+
+| Screen    | Address                             | What it shows                                                             |
+| --------- | ----------------------------------- | ------------------------------------------------------------------------- |
+| Proofdesk | `http://localhost:3000`             | The customer page and the staff console                                   |
+| Grafana   | `http://localhost:3001/d/proofdesk` | What the agent did, what it cost, what stopped it, and a trace per ticket |
+| Temporal  | `http://localhost:8233`             | Each ticket's workflow, step by step                                      |
+| Keycloak  | `http://localhost:8080`             | The realm, its clients and users                                          |
+
+Sign in at `http://localhost:3000` with one of the local accounts. The password for all of them is `local-demo-password`, or `DEMO_PASSWORD` if you set it.
+
+| Account                                                  | Sees                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `maya.okafor@example.org`                                | A customer of Harbor Notes with a duplicate charge: file a request, read the reply, delete the account |
+| `mateus.rocha@example.org`                               | A customer of Tallyfield with a $980 duplicate, which needs approval                                   |
+| `approver@harbor.example`, `approver@tallyfield.example` | Refunds waiting for approval, and tickets the agent handed over                                        |
+| `operator@harbor.example`, `operator@tallyfield.example` | The kill switch                                                                                        |
+
+Sign-in is the authorization code flow with PKCE. The page keeps tokens in memory only, and its content security policy lets it run no script but its own.
 
 With `ANTHROPIC_API_KEY` in the environment or in `.env`, the agent is Claude and a demo ticket costs about two cents. Without it, or with `SCRIPTED_MODEL=1`, a scripted stand-in handles the two demo tickets and nothing is spent.
 
@@ -188,24 +207,24 @@ The systems of record run as a seeded environment, so every ticket has a known c
 
 ## Repository layout
 
-| Path                                                              | Contents                                                                                             |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `apps/portal`                                                     | Ticket submission and routing, grants, staff approvals, review queue, kill switch, deletion requests |
-| `apps/worker`                                                     | The ticket, deletion and watchdog workflows, and their activities                                    |
-| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                                                 |
-| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                                            |
-| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                                                    |
-| `packages/gateway`                                                | Model access: budgets, retries, failover between models, record and replay                           |
-| `packages/policy`                                                 | Cedar policies and the facts they are decided on                                                     |
-| `packages/identity`                                               | Token verification, grant signing, realm provisioning                                                |
-| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                               |
-| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                                |
-| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                                            |
-| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                            |
-| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets          |
-| `apps/stack`                                                      | Provisioning and the demo client for the local stack                                                 |
-| `infra`                                                           | Compose file and the image every service runs from                                                   |
-| `docs`                                                            | Decision records, eval report, threat model                                                          |
+| Path                                                              | Contents                                                                                                                    |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apps/portal`                                                     | Ticket submission and routing, grants, staff approvals, review queue, kill switch, deletion requests, and the web interface |
+| `apps/worker`                                                     | The ticket, deletion and watchdog workflows, and their activities                                                           |
+| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                                                                        |
+| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                                                                   |
+| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                                                                           |
+| `packages/gateway`                                                | Model access: budgets, retries, failover between models, record and replay                                                  |
+| `packages/policy`                                                 | Cedar policies and the facts they are decided on                                                                            |
+| `packages/identity`                                               | Token verification, grant signing, realm provisioning                                                                       |
+| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                                                      |
+| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                                                       |
+| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                                                                   |
+| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                                                   |
+| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets                                 |
+| `apps/stack`                                                      | Provisioning and the demo client for the local stack                                                                        |
+| `infra`                                                           | Compose file and the image every service runs from                                                                          |
+| `docs`                                                            | Decision records, eval report, threat model                                                                                 |
 
 ## Design decisions
 
@@ -226,13 +245,15 @@ The systems of record run as a seeded environment, so every ticket has a known c
 15. [Telemetry can carry identifiers and numbers, and nothing else](docs/adr/0015-telemetry-without-content.md)
 16. [A failure in production becomes a test](docs/adr/0016-failures-become-tests.md)
 
+See also the [postmortems](docs/postmortems/README.md) and [what was left out, and why](docs/cut-list.md).
+
 ## Scope
 
 - **One agent, by choice.** Every property here can be shown with one. Multi-agent orchestration would add surface without adding a proof.
 - **No agent framework.** The loop is a few hundred lines, and the controls around it are the point.
 - **One model provider.** Failover is between Claude models, which covers a model short of capacity and not the provider being down. Help-centre search is full-text with queries the agent writes; the vector path is built and switched off. See [ADR 10](docs/adr/0010-one-model-provider.md).
 - **Local only.** The whole system runs on one machine with Docker Compose. It is not deployed to a cloud, and the local stack uses development settings: plain HTTP, password sign-in and fixed local secrets.
-- **No browser interface.** The portal, staff approvals and the kill switch are HTTP APIs.
+- **A small interface.** One page for customers and staff, written without a framework. It is not driven by an automated browser test.
 
 ## Licence
 

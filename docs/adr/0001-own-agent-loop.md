@@ -21,7 +21,7 @@ Write the loop by hand on the model API, behind a provider-neutral interface in 
 
 ## Cost
 
-- We write and test retries, context trimming and tool dispatch ourselves.
+- Retries and tool dispatch are ours to write and test. Context trimming is not built: a ticket's conversation is short, and the turn limit bounds it.
 - No ready-made integrations. Each tool is an MCP server we build.
 
 ## When this breaks

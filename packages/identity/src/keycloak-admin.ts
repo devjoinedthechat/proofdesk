@@ -201,7 +201,10 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
     standardFlowEnabled: true,
     redirectUris: ["http://localhost:3000/*"],
     webOrigins: ["+"],
-    attributes: { "pkce.code.challenge.method": "S256" },
+    attributes: {
+      "pkce.code.challenge.method": "S256",
+      "post.logout.redirect.uris": "http://localhost:3000/*",
+    },
     defaultClientScopes: [...IDENTITY_SCOPES, SCOPES.tickets, SCOPES.approvals],
   });
 

@@ -10,7 +10,11 @@ main(async () => {
     db: connect<DocumentsDatabase>(env("DOCUMENTS_DATABASE_URL")),
     // No embedder: the help centre is searched by full text. The queries are
     // written by the model that calls the tool.
-    verify: createTokenVerifier({ issuer, audience: CLIENTS.documentsMcp }),
+    verify: createTokenVerifier({
+      issuer,
+      audience: CLIENTS.documentsMcp,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
+    }),
     resourceUrl: env("PUBLIC_URL"),
     issuer,
   });

@@ -20,8 +20,10 @@ export function createTokenClient(options: {
   issuer: string;
   clientId: string;
   clientSecret: string;
+  /** Where this client reaches the realm, when that differs from its public name. */
+  backchannel?: string | undefined;
 }) {
-  const endpoint = `${options.issuer}/protocol/openid-connect/token`;
+  const endpoint = `${options.backchannel ?? options.issuer}/protocol/openid-connect/token`;
 
   async function request(parameters: Record<string, string>): Promise<IssuedToken> {
     const response = await fetch(endpoint, {

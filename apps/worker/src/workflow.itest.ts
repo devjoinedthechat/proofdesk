@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import type { McpToolDescriptor, ToolOutcome } from "@proofdesk/agent";
 import {
   type AppDatabase,
@@ -30,7 +31,7 @@ import {
   takeSnapshot,
 } from "@proofdesk/simulator";
 import { Client, Connection } from "@temporalio/client";
-import { NativeConnection, type Worker } from "@temporalio/worker";
+import { NativeConnection, Worker as TemporalWorker, type Worker } from "@temporalio/worker";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createActivities, type TicketRef } from "./activities.ts";
@@ -344,6 +345,39 @@ describe("ticket workflow", () => {
       expect(decoded).not.toContain(secret);
     }
   }, 60_000);
+
+  it("replays a finished ticket's history through the current workflow code without diverging", async () => {
+    // A ticket that waited for approval, so the history has a signal and a
+    // timer in it as well as activities. If the workflow code were changed in
+    // a way that a running ticket could not survive, this replay would throw.
+    const target = scenario("refund-over-limit-approved");
+    const run = await setup(
+      target,
+      overLimitScript(
+        resolveWith("refunded", "within_window", (number) => `Refunded $290.00 for ${number}.`),
+      ),
+    );
+    await run.startWorker();
+    const handle = await run.start();
+    const waiting = await waitFor(
+      () => handle.query(progress),
+      (value) => value.phase === "waiting_approval",
+      "the approval request",
+    );
+    await handle.signal(approvalDecided, {
+      approvalId: waiting.approvalId ?? "",
+      decision: "approved",
+      decidedBy: "staff:ada",
+    });
+    await handle.result();
+
+    await expect(
+      TemporalWorker.runReplayHistory(
+        { workflowsPath: fileURLToPath(new URL("./workflows.ts", import.meta.url)) },
+        await handle.fetchHistory(),
+      ),
+    ).resolves.toBeUndefined();
+  }, 120_000);
 
   it("pays exactly once when the worker is lost right after the refund", async () => {
     const target = scenario("refund-duplicate-with-invoice");

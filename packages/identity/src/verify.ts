@@ -25,8 +25,20 @@ const text = (value: unknown) => (typeof value === "string" && value !== "" ? va
  * this audience. A token minted for another service is rejected, which is what
  * stops one service from replaying a caller's token against another.
  */
-export function createTokenVerifier(options: { issuer: string; audience: string }): TokenVerifier {
-  const jwks = createRemoteJWKSet(new URL(`${options.issuer}/protocol/openid-connect/certs`));
+export function createTokenVerifier(options: {
+  /** The realm's public name, exactly as it appears in a token's `iss` claim. */
+  issuer: string;
+  audience: string;
+  /**
+   * Where this service reaches the realm, when that differs from its public
+   * name: inside a private network, say. Only the signing keys are fetched
+   * from here. The issuer a token must name does not change.
+   */
+  backchannel?: string | undefined;
+}): TokenVerifier {
+  const jwks = createRemoteJWKSet(
+    new URL(`${options.backchannel ?? options.issuer}/protocol/openid-connect/certs`),
+  );
 
   return async (token) => {
     try {

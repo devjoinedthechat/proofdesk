@@ -31,6 +31,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
+      # One public name for the realm, whoever asks. A browser reaches Keycloak
+      # at this address and the services reach it inside the network; tokens
+      # name this address as their issuer either way.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports:
       - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
     depends_on:
@@ -106,7 +111,8 @@ services:
     command: ["node", "services/billing/src/main.ts"]
     environment:
       PORT: "3000"
-      KEYCLOAK_ISSUER: &issuer http://keycloak:8080/realms/proofdesk
+      KEYCLOAK_ISSUER: &issuer http://localhost:${KEYCLOAK_PORT:-8080}/realms/proofdesk
+      KEYCLOAK_BACKCHANNEL_URL: &backchannel http://keycloak:8080/realms/proofdesk
       BILLING_DATABASE_URL: postgresql://billing_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_billing
     depends_on: &provisioned
       provision:
@@ -119,6 +125,7 @@ services:
     environment:
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_DATABASE_URL: postgresql://entitlements_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_entitlements
     depends_on: *provisioned
 
@@ -130,6 +137,7 @@ services:
       <<: *secrets
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       BILLING_URL: http://billing:3000
       PUBLIC_URL: http://billing-mcp:3000
     depends_on: *provisioned
@@ -142,6 +150,7 @@ services:
       <<: *secrets
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_URL: http://entitlements:3000
       PUBLIC_URL: http://entitlements-mcp:3000
     depends_on: *provisioned
@@ -153,6 +162,7 @@ services:
     environment:
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       DOCUMENTS_DATABASE_URL: postgresql://documents_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_documents
       PUBLIC_URL: http://documents-mcp:3000
     depends_on: *provisioned
@@ -164,6 +174,7 @@ services:
     environment:
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       GRANT_ISSUER: *grant-issuer
       GRANT_KEY_FILE: /state/grant-key.json
       PORTAL_DATABASE_URL: postgresql://portal_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
@@ -188,6 +199,7 @@ services:
     environment:
       <<: *secrets
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       WORKER_DATABASE_URL: postgresql://worker_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
       PORTAL_URL: http://portal:3000
       BILLING_MCP_URL: http://billing-mcp:3000/mcp
@@ -242,6 +254,7 @@ services:
       <<: *secrets
       PORTAL_URL: http://portal:3000
       KEYCLOAK_ISSUER: *issuer
+      KEYCLOAK_BACKCHANNEL_URL: *backchannel
       STATE_DIR: /state
     volumes:
       - app-state:/state:ro

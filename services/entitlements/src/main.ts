@@ -10,6 +10,7 @@ main(async () => {
   const verify = createTokenVerifier({
     issuer: env("KEYCLOAK_ISSUER"),
     audience: CLIENTS.entitlementsApi,
+    backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
   });
   const app = createEntitlementsApp({
     db: connect<EntitlementsDatabase>(env("ENTITLEMENTS_DATABASE_URL")),

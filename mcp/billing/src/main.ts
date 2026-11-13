@@ -5,9 +5,14 @@ import { createBillingMcpApp } from "./app.ts";
 main(async () => {
   const issuer = env("KEYCLOAK_ISSUER");
   const app = createBillingMcpApp({
-    verify: createTokenVerifier({ issuer, audience: CLIENTS.billingMcp }),
+    verify: createTokenVerifier({
+      issuer,
+      audience: CLIENTS.billingMcp,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
+    }),
     tokens: createTokenClient({
       issuer,
+      backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
       clientId: CLIENTS.billingMcp,
       clientSecret: env("BILLING_MCP_CLIENT_SECRET"),
     }),

@@ -3,7 +3,7 @@
 #
 #   scripts/local.sh up            build, provision and start everything
 #   scripts/local.sh demo [name]   file a ticket and print what happens
-#                                  (refund, the default, or approval)
+#                                  (refund, the default; approval; pause)
 #   scripts/local.sh logs [name]   follow a service's logs
 #   scripts/local.sh down          stop, keeping the data
 #   scripts/local.sh reset         stop and delete the data

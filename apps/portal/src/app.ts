@@ -144,6 +144,48 @@ export function routeFor(ticketId: string, canarySharePercent: number): TicketRo
   return bucket < canarySharePercent ? "canary" : "stable";
 }
 
+const seenInvoices = z.object({
+  invoices: z.array(
+    z.object({
+      number: z.string(),
+      amountCents: z.number(),
+      payments: z.array(
+        z.object({
+          id: z.string(),
+          amountCents: z.number(),
+          status: z.string(),
+          createdAt: z.string(),
+          refundedCents: z.number(),
+        }),
+      ),
+    }),
+  ),
+});
+const runWithCalls = z.object({
+  toolCalls: z.array(
+    z.object({
+      tool: z.string(),
+      outcome: z.object({ content: z.string(), isError: z.boolean() }),
+    }),
+  ),
+});
+
+/** The invoices the agent read during a run, or none if it read none. */
+function invoicesSeen(state: unknown): z.infer<typeof seenInvoices>["invoices"] {
+  const run = runWithCalls.safeParse(state);
+  if (!run.success) return [];
+  const listed = run.data.toolCalls.find(
+    (call) => call.tool === "list_invoices" && !call.outcome.isError,
+  );
+  if (!listed) return [];
+  try {
+    const parsed = seenInvoices.safeParse(JSON.parse(listed.outcome.content));
+    return parsed.success ? parsed.data.invoices : [];
+  } catch {
+    return [];
+  }
+}
+
 const toTicket = (row: TicketRow) => ({
   id: row.id,
   category: row.category,
@@ -216,7 +258,16 @@ export function createPortalApp(deps: PortalDeps) {
       trx
         .selectFrom("tickets as t")
         .leftJoin("ticketReviews as r", "r.ticketId", "t.id")
-        .select(["t.id", "t.category", "t.subject", "t.body", "t.reasonCode", "t.resolvedAt"])
+        .leftJoin("agentRuns as a", "a.ticketId", "t.id")
+        .select([
+          "t.id",
+          "t.category",
+          "t.subject",
+          "t.body",
+          "t.reasonCode",
+          "t.resolvedAt",
+          "a.state",
+        ])
         .where("t.outcome", "=", "handed_to_staff")
         .where("t.category", "<>", "data_deletion")
         .where("r.ticketId", "is", null)
@@ -231,6 +282,9 @@ export function createPortalApp(deps: PortalDeps) {
         body: row.body,
         reasonCode: row.reasonCode,
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
+        // What the agent read, so the reviewer can name the payment that
+        // should have been refunded.
+        invoices: invoicesSeen(row.state),
       })),
     });
   });
@@ -396,9 +450,13 @@ export function createPortalApp(deps: PortalDeps) {
   // fresh sign-in and by the customer typing their own email address.
   app.post("/account/deletion-request", async (c) => {
     const { token, ...scope } = await customer(c.req.raw);
-    const issuedAt = typeof token.claims.iat === "number" ? token.claims.iat : 0;
+    // When the person actually signed in. A refreshed token has a new issue
+    // time and the same sign-in time, so the issue time is used only where
+    // the sign-in time is absent.
+    const { auth_time: authTime, iat } = token.claims;
+    const signedInAt = typeof authTime === "number" ? authTime : typeof iat === "number" ? iat : 0;
     const wallNow = (deps.wallClock ?? (() => new Date()))().getTime() / 1000;
-    if (wallNow - issuedAt > MAX_SIGN_IN_AGE_SECONDS) {
+    if (wallNow - signedInAt > MAX_SIGN_IN_AGE_SECONDS) {
       throw new HttpError(401, "sign_in_too_old", "Sign in again to confirm this request");
     }
     const { confirmEmail } = await parseBody(c.req.raw, requestDeletion);

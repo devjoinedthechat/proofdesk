@@ -30,7 +30,7 @@ Temporal. One workflow per ticket; every model call and tool call is an activity
 
 - Activities run at least once, so every tool call carries an idempotency key.
 - Workflow history stores activity inputs and outputs. Personal data must stay out of it: workflows pass record IDs, not records.
-- Workflow code must be deterministic. Replay tests in CI guard this.
+- Workflow code must be deterministic. A test replays a finished ticket's history, with an approval wait in it, through the current workflow code and fails if the two diverge.
 
 ## When this breaks
 

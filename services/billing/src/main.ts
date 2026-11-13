@@ -11,6 +11,7 @@ main(async () => {
   const verify = createTokenVerifier({
     issuer: env("KEYCLOAK_ISSUER"),
     audience: CLIENTS.billingApi,
+    backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
   });
   const app = createBillingApp({
     db: connect<BillingDatabase>(env("BILLING_DATABASE_URL")),
