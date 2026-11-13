@@ -1,0 +1,34 @@
+// The vocabulary policies are written in. Requests are validated against it,
+// so a tool that is not listed here cannot be authorised at all.
+
+entity Agent;
+
+entity Ticket = {
+  category: String,
+  // The most this ticket's refunds may total without staff approval.
+  approvalLimitCents: Long,
+};
+
+type Common = {
+  // Set by staff to stop the agent from acting, per tenant.
+  agentPaused: Bool,
+};
+
+action list_invoices, list_subscriptions appliesTo {
+  principal: Agent,
+  resource: Ticket,
+  context: Common,
+};
+
+action create_refund appliesTo {
+  principal: Agent,
+  resource: Ticket,
+  context: {
+    agentPaused: Bool,
+    amountCents: Long,
+    // Refunds this ticket has already paid out.
+    ticketRefundedCents: Long,
+    // True only when staff approved this exact call.
+    approved: Bool,
+  },
+};

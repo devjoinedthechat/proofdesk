@@ -4,6 +4,7 @@ import { type Kysely, sql, type Transaction } from "kysely";
 export const DB_ROLES = {
   portal: "portal_app",
   grants: "grants_app",
+  worker: "worker_app",
   billing: "billing_app",
   entitlements: "entitlements_app",
 } as const;

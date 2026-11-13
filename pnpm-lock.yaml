@@ -136,6 +136,9 @@ importers:
       '@proofdesk/mcp-billing':
         specifier: workspace:*
         version: link:../../mcp/billing
+      '@proofdesk/policy':
+        specifier: workspace:*
+        version: link:../policy
       '@proofdesk/portal':
         specifier: workspace:*
         version: link:../../apps/portal
@@ -163,6 +166,15 @@ importers:
       jose:
         specifier: 6.2.17
         version: 6.2.17
+
+  packages/policy:
+    dependencies:
+      '@cedar-policy/cedar-wasm':
+        specifier: 4.14.0
+        version: 4.14.0
+      '@proofdesk/agent':
+        specifier: workspace:*
+        version: link:../agent
 
   packages/service:
     dependencies:
@@ -316,6 +328,9 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@cedar-policy/cedar-wasm@4.14.0':
+    resolution: {integrity: sha512-TPyz3zMl5r7W5iSHq51IgG+NTILGoXB0VPrEcXnzCEpPUqL/7b+AtMPVVHB/UoJWuXA8YORjLuWxKHUW33ePAA==}
 
   '@dbmate/darwin-arm64@2.38.1':
     resolution: {integrity: sha512-cf8e23w/FtJMvP+jJY59bBHLp2XYgP3pVdTppOUekI/6vZnFA5G/3fQfBAM2e/xRpOhAyT8ctwpJITD3TqGruw==}
@@ -1927,6 +1942,8 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.6.7':
     optional: true
+
+  '@cedar-policy/cedar-wasm@4.14.0': {}
 
   '@dbmate/darwin-arm64@2.38.1':
     optional: true

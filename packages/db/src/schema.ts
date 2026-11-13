@@ -60,6 +60,18 @@ export type GrantAssertionRow = {
   issuedAt: Date;
 };
 
+export type AuditLogRow = {
+  seq: number;
+  tenantId: string;
+  ticketId: string | null;
+  at: Date;
+  actor: string;
+  event: string;
+  detail: string;
+  prevHash: string;
+  hash: string;
+};
+
 /** The application database: who the tenants and customers are, and their tickets. */
 export type AppDatabase = {
   tenants: TenantRow;
@@ -67,4 +79,5 @@ export type AppDatabase = {
   tickets: TicketRow;
   ticketGrants: TicketGrantRow;
   grantAssertions: GrantAssertionRow;
+  auditLog: AuditLogRow;
 };

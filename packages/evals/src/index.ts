@@ -1,6 +1,5 @@
 export {
   type AgentSolverOptions,
-  approvalLimit,
   createAgentSolver,
   directBillingTools,
 } from "./agent-solver.ts";

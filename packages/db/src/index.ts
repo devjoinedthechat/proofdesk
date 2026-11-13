@@ -1,10 +1,12 @@
 import { fileURLToPath } from "node:url";
 
 export { createDatabase, databaseUrl, dropDatabase, ensureRoles } from "./admin.ts";
+export { type AuditEntry, type AuditHead, appendAudit, auditHead, verifyAudit } from "./audit.ts";
 export { connect } from "./connect.ts";
 export { migrate } from "./migrate.ts";
 export type {
   AppDatabase,
+  AuditLogRow,
   CustomerRow,
   GrantAssertionRow,
   TenantRow,

@@ -1,8 +1,6 @@
 import {
   type AgentTool,
-  type Authorize,
   checkResolution,
-  refundsMade,
   runAgent,
   systemPrompt,
   ticketMessage,
@@ -10,6 +8,7 @@ import {
 } from "@proofdesk/agent";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
+import { createToolPolicy, policyAuthorizer } from "@proofdesk/policy";
 import { ServiceApiError } from "@proofdesk/service";
 import type { Solver, SolverContext } from "@proofdesk/simulator";
 import { z } from "zod";
@@ -41,25 +40,7 @@ export function directBillingTools(context: SolverContext): AgentTool[] {
   }));
 }
 
-/**
- * The approval rule in plain code: a ticket's refunds may total at most the
- * tenant's limit without a person agreeing. The worker enforces the same rule
- * through the policy engine; this version exists so evaluations do not need it.
- */
-export function approvalLimit(limitCents: number): Authorize {
-  return (call, history) => {
-    if (call.tool !== "create_refund") return { decision: "allow" };
-    const amount = call.input.amountCents;
-    if (typeof amount !== "number") return { decision: "allow" };
-    const already = refundsMade(history).reduce((sum, refund) => sum + refund.amountCents, 0);
-    return already + amount > limitCents
-      ? {
-          decision: "needs_approval",
-          reason: "The refund total for this ticket is above the approval limit.",
-        }
-      : { decision: "allow" };
-  };
-}
+const toolPolicy = createToolPolicy();
 
 export type AgentSolverOptions = {
   gateway: ModelProvider;
@@ -93,7 +74,13 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       }),
       ticket: ticketMessage({ now: context.now, subject: ticket.subject, body: ticket.body }),
       tools: tools.map((tool) => withSystemIdempotency(tool, ticket.id)),
-      authorize: approvalLimit(tenant.refundApprovalLimitCents),
+      authorize: policyAuthorizer(toolPolicy, {
+        ticket: {
+          id: ticket.id,
+          category: ticket.category,
+          approvalLimitCents: tenant.refundApprovalLimitCents,
+        },
+      }),
       requestApproval: (call) => {
         const amountCents = Number(call.input.amountCents);
         return context.requestApproval({
