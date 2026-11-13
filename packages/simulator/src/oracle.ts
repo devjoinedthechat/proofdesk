@@ -1,5 +1,6 @@
+import { CATALOG } from "./catalog.ts";
 import { decideRefund, type ReasonCode, type RefundIntent } from "./refund-policy.ts";
-import type { Solver, SolverResult } from "./scenario.ts";
+import type { PlanChangeIntent, Solver, SolverResult } from "./scenario.ts";
 import { formatMoney } from "./world.ts";
 
 const REFUSALS: Partial<Record<ReasonCode, string>> = {
@@ -20,10 +21,10 @@ const REFUSALS: Partial<Record<ReasonCode, string>> = {
  * scenario or the policy is wrong.
  */
 export function createOracle(
-  intent: RefundIntent,
+  intent: RefundIntent | PlanChangeIntent,
   lookups: { query: string; phrase: string }[] = [],
 ): Solver {
-  const decide = decideTicket(intent);
+  const decide = "kind" in intent ? decidePlanChange(intent) : decideTicket(intent);
   return async (context): Promise<SolverResult> => {
     const result = await decide(context);
     // Answer the customer's side questions from the help centre, quoting the
@@ -105,6 +106,77 @@ function decideTicket(intent: RefundIntent): Solver {
       outcome: "refunded",
       reasonCode: decision.reasonCode,
       reply: `I have refunded ${total} for invoice ${decision.invoice.number}.`,
+    };
+  };
+}
+
+const MAX_SEATS = 50;
+
+/** Solves a plan-change ticket by the written policy, using the same two service clients the agent's tools use. */
+function decidePlanChange(intent: PlanChangeIntent): Solver {
+  return async (context): Promise<SolverResult> => {
+    const { customer, ticket, billing, entitlements } = context;
+    const subscriptions = await billing.listSubscriptions(customer.id);
+    const subscription = subscriptions.find((candidate) => candidate.status === "active");
+
+    if (!subscription) {
+      return {
+        outcome: "refused",
+        reasonCode: "subscription_not_active",
+        reply:
+          "Your subscription is cancelled, so it cannot be changed. You can subscribe again at any time.",
+      };
+    }
+    if (intent.planCode === undefined && intent.seats === undefined) {
+      return {
+        outcome: "needs_clarification",
+        reasonCode: "request_unclear",
+        reply: "Which plan would you like, and how many seats?",
+      };
+    }
+    const planCode = intent.planCode ?? subscription.plan.code;
+    const seats = intent.seats ?? subscription.seats;
+    const plans =
+      Object.values(CATALOG).find((entry) => entry.tenant.id === context.tenant.id)?.plans ?? [];
+    const target = plans.find((plan) => plan.code === planCode);
+
+    if (!target) {
+      return {
+        outcome: "refused",
+        reasonCode: "plan_not_available",
+        reply: `We have no plan called ${planCode}.`,
+      };
+    }
+    if (target.billingInterval !== subscription.plan.billingInterval) {
+      return {
+        outcome: "handed_to_staff",
+        reasonCode: "billing_interval_change",
+        reply:
+          "Moving between monthly and annual billing is arranged by our team, who will reply to you directly.",
+      };
+    }
+    if (seats > MAX_SEATS) {
+      return {
+        outcome: "handed_to_staff",
+        reasonCode: "seat_limit",
+        reply: `More than ${MAX_SEATS} seats is arranged by our team, who will reply to you directly.`,
+      };
+    }
+    if (planCode === subscription.plan.code && seats === subscription.seats) {
+      return {
+        outcome: "refused",
+        reasonCode: "no_change_needed",
+        reply: `Your subscription is already on ${target.name} with ${seats} seats.`,
+      };
+    }
+
+    const key = `${ticket.id}:plan-change`;
+    await billing.changeSubscription(subscription.id, { planCode, seats }, key);
+    await entitlements.setEntitlement(customer.id, { planCode, seats }, key);
+    return {
+      outcome: "plan_changed",
+      reasonCode: "plan_changed",
+      reply: `Your subscription is now on ${target.name} with ${seats} seats, from your next renewal. Nothing is charged today.`,
     };
   };
 }

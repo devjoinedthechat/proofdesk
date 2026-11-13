@@ -1,12 +1,12 @@
 # Proofdesk
 
-A back-office support agent for a simulated subscription company, built as a reference for production-grade AI agents.
+A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself, under delegated identity, policy as code, durable execution and measured evals.
 
-The agent resolves refund, plan-change and data-deletion tickets by reading the company's records and making the changes itself. Each production property the repo claims is backed by a test that tries to break it.
+Every property the repo claims is backed by a test that tries to break it. The systems of record run as a seeded test environment, so each ticket has a known correct outcome and a run is judged on the final state of the databases, not on a model's opinion of itself.
 
 ## Results on real models
 
-Three repeats of every scenario on each model, judged on the final state of the simulated company.
+Three repeats of every scenario on each model, judged on the final state of the systems of record.
 
 | Suite                                     | `claude-sonnet-5-5` | `claude-haiku-5-5` |
 | ----------------------------------------- | ------------------- | ------------------ |
@@ -49,9 +49,9 @@ pnpm stack:up   # Postgres with pgvector, Keycloak, Temporal
 
 `pnpm stack:down` stops the stack. `pnpm stack:reset` also deletes its data.
 
-## The simulated company
+## The test environment
 
-The agent works for two fictional companies with different refund rules, so the same ticket can have two correct answers.
+The environment has two tenants with different refund rules, so the same ticket can have two correct answers.
 
 | Tenant       | Refund window | Approval needed above |
 | ------------ | ------------- | --------------------- |

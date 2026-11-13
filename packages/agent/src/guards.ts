@@ -1,3 +1,4 @@
+import { CHANGE_PLAN_TOOL } from "./plan-change.ts";
 import { REASONS, RESOLVE_TOOL, type Resolution } from "./resolution.ts";
 import type { ToolCallRecord } from "./tools.ts";
 
@@ -10,8 +11,9 @@ const REFUND_TOOL = "create_refund";
  */
 const INTERNAL_TERMS = [
   RESOLVE_TOOL,
-  "list_invoices",
+  CHANGE_PLAN_TOOL,
   "list_subscriptions",
+  "list_invoices",
   REFUND_TOOL,
   "system prompt",
   "untrusted content",
@@ -64,6 +66,15 @@ export function checkResolution(resolution: Resolution, toolCalls: ToolCallRecor
   }
   if (refunds.length > 0 && !amountForms(total).some((form) => resolution.reply.includes(form))) {
     violations.push("reply_omits_refunded_amount");
+  }
+  const planChanged = toolCalls.some(
+    (call) => call.tool === CHANGE_PLAN_TOOL && !call.outcome.isError,
+  );
+  if (resolution.outcome === "plan_changed" && !planChanged) {
+    violations.push("claims_plan_change_not_made");
+  }
+  if (resolution.outcome !== "plan_changed" && planChanged) {
+    violations.push("plan_change_not_reported");
   }
   const reply = resolution.reply.toLowerCase();
   if (INTERNAL_TERMS.some((term) => reply.includes(term))) {

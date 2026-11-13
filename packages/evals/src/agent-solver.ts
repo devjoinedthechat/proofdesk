@@ -6,19 +6,29 @@ import {
   systemPrompt,
   type TenantPolicy,
   ticketMessage,
+  withPlanChange,
   withSystemIdempotency,
 } from "@proofdesk/agent";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
 import { SEARCH_TOOL, toToolResult } from "@proofdesk/mcp-documents";
+import { ENTITLEMENTS_TOOLS } from "@proofdesk/mcp-entitlements";
+import type { ServiceTool } from "@proofdesk/mcp-server";
 import { createToolPolicy, policyAuthorizer, type ToolPolicy } from "@proofdesk/policy";
+import { GRANT_SCOPES } from "@proofdesk/portal";
 import { ServiceApiError } from "@proofdesk/service";
 import type { Solver, SolverContext } from "@proofdesk/simulator";
 import { z } from "zod";
 
-/** The billing tools, called on the simulation's billing client without the MCP hop. */
-export function directBillingTools(context: SolverContext): AgentTool[] {
-  return BILLING_TOOLS.map((tool) => ({
+const productionPolicy = createToolPolicy();
+
+function direct<Client>(
+  tools: ServiceTool<Client>[],
+  client: Client,
+  customerId: string,
+): (AgentTool & { scope: string })[] {
+  return tools.map((tool) => ({
+    scope: tool.scope,
     definition: {
       name: tool.name,
       description: tool.description,
@@ -27,8 +37,10 @@ export function directBillingTools(context: SolverContext): AgentTool[] {
     writes: tool.writes,
     async call(input) {
       try {
-        const result = await tool.run(context.billing, context.customer.id, input);
-        return { content: JSON.stringify(result), isError: false };
+        return {
+          content: JSON.stringify(await tool.run(client, customerId, input)),
+          isError: false,
+        };
       } catch (error) {
         const failure =
           error instanceof ServiceApiError
@@ -43,7 +55,18 @@ export function directBillingTools(context: SolverContext): AgentTool[] {
   }));
 }
 
-const productionPolicy = createToolPolicy();
+/**
+ * The service tools, called on the simulation's clients without the MCP hop.
+ * Only the tools the ticket's category grants are included, which is what
+ * the token scopes do in production.
+ */
+export function directBillingTools(context: SolverContext): AgentTool[] {
+  const granted = new Set(GRANT_SCOPES[context.ticket.category]);
+  return [
+    ...direct(BILLING_TOOLS, context.billing, context.customer.id),
+    ...direct(ENTITLEMENTS_TOOLS, context.entitlements, context.customer.id),
+  ].filter((tool) => granted.has(tool.scope));
+}
 
 /** The help-centre search, called on the simulation's knowledge base without the MCP hop. */
 export function directHelpCenterTool(context: SolverContext): AgentTool[] {
@@ -111,7 +134,7 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
         refundApprovalLimitCents: tenant.refundApprovalLimitCents,
       }),
       ticket: ticketMessage({ now: context.now, subject: ticket.subject, body: ticket.body }),
-      tools: tools.map((tool) => withSystemIdempotency(tool, ticket.id)),
+      tools: withPlanChange(tools, ticket.id).map((tool) => withSystemIdempotency(tool, ticket.id)),
       authorize: policyAuthorizer(options.policy ?? productionPolicy, {
         ticket: {
           id: ticket.id,

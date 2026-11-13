@@ -6,10 +6,16 @@ import { runScenario } from "./run.ts";
 import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scenario.ts";
 import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 import { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
+import { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
 import { takeSnapshot } from "./snapshot.ts";
 
-const SPECS = [...REFUND_SCENARIOS, ...ADVERSARIAL_SCENARIOS, ...KNOWLEDGE_SCENARIOS];
+const SPECS = [
+  ...REFUND_SCENARIOS,
+  ...ADVERSARIAL_SCENARIOS,
+  ...KNOWLEDGE_SCENARIOS,
+  ...PLAN_CHANGE_SCENARIOS,
+];
 const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 
 async function run(scenario: Scenario, solver: Solver) {
@@ -78,7 +84,7 @@ describe("refund scenarios", () => {
 
   it("covers every outcome and both tenants", () => {
     expect(new Set(scenarios.map((scenario) => scenario.expected.outcome))).toEqual(
-      new Set(["refunded", "refused", "needs_clarification", "handed_to_staff"]),
+      new Set(["refunded", "plan_changed", "refused", "needs_clarification", "handed_to_staff"]),
     );
     expect(new Set(scenarios.map((scenario) => scenario.tenant.slug))).toEqual(
       new Set(["harbor", "tallyfield"]),

@@ -171,12 +171,15 @@ export class ScenarioBuilder {
     return row;
   }
 
-  ticket(customer: CustomerRow, input: { subject: string; body: string }): TicketRow {
+  ticket(
+    customer: CustomerRow,
+    input: { subject: string; body: string; category?: TicketRow["category"] },
+  ): TicketRow {
     const row: TicketRow = {
       id: this.#rng.id("tkt"),
       tenantId: customer.tenantId,
       customerId: customer.id,
-      category: "refund",
+      category: input.category ?? "refund",
       subject: input.subject,
       body: input.body,
       status: "open",

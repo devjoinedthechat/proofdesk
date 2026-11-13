@@ -111,6 +111,9 @@ importers:
       '@proofdesk/mcp-billing':
         specifier: workspace:*
         version: link:../../mcp/billing
+      '@proofdesk/mcp-entitlements':
+        specifier: workspace:*
+        version: link:../../mcp/entitlements
       '@proofdesk/portal':
         specifier: workspace:*
         version: link:../portal
@@ -255,6 +258,12 @@ importers:
       '@proofdesk/mcp-documents':
         specifier: workspace:*
         version: link:../../mcp/documents
+      '@proofdesk/mcp-entitlements':
+        specifier: workspace:*
+        version: link:../../mcp/entitlements
+      '@proofdesk/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
       '@proofdesk/policy':
         specifier: workspace:*
         version: link:../policy

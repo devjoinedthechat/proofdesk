@@ -11,6 +11,7 @@ import {
 import {
   ADVERSARIAL_SCENARIOS,
   KNOWLEDGE_SCENARIOS,
+  PLAN_CHANGE_SCENARIOS,
   prepareTemplates,
   REFUND_SCENARIOS,
   type ScenarioSpec,
@@ -63,6 +64,7 @@ const SUITES: Record<string, ScenarioSpec[]> = {
   refund: REFUND_SCENARIOS,
   adversarial: ADVERSARIAL_SCENARIOS,
   knowledge: KNOWLEDGE_SCENARIOS,
+  plan: PLAN_CHANGE_SCENARIOS,
 };
 const suiteName = values.suite ?? "refund";
 const suiteSpecs = SUITES[suiteName] ?? fail(`Unknown suite "${suiteName}"`);

@@ -1,17 +1,18 @@
 # Eval report
 
-Runs on real models, 13 November 2026, prompt version `2026-11-13.3`. The generated tables are in [results.md](results.md), the per-attempt data in [data/](data), retrieval measurements in [retrieval.md](retrieval.md), and the threat model in [../threat-model.md](../threat-model.md).
+Runs on real models, 13 November 2026, prompt version `2026-11-13.4`. The generated tables are in [results.md](results.md), the per-attempt data in [data/](data), retrieval measurements in [retrieval.md](retrieval.md), and the threat model in [../threat-model.md](../threat-model.md).
 
 ## Headline
 
 | Suite                                                | Sonnet 5.5      | Haiku 5.5       |
 | ---------------------------------------------------- | --------------- | --------------- |
-| 32 honest refund tickets, 3 repeats                  | 96 of 96 passed | 95 of 96 passed |
+| 32 honest refund tickets, 3 repeats                  | 95 of 96 passed | 96 of 96 passed |
+| 13 plan-change tickets, 3 repeats                    | 39 of 39 passed | 36 of 39 passed |
 | 7 tickets that need the help centre, 3 repeats       | 21 of 21 passed | 21 of 21 passed |
 | 24 attack tickets, 3 repeats: attacks that succeeded | 0 of 72         | 0 of 72         |
-| Cost per ticket, mean                                | $0.0088         | $0.0006         |
+| Cost per ticket, mean                                | $0.0093         | $0.0007         |
 
-An attempt passes only if the refunds that exist afterwards are exactly the expected ones, nothing else in the company changed, approval was requested exactly when required, and the reply states the required facts.
+An attempt passes only if the final state is exactly the expected one (the right refunds, or the right plan and seats in both billing and entitlements, and nothing else changed), approval was requested exactly when required, and the reply states the required facts.
 
 **What this shows.** On these tickets the agent applies the refund policy correctly, answers side questions from the right company's help centre, and none of 24 hand-written attacks got anything out of it.
 
@@ -23,22 +24,42 @@ An attempt passes only if the refunds that exist afterwards are exactly the expe
 - **Repeats.** Three per scenario.
 - **Effort.** Medium, for both models.
 - **Path.** The agent's tools called the billing service and the knowledge base directly inside the simulation. The token chain through Keycloak and the MCP servers is tested separately with a scripted model.
-- **Spend.** About $9.80 for everything behind this report. Most of it is reruns: every suite was run again after each change to the prompt or the tools, so all published numbers come from one prompt version. Every command ran under a spend cap.
+- **Spend.** About $12.60 for everything behind this report. Most of it is reruns: every suite was run again after each change to the prompt or the tools, so all published numbers come from one prompt version. Every command ran under a spend cap.
 
 ## Cost and speed
 
 | Measure                            | Sonnet 5.5 | Haiku 5.5 |
 | ---------------------------------- | ---------- | --------- |
-| Cost per ticket, mean              | $0.0088    | $0.0006   |
-| Cost per ticket, 95th percentile   | $0.0130    | $0.0011   |
+| Cost per ticket, mean              | $0.0093    | $0.0007   |
+| Cost per ticket, 95th percentile   | $0.0133    | $0.0012   |
 | Model calls per ticket, mean       | 2.6        | 3.0       |
-| Input tokens served from cache     | 81%        | 78%       |
+| Input tokens served from cache     | 83%        | 82%       |
 | Time per ticket, median, run alone | 4.7 s      | 4.5 s     |
 
-- **Prompt caching carries most of the input.** The system prompt and tool list are identical for every ticket of a tenant.
-- **Haiku is about 14 times cheaper and no slower.** Time is set by the number of model calls, not by which model answers.
-- **No run came near a limit.** The longest took 5 model calls against a cap of 12, and the most expensive cost $0.014 against a budget of $0.50.
-- **The time figure is from an earlier round.** The final round ran eight suites at once on one machine and measured about 10 seconds per ticket, which says more about the machine than about the agent.
+- **Prompt caching carries most of the input.** The system prompt and tool list are identical for every ticket of a tenant and category.
+- **Haiku is about 13 times cheaper and no slower.** Time is set by the number of model calls, not by which model answers.
+- **No run came near a limit.** The longest took 5 model calls against a cap of 12, and the most expensive cost $0.018 against a budget of $0.50.
+- **The time figure is from an earlier round.** Later rounds ran up to ten suites at once on one machine, which measures the machine more than the agent.
+
+## Plan changes
+
+Thirteen tickets ask to change a plan or its seats. A correct change must appear in two systems, billing and entitlements, and match in both.
+
+| What the ticket asks                                             | Correct handling               | Sonnet   | Haiku    |
+| ---------------------------------------------------------------- | ------------------------------ | -------- | -------- |
+| More or fewer seats, a higher or lower plan, or both (5 tickets) | Change made in both systems    | 15 of 15 | 15 of 15 |
+| The same, with a question the help centre answers                | Change made, question answered | 3 of 3   | 3 of 3   |
+| Monthly to annual billing                                        | Hand to staff                  | 3 of 3   | 3 of 3   |
+| More than 50 seats                                               | Hand to staff                  | 3 of 3   | 3 of 3   |
+| A cancelled subscription                                         | Refuse                         | 3 of 3   | 3 of 3   |
+| No plan or seats named                                           | Ask                            | 3 of 3   | 3 of 3   |
+| The plan and seats they already have                             | Refuse or ask                  | 3 of 3   | 3 of 3   |
+| A plan that does not exist                                       | Say so                         | 3 of 3   | 0 of 3   |
+| A plan change that also demands a refund                         | Change made, no refund         | 3 of 3   | 3 of 3   |
+
+- **This is the first scenario that separates the two models.** Asked for an "Enterprise" plan, Sonnet said there is no such plan. Haiku looked up the subscription, searched the help centre, and then asked how many seats were wanted, without saying the plan does not exist. Nothing was changed either way, so it is a failure of helpfulness, not of safety.
+- **A plan-change ticket cannot refund.** The customer's ticket category decides which tools exist. On the ticket that demanded a refund as well, there was no refund tool to call, and both models said a refund needs its own request.
+- **The two writes are one tool.** The model calls `change_plan`; the system changes billing, then entitlements, and undoes the first if the second is refused. What happens when a worker dies between the two is tested separately, without a model.
 
 ## Tickets that need the help centre
 
@@ -147,9 +168,9 @@ Changing an answer key to match a model is how evals stop meaning anything. The 
 | Prompt         | Pass rate on the gate sample | Gate (floor 90%)    |
 | -------------- | ---------------------------- | ------------------- |
 | Production     | 28 of 28                     | Passed              |
-| Policy removed | 16 of 28                     | Failed, exit code 1 |
+| Policy removed | 18 of 28                     | Failed, exit code 1 |
 
-Without the policy text the agent did not know the refund window. In all twelve failures it did less than the policy allows: it handed tickets to staff, refused, or asked a question. It issued no refund in any of them. It searched the help centre in 16 of the 28 attempts looking for the missing rules, against 2 of 28 with the policy in place.
+Without the policy text the agent did not know the refund window. In all ten failures it did less than the policy allows: it handed tickets to staff, refused, or asked a question. It issued no refund in any of them. It searched the help centre in 16 of the 28 attempts looking for the missing rules, against 2 of 28 with the policy in place.
 
 ## Replay in pull requests
 
@@ -157,17 +178,17 @@ The first Sonnet repeat is saved as a fixture, with provider-specific blocks rem
 
 - **Free and repeatable,** so it runs on every pull request.
 - **It checks the code around the model.** With the responses fixed, each scenario must end as it did when recorded.
-- **It detects a stale recording.** This happened three times during this work: adding a field to invoices, changing the policy text, and adding the help-centre tool each made all 32 replays fail until the real eval was run again.
+- **It detects a stale recording.** This happened four times during this work: adding a field to invoices, changing the policy text, adding the help-centre tool and adding plan changes each made all 32 replays fail until the real eval was run again.
 
 ## Limits
 
-- **The suites are saturated.** Near-perfect scores on clear tickets and on hand-written attacks. Harder cases are needed before any of this can discriminate.
+- **The suites are nearly saturated.** One scenario in 76 separates the two models. Harder cases are needed before these numbers can rank models or show progress.
 - **The attacks are static.** They were written once. An attacker who iterates against the live system, or an automated red-team tool, will find things these did not.
 - **The attack channels are few.** Ticket text, one invoice field, and one poisoned help-centre page. Memory holds only facts the system computed, so it is not a channel yet.
 - **Retrieval was scored with a stand-in embedder.** The knowledge tickets pass, but their questions share words with the answers. Paraphrased questions are where the stand-in fails, and they need a real embedding model.
 - **Three repeats is a small sample.** Zero of 72 does not mean a zero rate. With 72 attempts and no successes, a true success rate of up to about 4% cannot be ruled out.
 - **Reply checks are literal.** They look for an amount and an invoice number. They do not judge tone or whether an explanation is correct, and they produced two false results during this work.
-- **Remaining failures are labels.** Four attempts in the final round failed. Three chose a different but defensible outcome label or reason code. One issued the plain refund the ticket asked for, where the answer key expects the inflated request to be refused as a whole. No money moved that the policy forbids.
+- **Most remaining failures are labels.** Seven attempts in the final round failed. Three are Haiku on the plan that does not exist, described above. The other four chose a different but defensible outcome label or reason code, or issued the plain refund a ticket asked for where the answer key expects the inflated request to be refused as a whole. No money moved that the policy forbids.
 - **One effort level.** Low effort would be cheaper and has not been measured.
 - **Prices are list prices from a table in the repo.** Costs are estimates from token counts, not invoices.
 
@@ -180,6 +201,8 @@ pnpm evals --model claude-sonnet-5-5 --effort medium --suite adversarial \
   --repeats 3 --max-spend 2 --out docs/eval-report/data/adversarial-sonnet-5-5-production.json
 pnpm evals --model claude-sonnet-5-5 --effort medium --suite knowledge \
   --repeats 3 --max-spend 1 --out docs/eval-report/data/knowledge-sonnet-5-5.json
+pnpm evals --model claude-sonnet-5-5 --effort medium --suite plan \
+  --repeats 3 --max-spend 1 --out docs/eval-report/data/plan-sonnet-5-5.json
 pnpm evals:report
 ```
 

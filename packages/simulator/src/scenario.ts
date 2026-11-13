@@ -7,7 +7,12 @@ import type { KnowledgeDocument } from "./knowledge.ts";
 import type { PlannedRefund, ReasonCode, RefundIntent } from "./refund-policy.ts";
 import type { World } from "./world.ts";
 
-export type Outcome = "refunded" | "refused" | "needs_clarification" | "handed_to_staff";
+export type Outcome =
+  | "refunded"
+  | "plan_changed"
+  | "refused"
+  | "needs_clarification"
+  | "handed_to_staff";
 
 /** The known correct result of a scenario, written by hand. */
 export type Expected = {
@@ -18,9 +23,14 @@ export type Expected = {
    * honest labels for doing nothing yet and saying why.
    */
   alsoAccept?: Outcome[];
-  reasonCode: ReasonCode | "other";
+  reasonCode: ReasonCode | PlanReasonCode | "other";
   /** Exactly the refunds that must exist afterwards. Anything else is a failure. */
   refunds: { paymentId: string; amountCents: number }[];
+  /**
+   * The plan change that must have been made, in billing and in entitlements
+   * alike. Absent means no subscription or entitlement may change.
+   */
+  planChange?: { subscriptionId: string; planCode: string; seats: number };
   /** Present when staff approval must be requested, for this total. */
   approval?: { amountCents: number };
   reply: {
@@ -65,11 +75,28 @@ export type Attack = {
   goalReached(observed: Observed): boolean;
 };
 
+/** What a plan-change ticket is asking for, as a careful human reader would understand it. */
+export type PlanChangeIntent = {
+  kind: "plan_change";
+  /** Absent when the ticket does not say. */
+  planCode?: string;
+  seats?: number;
+};
+
+export type PlanReasonCode =
+  | "plan_changed"
+  | "request_unclear"
+  | "plan_not_available"
+  | "billing_interval_change"
+  | "seat_limit"
+  | "subscription_not_active"
+  | "no_change_needed";
+
 export type ScenarioCase = {
   customer: CustomerRow;
   ticket: TicketRow;
   /** The ticket's meaning in structured form. Only the oracle may read it. */
-  intent: RefundIntent;
+  intent: RefundIntent | PlanChangeIntent;
   /** How staff answer an approval request in this scenario. */
   staffDecision?: "approved" | "rejected";
   attack?: Attack;

@@ -13,6 +13,7 @@ export type Change = {
 
 function keyOf(table: string, row: Row): string {
   if (table === "entitlements.entitlements") return `${row.tenantId}/${row.customerId}`;
+  if (table === "entitlements.writes") return `${row.tenantId}/${row.idempotencyKey}`;
   return String(row.id);
 }
 
@@ -35,7 +36,9 @@ export async function takeSnapshot(dbs: Databases): Promise<Snapshot> {
     "billing.invoices": dbs.billing.selectFrom("invoices").selectAll().execute(),
     "billing.payments": dbs.billing.selectFrom("payments").selectAll().execute(),
     "billing.refunds": dbs.billing.selectFrom("refunds").selectAll().execute(),
+    "billing.plan_changes": dbs.billing.selectFrom("planChanges").selectAll().execute(),
     "entitlements.entitlements": dbs.entitlements.selectFrom("entitlements").selectAll().execute(),
+    "entitlements.writes": dbs.entitlements.selectFrom("entitlementWrites").selectAll().execute(),
   };
 
   const snapshot: Snapshot = {};

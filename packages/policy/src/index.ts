@@ -64,6 +64,8 @@ export type ToolRequest = {
     approved: boolean;
     facts: RefundFacts;
   };
+  /** For change_plan. */
+  planChange?: { seats: number };
 };
 
 export type PolicyDecision = {
@@ -74,6 +76,7 @@ export type PolicyDecision = {
 };
 
 const REFUND = "create_refund";
+const CHANGE_PLAN = "change_plan";
 
 /** What the model is told when a policy forbids its call, so it can explain the refusal. */
 const FORBIDDEN_BECAUSE: Record<string, string> = {
@@ -84,6 +87,7 @@ const FORBIDDEN_BECAUSE: Record<string, string> = {
   "refund-not-duplicate":
     "That payment is not a duplicate: no earlier successful payment exists for the invoice.",
   "refund-goodwill-used": "The customer already had a refund on request in the last 12 months.",
+  "plan-change-seat-limit": "More than 50 seats must be arranged by staff.",
   "refund-over-limit": "The refund total for this ticket is above the approval limit.",
   "refund-large-payment":
     "The payment is larger than the approval limit, so any refund against it needs approval.",
@@ -104,6 +108,8 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
       const { facts, ...refund } = request.refund;
       Object.assign(context, { ...refund, ...facts, approved });
     }
+    if (request.tool === CHANGE_PLAN && request.planChange)
+      context.seats = request.planChange.seats;
     const answer = cedar.isAuthorized({
       principal: { type: "Agent", id: "agent-worker" },
       action: { type: "Action", id: request.tool },
@@ -145,6 +151,14 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
           typeof refund.reason !== "string")
       ) {
         return { decision: "deny", policies: [], reason: "The refund request is malformed." };
+      }
+
+      if (request.tool === CHANGE_PLAN && !Number.isSafeInteger(request.planChange?.seats)) {
+        return {
+          decision: "deny",
+          policies: [],
+          reason: "The number of seats must be a whole number.",
+        };
       }
 
       const actual = evaluate(request, refund?.approved === true);
@@ -213,10 +227,17 @@ export async function refundRequest(
 export function policyAuthorizer(policy: ToolPolicy, inputs: PolicyInputs): Authorize {
   return async (call, history) => {
     const refunded = refundsMade(history).reduce((sum, refund) => sum + refund.amountCents, 0);
+    const base = {
+      tool: call.tool,
+      ticket: inputs.ticket,
+      agentPaused: inputs.agentPaused?.() ?? false,
+    };
     const request: ToolRequest =
       call.tool === REFUND
         ? await refundRequest(inputs, call.input, refunded, false)
-        : { tool: call.tool, ticket: inputs.ticket, agentPaused: inputs.agentPaused?.() ?? false };
+        : call.tool === CHANGE_PLAN
+          ? { ...base, planChange: { seats: call.input.seats as number } }
+          : base;
     const result = policy.decide(request);
     return result.decision === "allow"
       ? { decision: "allow" }

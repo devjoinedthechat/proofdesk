@@ -5,6 +5,7 @@ import {
   baseWorld,
   createSimEnv,
   materialise,
+  PLAN_CHANGE_SCENARIOS,
   REFUND_SCENARIOS,
   runScenario,
   type Scenario,
@@ -21,7 +22,9 @@ import { createSecuredHarness, type SecuredHarness } from "./secured.ts";
 // model makes the right decisions is the job of the evaluation suite.
 
 const scenario = (id: string): Scenario => {
-  const spec = REFUND_SCENARIOS.find((candidate) => candidate.id === id);
+  const spec = [...REFUND_SCENARIOS, ...PLAN_CHANGE_SCENARIOS].find(
+    (candidate) => candidate.id === id,
+  );
   if (!spec) throw new Error(`No scenario ${id}`);
   return materialise(spec, baseWorld());
 };
@@ -235,6 +238,53 @@ describe("the agent as a scenario solver", () => {
     // The second call reuses the first call's key, so billing returns the
     // first refund. The final state holds exactly one.
     expect(result.failures).toEqual([]);
+  });
+});
+
+describe("plan changes as a scenario", () => {
+  it("changes billing and access with one tool call and passes the final-state check", async () => {
+    const target = scenario("plan-add-seats");
+    const { solver, provider } = scripted([
+      call("list_subscriptions", {}),
+      (request) => {
+        const results = request.messages.flatMap((message) =>
+          message.role === "user"
+            ? message.content.filter((block) => block.type === "tool_result")
+            : [],
+        );
+        const [subscription] = JSON.parse(results.at(-1)?.content ?? "{}").subscriptions as {
+          id: string;
+        }[];
+        return call("change_plan", {
+          subscriptionId: subscription?.id,
+          planCode: "team-monthly",
+          seats: 5,
+        });
+      },
+      resolve("plan_changed", "plan_changed", "Your Team plan has 5 seats from your next renewal."),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    // A plan-change ticket has no refund tool, and the saga's parts are hidden.
+    expect(provider.calls[0]?.request.tools?.map((tool) => tool.name).sort()).toEqual([
+      "change_plan",
+      "get_entitlement",
+      "list_invoices",
+      "list_subscriptions",
+      "resolve_ticket",
+    ]);
+  });
+
+  it("gives a refund ticket no way to change a plan", async () => {
+    const { solver, provider } = scripted([resolve("refused", "outside_window", "No.")]);
+    await runDirect(scenario("refund-outside-window"), solver);
+
+    const shown = provider.calls[0]?.request.tools?.map((tool) => tool.name) ?? [];
+    expect(shown).toContain("create_refund");
+    expect(shown).not.toContain("change_plan");
+    expect(shown).not.toContain("change_subscription");
   });
 });
 

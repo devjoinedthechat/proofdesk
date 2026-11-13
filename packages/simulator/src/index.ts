@@ -34,6 +34,8 @@ export {
   materialise,
   type Observed,
   type Outcome,
+  type PlanChangeIntent,
+  type PlanReasonCode,
   type Scenario,
   type ScenarioCase,
   type ScenarioSpec,
@@ -43,6 +45,7 @@ export {
 } from "./scenario.ts";
 export { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 export { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
+export { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 export { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
 export { type Change, diffSnapshots, type Snapshot, takeSnapshot } from "./snapshot.ts";
 export { formatMoney, SIM_NOW, type World } from "./world.ts";

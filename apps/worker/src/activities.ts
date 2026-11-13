@@ -1,12 +1,17 @@
 import {
   type AgentState,
+  CHANGE_PLAN_TOOL,
+  changePlan,
+  changePlanTool,
   checkResolution,
   hideIdempotencyKey,
   initialState,
   inspectNext,
+  isPlanChangePart,
   type McpToolDescriptor,
   modelStep,
   type NextCall,
+  planChangeAvailable,
   refundsMade,
   type Screening,
   settleNext,
@@ -24,7 +29,7 @@ import {
   type TicketStatus,
   withRowScope,
 } from "@proofdesk/db";
-import type { Effort, ModelProvider } from "@proofdesk/gateway";
+import type { Effort, ModelProvider, ToolDefinition } from "@proofdesk/gateway";
 import {
   type InvoiceRecords,
   type PolicyInputs,
@@ -80,10 +85,22 @@ export type ActivityDeps = {
 
 const TICKET_STATUS: Record<string, TicketStatus> = {
   refunded: "resolved",
+  plan_changed: "resolved",
   refused: "refused",
   needs_clarification: "waiting_customer",
   handed_to_staff: "handed_to_staff",
 };
+
+/** What the model is shown: the service tools minus the saga's parts, plus the saga as one tool. */
+function toolsShown(tools: McpToolDescriptor[]): ToolDefinition[] {
+  const names = tools.map((tool) => tool.definition.name);
+  return [
+    ...tools
+      .filter((tool) => !isPlanChangePart(tool.definition.name))
+      .map((tool) => hideIdempotencyKey(tool.definition)),
+    ...(planChangeAvailable(names) ? [changePlanTool] : []),
+  ];
+}
 
 const HANDOVER_REPLY = "I have passed your request to our team, who will reply to you directly.";
 
@@ -233,7 +250,7 @@ export function createActivities(deps: ActivityDeps) {
             refundWindowDays: tenant.refundWindowDays,
             refundApprovalLimitCents: tenant.refundApprovalLimitCents,
           }),
-          tools: tools.map((tool) => hideIdempotencyKey(tool.definition)),
+          tools: toolsShown(tools),
           ...(deps.effort ? { effort: deps.effort } : {}),
         });
         return { pending: state.pending.length, stopped: state.stopped !== undefined };
@@ -269,9 +286,11 @@ export function createActivities(deps: ActivityDeps) {
 
       return advance<CallOutput>(ref, step, async (state, tools) => {
         const byName = new Map(tools.map((tool) => [tool.definition.name, tool]));
+        const canChangePlan = planChangeAvailable([...byName.keys()]);
         let next: NextCall = await inspectNext(
           state,
-          (name) => byName.has(name),
+          (name) =>
+            name === CHANGE_PLAN_TOOL ? canChangePlan : byName.has(name) && !isPlanChangePart(name),
           policyAuthorizer(deps.policy, inputs),
         );
 
@@ -350,9 +369,19 @@ export function createActivities(deps: ActivityDeps) {
           state,
           next,
           async (name, toolInput) => {
-            const tool = byName.get(name);
-            if (!tool) return { content: `Unknown tool "${name}".`, isError: true };
-            return deps.tools.call(ref, tool, withIdempotencyKey(ref.ticketId, name, toolInput));
+            const keyed = withIdempotencyKey(ref.ticketId, name, toolInput);
+            const callPart = async (part: string, input: Record<string, unknown>) => {
+              const tool = byName.get(part);
+              if (!tool) throw new Error(`Tool "${part}" is not available`);
+              return deps.tools.call(ref, tool, input);
+            };
+            // A plan change is a saga over two services, run inside this
+            // one step. If the step is retried, the shared key makes each
+            // service return what it already did.
+            if (name === CHANGE_PLAN_TOOL) {
+              return changePlan(callPart, toolInput, String(keyed.idempotencyKey));
+            }
+            return callPart(name, keyed);
           },
           approval?.decision,
         );

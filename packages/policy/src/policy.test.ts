@@ -372,3 +372,52 @@ describe("policyAuthorizer", () => {
     });
   });
 });
+
+describe("plan changes", () => {
+  const planTicket = { ...ticket, category: "plan_change" };
+  const change = (seats: number, overrides: Partial<ToolRequest> = {}) =>
+    policy.decide({
+      tool: "change_plan",
+      ticket: planTicket,
+      agentPaused: false,
+      planChange: { seats },
+      ...overrides,
+    });
+
+  it("are allowed on plan-change tickets and nowhere else", () => {
+    expect(change(5).decision).toBe("allow");
+    expect(change(5, { ticket }).decision).toBe("deny");
+    expect(change(5, { ticket: { ...ticket, category: "data_deletion" } }).decision).toBe("deny");
+  });
+
+  it("stop at fifty seats", () => {
+    expect(change(50).decision).toBe("allow");
+    expect(change(51)).toMatchObject({
+      decision: "deny",
+      policies: ["plan-change-seat-limit"],
+      reason: "More than 50 seats must be arranged by staff.",
+    });
+    expect(change(0).decision).toBe("deny");
+    expect(change(2.5).decision).toBe("deny");
+  });
+
+  it("are stopped by the kill switch", () => {
+    expect(change(5, { agentPaused: true }).decision).toBe("deny");
+  });
+
+  it("do not make refunds possible on a plan-change ticket", () => {
+    expect(decide({ ticket: planTicket }).decision).toBe("deny");
+    expect(decide({ ticket: planTicket, approved: true }).decision).toBe("deny");
+  });
+
+  it("allow reading the entitlement only on plan-change tickets", () => {
+    const read = (category: string) =>
+      policy.decide({
+        tool: "get_entitlement",
+        ticket: { ...ticket, category },
+        agentPaused: false,
+      }).decision;
+    expect(read("plan_change")).toBe("allow");
+    expect(read("refund")).toBe("deny");
+  });
+});

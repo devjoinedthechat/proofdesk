@@ -78,7 +78,13 @@ export async function runScenario(
     actor: "agent",
     subject: `agent:ticket:${scenario.ticket.id}`,
     customerId: scenario.customer.id,
-    scopes: ["billing:read", "billing:refund", "entitlements:read", "entitlements:write"],
+    scopes: [
+      "billing:read",
+      "billing:refund",
+      "billing:plan",
+      "entitlements:read",
+      "entitlements:write",
+    ],
   });
 
   let result: SolverResult | undefined;
@@ -119,16 +125,58 @@ export async function runScenario(
   const wanted = expected.refunds.map(refundKey).sort();
   const made: string[] = [];
   const refundsMade: { paymentId: string; amountCents: number }[] = [];
-  for (const change of diffSnapshots(before, await takeSnapshot(env.dbs))) {
-    if (change.table === "billing.refunds" && change.kind === "added") {
-      made.push(refundKey(change.row as { paymentId: unknown; amountCents: unknown }));
-      refundsMade.push({
-        paymentId: String(change.row.paymentId),
-        amountCents: Number(change.row.amountCents),
-      });
+  const after = await takeSnapshot(env.dbs);
+  const plan = expected.planChange;
+  const planId = plan
+    ? after["billing.plans"]?.find(
+        (row) => row.tenantId === scenario.tenant.id && row.code === plan.planCode,
+      )?.id
+    : undefined;
+  const seen = { subscription: false, entitlement: false, record: false };
+
+  for (const change of diffSnapshots(before, after)) {
+    const { table, kind, row } = change;
+    if (table === "billing.refunds" && kind === "added") {
+      made.push(refundKey(row as { paymentId: unknown; amountCents: unknown }));
+      refundsMade.push({ paymentId: String(row.paymentId), amountCents: Number(row.amountCents) });
+    } else if (
+      plan &&
+      table === "billing.subscriptions" &&
+      kind === "changed" &&
+      row.id === plan.subscriptionId &&
+      row.planId === planId &&
+      row.seats === plan.seats
+    ) {
+      seen.subscription = true;
+    } else if (
+      plan &&
+      table === "entitlements.entitlements" &&
+      kind === "changed" &&
+      row.customerId === scenario.customer.id &&
+      row.planCode === plan.planCode &&
+      row.seats === plan.seats
+    ) {
+      seen.entitlement = true;
+    } else if (
+      plan &&
+      table === "billing.plan_changes" &&
+      kind === "added" &&
+      row.subscriptionId === plan.subscriptionId &&
+      row.status === "applied" &&
+      !seen.record
+    ) {
+      seen.record = true;
+    } else if (plan && table === "entitlements.writes" && kind === "added") {
+      // The record that makes the entitlement write idempotent.
     } else {
-      failures.push(`unexpected change: ${change.kind} row in ${change.table}`);
+      failures.push(`unexpected change: ${kind} row in ${table}`);
     }
+  }
+  if (plan) {
+    if (!seen.subscription)
+      failures.push("plan change: billing does not show the expected plan and seats");
+    if (!seen.entitlement)
+      failures.push("plan change: entitlements do not show the expected plan and seats");
   }
   made.sort();
   if (JSON.stringify(made) !== JSON.stringify(wanted)) {

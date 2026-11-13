@@ -13,7 +13,9 @@ import {
 import { call, invoicesSeen, listInvoices, refundLastPayment, resolveWith } from "@proofdesk/evals";
 import { MockProvider, type MockStep } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
+import { ENTITLEMENTS_TOOLS } from "@proofdesk/mcp-entitlements";
 import { createToolPolicy } from "@proofdesk/policy";
+import { GRANT_SCOPES } from "@proofdesk/portal";
 import { ServiceApiError } from "@proofdesk/service";
 import {
   baseWorld,
@@ -21,6 +23,7 @@ import {
   diffSnapshots,
   loadWorld,
   materialise,
+  PLAN_CHANGE_SCENARIOS,
   REFUND_SCENARIOS,
   type Scenario,
   type SimEnv,
@@ -40,7 +43,9 @@ import { approvalDecided, progress } from "./workflows.ts";
 // happens when workers stop, activities are retried, and people take their time.
 
 const scenario = (id: string): Scenario => {
-  const spec = REFUND_SCENARIOS.find((candidate) => candidate.id === id);
+  const spec = [...REFUND_SCENARIOS, ...PLAN_CHANGE_SCENARIOS].find(
+    (candidate) => candidate.id === id,
+  );
   if (!spec) throw new Error(`No scenario ${id}`);
   return materialise(spec, baseWorld());
 };
@@ -65,17 +70,45 @@ async function setup(target: Scenario, steps: MockStep[]) {
     tenantId: target.tenant.id,
     customerId: target.customer.id,
   };
-  const billing = env.clientsFor({
+  const clients = env.clientsFor({
     tenantId: ref.tenantId,
     actor: "agent",
     subject: `agent:ticket:${ref.ticketId}`,
     customerId: ref.customerId,
-    scopes: ["billing:read", "billing:refund"],
-  }).billing;
+    scopes: [
+      "billing:read",
+      "billing:refund",
+      "billing:plan",
+      "entitlements:read",
+      "entitlements:write",
+    ],
+  });
+  const { billing } = clients;
 
   const provider = new MockProvider(steps);
-  const state = { paused: false, failAfterRefund: 0, refundCalls: 0 };
-  const descriptors: McpToolDescriptor[] = BILLING_TOOLS.map((tool) => ({
+  const state = {
+    paused: false,
+    failAfterRefund: 0,
+    refundCalls: 0,
+    /** Makes the entitlement write crash this many times, after billing has changed. */
+    crashEntitlementWrite: 0,
+    /** Makes the undo of a billing change crash this many times. */
+    crashRevert: 0,
+    calls: [] as string[],
+  };
+  // Only the tools the ticket's category grants, as the token scopes arrange in production.
+  const granted = new Set(GRANT_SCOPES[target.ticket.category]);
+  const serviceTools = [
+    ...BILLING_TOOLS.map((tool) => ({
+      tool,
+      run: (input: unknown) => tool.run(billing, ref.customerId, input),
+    })),
+    ...ENTITLEMENTS_TOOLS.map((tool) => ({
+      tool,
+      run: (input: unknown) => tool.run(clients.entitlements, ref.customerId, input),
+    })),
+  ].filter(({ tool }) => granted.has(tool.scope));
+  const descriptors: McpToolDescriptor[] = serviceTools.map(({ tool }) => ({
     definition: {
       name: tool.name,
       description: tool.description,
@@ -97,21 +130,26 @@ async function setup(target: Scenario, steps: MockStep[]) {
     tools: {
       list: async () => descriptors,
       async call(_ref, descriptor, input): Promise<ToolOutcome> {
-        const tool = BILLING_TOOLS.find(
-          (candidate) => candidate.name === descriptor.definition.name,
-        );
-        if (!tool) throw new Error("unknown tool");
+        const name = descriptor.definition.name;
+        const entry = serviceTools.find((candidate) => candidate.tool.name === name);
+        if (!entry) throw new Error("unknown tool");
+        state.calls.push(name);
+        if (name === "set_entitlement" && state.crashEntitlementWrite > 0) {
+          state.crashEntitlementWrite -= 1;
+          throw new Error("worker lost before access was updated");
+        }
+        if (name === "revert_subscription_change" && state.crashRevert > 0) {
+          state.crashRevert -= 1;
+          throw new Error("worker lost before the billing change was undone");
+        }
         let outcome: ToolOutcome;
         try {
-          outcome = {
-            content: JSON.stringify(await tool.run(billing, ref.customerId, input)),
-            isError: false,
-          };
+          outcome = { content: JSON.stringify(await entry.run(input)), isError: false };
         } catch (error) {
           if (!(error instanceof ServiceApiError)) throw error;
           outcome = { content: JSON.stringify({ error: { code: error.code } }), isError: true };
         }
-        if (tool.name === "create_refund") {
+        if (name === "create_refund") {
           state.refundCalls += 1;
           // Simulates a worker that dies after billing paid but before the
           // result was saved.
@@ -758,5 +796,166 @@ describe("memory across tickets", () => {
     const block = run.provider.calls[0]?.request.messages[0]?.content[0];
     expect(block?.type === "text" ? block.text : "").not.toContain("Earlier tickets");
     expect(await purgeExpiredMemories(run.env.dbs.app, run.env.now)).toBe(1);
+  }, 60_000);
+});
+
+describe("plan change across two systems", () => {
+  const changeTo = (planCode: string, seats: number): MockStep[] => [
+    call("list_subscriptions", {}),
+    (request) => {
+      const results = request.messages.flatMap((message) =>
+        message.role === "user"
+          ? message.content.filter((block) => block.type === "tool_result")
+          : [],
+      );
+      const subscriptions = JSON.parse(results.at(-1)?.content ?? "{}").subscriptions as {
+        id: string;
+      }[];
+      return call("change_plan", { subscriptionId: subscriptions[0]?.id, planCode, seats });
+    },
+    (request) => {
+      const last = request.messages.at(-1);
+      const failed =
+        last?.role === "user" &&
+        last.content.some((block) => block.type === "tool_result" && block.isError);
+      return failed
+        ? call("resolve_ticket", {
+            outcome: "handed_to_staff",
+            reasonCode: "other",
+            reply: "I could not make the change and have passed this to our team.",
+          })
+        : call("resolve_ticket", {
+            outcome: "plan_changed",
+            reasonCode: "plan_changed",
+            reply: `Your plan now has ${seats} seats, from your next renewal.`,
+          });
+    },
+  ];
+
+  const systems = async (run: Setup) => {
+    const subscription = await run.env.dbs.billing
+      .selectFrom("subscriptions as s")
+      .innerJoin("plans as p", "p.id", "s.planId")
+      .select(["p.code as planCode", "s.seats"])
+      .where("s.customerId", "=", run.ref.customerId)
+      .executeTakeFirstOrThrow();
+    const entitlement = await run.env.dbs.entitlements
+      .selectFrom("entitlements")
+      .select(["planCode", "seats"])
+      .where("customerId", "=", run.ref.customerId)
+      .executeTakeFirstOrThrow();
+    const changes = await run.env.dbs.billing
+      .selectFrom("planChanges")
+      .select("status")
+      .where("customerId", "=", run.ref.customerId)
+      .execute();
+    return {
+      billing: subscription,
+      access: entitlement,
+      changes: changes.map((change) => change.status),
+    };
+  };
+
+  it("changes billing and access together, and shows the model one tool for it", async () => {
+    const run = await setup(scenario("plan-add-seats"), changeTo("team-monthly", 5));
+    await run.startWorker();
+
+    const outcome = await (await run.start()).result();
+
+    expect(outcome).toEqual({ outcome: "plan_changed", reasonCode: "plan_changed" });
+    expect(await systems(run)).toEqual({
+      billing: { planCode: "team-monthly", seats: 5 },
+      access: { planCode: "team-monthly", seats: 5 },
+      changes: ["applied"],
+    });
+    const shown = run.provider.calls[0]?.request.tools?.map((tool) => tool.name);
+    expect(shown).toContain("change_plan");
+    for (const hidden of [
+      "change_subscription",
+      "revert_subscription_change",
+      "set_entitlement",
+      "create_refund",
+    ]) {
+      expect(shown).not.toContain(hidden);
+    }
+    expect((await run.ticket()).status).toBe("resolved");
+  }, 60_000);
+
+  it("finishes the change when the worker is lost between the two writes", async () => {
+    const run = await setup(scenario("plan-add-seats"), changeTo("team-monthly", 5));
+    run.state.crashEntitlementWrite = 2;
+    await run.startWorker();
+
+    const outcome = await (await run.start()).result();
+
+    // Billing changed on the first attempt. Each retry asked billing again
+    // with the same key and was given the change it had already made.
+    expect(run.state.calls.filter((name) => name === "change_subscription")).toHaveLength(3);
+    expect(outcome.outcome).toBe("plan_changed");
+    expect(await systems(run)).toEqual({
+      billing: { planCode: "team-monthly", seats: 5 },
+      access: { planCode: "team-monthly", seats: 5 },
+      changes: ["applied"],
+    });
+  }, 60_000);
+
+  it("undoes the billing change when access cannot be updated", async () => {
+    const run = await setup(scenario("plan-add-seats"), changeTo("team-monthly", 5));
+    // Billing says the subscription is active; entitlements say access is suspended.
+    await run.env.dbs.entitlements
+      .updateTable("entitlements")
+      .set({ status: "suspended" })
+      .where("customerId", "=", run.ref.customerId)
+      .execute();
+    await run.startWorker();
+
+    const outcome = await (await run.start()).result();
+
+    expect(outcome.outcome).toBe("handed_to_staff");
+    expect(await systems(run)).toEqual({
+      billing: { planCode: "team-monthly", seats: 3 },
+      access: { planCode: "team-monthly", seats: 3 },
+      changes: ["reverted"],
+    });
+    const toolResult = JSON.stringify(run.provider.calls.at(-1)?.request.messages.at(-1));
+    expect(toolResult).toContain("plan_change_rolled_back");
+  }, 60_000);
+
+  it("still ends consistent when the worker is lost during the undo", async () => {
+    const run = await setup(scenario("plan-add-seats"), changeTo("team-monthly", 5));
+    await run.env.dbs.entitlements
+      .updateTable("entitlements")
+      .set({ status: "suspended" })
+      .where("customerId", "=", run.ref.customerId)
+      .execute();
+    run.state.crashRevert = 1;
+    await run.startWorker();
+
+    await (await run.start()).result();
+
+    expect(await systems(run)).toEqual({
+      billing: { planCode: "team-monthly", seats: 3 },
+      access: { planCode: "team-monthly", seats: 3 },
+      changes: ["reverted"],
+    });
+  }, 60_000);
+
+  it("hands over a run that says the plan changed when it did not", async () => {
+    const run = await setup(scenario("plan-add-seats"), [
+      call("resolve_ticket", {
+        outcome: "plan_changed",
+        reasonCode: "plan_changed",
+        reply: "Done, you now have 5 seats.",
+      }),
+    ]);
+    await run.startWorker();
+
+    const outcome = await (await run.start()).result();
+
+    expect(outcome).toEqual({
+      outcome: "handed_to_staff",
+      reasonCode: "guard_claims_plan_change_not_made",
+    });
+    expect((await systems(run)).changes).toEqual([]);
   }, 60_000);
 });

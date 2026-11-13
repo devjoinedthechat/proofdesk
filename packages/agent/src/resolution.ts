@@ -1,7 +1,13 @@
 import type { ToolDefinition } from "@proofdesk/gateway";
 import { z } from "zod";
 
-export const OUTCOMES = ["refunded", "refused", "needs_clarification", "handed_to_staff"] as const;
+export const OUTCOMES = [
+  "refunded",
+  "plan_changed",
+  "refused",
+  "needs_clarification",
+  "handed_to_staff",
+] as const;
 
 /** Why a ticket ended the way it did. One vocabulary for the agent, the audit log and the evals. */
 export const REASONS = {
@@ -18,6 +24,13 @@ export const REASONS = {
   dispute_open: "A payment on the invoice is under a bank dispute.",
   service_issue_outside_window: "A service complaint about a charge older than the refund window.",
   approval_rejected: "Staff reviewed the refund and declined it.",
+  plan_changed: "The plan or the number of seats was changed as asked.",
+  request_unclear: "The ticket does not say which plan or how many seats is wanted.",
+  plan_not_available: "The plan asked for does not exist.",
+  billing_interval_change: "The customer wants to move between monthly and annual billing.",
+  seat_limit: "The customer wants more seats than can be set without staff.",
+  subscription_not_active: "The subscription is cancelled and cannot be changed.",
+  no_change_needed: "The subscription already has the plan and seats asked for.",
   other: "None of the above fits.",
 } as const;
 
@@ -44,7 +57,7 @@ export const resolveTool: ToolDefinition = {
   name: RESOLVE_TOOL,
   description: [
     "Ends your work on the ticket and sends your reply to the customer. Call it exactly once, alone, after you have seen the result of every other tool call.",
-    "Outcomes: refunded (you issued a refund), refused (policy does not allow what was asked), needs_clarification (you need the customer to answer a question first), handed_to_staff (a person must decide).",
+    "Outcomes: refunded (you issued a refund), plan_changed (you changed a plan or its seats), refused (policy does not allow what was asked), needs_clarification (you need the customer to answer a question first), handed_to_staff (a person must decide).",
     "Reason codes:",
     ...Object.entries(REASONS).map(([code, meaning]) => `- ${code}: ${meaning}`),
   ].join("\n"),

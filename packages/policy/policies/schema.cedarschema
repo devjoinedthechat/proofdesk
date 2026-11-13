@@ -16,7 +16,7 @@ type Common = {
   agentPaused: Bool,
 };
 
-action list_invoices, list_subscriptions, search_help_center appliesTo {
+action list_invoices, list_subscriptions, search_help_center, get_entitlement appliesTo {
   principal: Agent,
   resource: Ticket,
   context: Common,
@@ -46,5 +46,15 @@ action create_refund appliesTo {
     invoiceDisputed: Bool,
     // The customer had a refund on request in the last 365 days.
     goodwillUsed: Bool,
+  },
+};
+
+action change_plan appliesTo {
+  principal: Agent,
+  resource: Ticket,
+  context: {
+    agentPaused: Bool,
+    // The number of seats after the change.
+    seats: Long,
   },
 };

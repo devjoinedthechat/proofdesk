@@ -20,7 +20,18 @@ export {
   type McpToolOptions,
 } from "./mcp.ts";
 export {
+  CHANGE_PLAN_TOOL,
+  changePlan,
+  changePlanTool,
+  isPlanChangePart,
+  PLAN_CHANGE_PARTS,
+  planChangeAvailable,
+  withPlanChange,
+} from "./plan-change.ts";
+export {
+  MAX_SEATS,
   PROMPT_VERSION,
+  planChangePolicyText,
   refundPolicyText,
   systemPrompt,
   type TenantPolicy,

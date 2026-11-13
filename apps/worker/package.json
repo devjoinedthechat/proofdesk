@@ -27,6 +27,7 @@
     "@proofdesk/billing": "workspace:*",
     "@proofdesk/evals": "workspace:*",
     "@proofdesk/mcp-billing": "workspace:*",
+    "@proofdesk/mcp-entitlements": "workspace:*",
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "@proofdesk/simulator": "workspace:*",
