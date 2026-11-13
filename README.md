@@ -14,7 +14,7 @@ pnpm check      # lint, type checks, all tests
 pnpm stack:up   # Postgres with pgvector, Keycloak, Temporal
 ```
 
-`pnpm test` starts its own Postgres and Keycloak containers, so it does not need the stack. `pnpm test:unit` runs the tests that need no Docker.
+`pnpm test` starts its own Postgres, Keycloak and Temporal containers, so it does not need the stack. `pnpm test:unit` runs the tests that need no Docker.
 
 | Service     | Address               | Local login               |
 | ----------- | --------------------- | ------------------------- |
@@ -65,6 +65,22 @@ MCP server → billing service → Postgres under row-level security
 
 Each row was also checked from the other side: with the control removed, the test fails.
 
+## Durable execution
+
+Each ticket is one Temporal workflow. A worker can stop at any point and another continues from the same step.
+
+| Claim                                          | Test that tries to break it                                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A refund is issued exactly once                | The refund activity fails twice after billing has paid; the tool runs three times and one refund exists          |
+| A repeated or overlapping step changes nothing | The same activity is run twice, and two attempts of one step are run at once                                     |
+| A large refund waits for a person              | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes |
+| Approval cannot override the kill switch       | The agent is paused after the request; the approved refund is still denied                                       |
+| The model's account is not trusted             | A run that claims a refund it never made is handed to staff                                                      |
+| No customer data in workflow history           | The finished history is searched for the ticket text, name, email and amount                                     |
+| The audit log is tamper-evident                | Entries are edited, re-hashed and deleted with full database access                                              |
+
+These run with a scripted stand-in for the model. They test the system around the model, not the model's judgment.
+
 ## Layout
 
 | Path                     | Contents                                                                       |
@@ -86,6 +102,7 @@ Each row was also checked from the other side: with the control removed, the tes
 - [Postgres for vectors](docs/adr/0003-postgres-for-vectors.md)
 - [Ground truth before the agent](docs/adr/0004-ground-truth-before-the-agent.md)
 - [Ticket grants for agent authority](docs/adr/0005-ticket-grants-for-agent-authority.md)
+- [Run state lives in the database, not in workflow history](docs/adr/0006-run-state-outside-workflow-history.md)
 
 ## Licence
 

@@ -23,6 +23,7 @@
     "@proofdesk/db": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/simulator": "workspace:*",
+    "@proofdesk/worker": "workspace:*",
     "@testcontainers/postgresql": "12.2.1",
     "@types/node": "22.20.5",
     "testcontainers": "12.2.1",

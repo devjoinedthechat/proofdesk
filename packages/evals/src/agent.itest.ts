@@ -1,11 +1,5 @@
 import { testPostgresUrl } from "@proofdesk/db";
-import {
-  type Message,
-  MockProvider,
-  type MockStep,
-  type ModelRequest,
-  toolUseResponse,
-} from "@proofdesk/gateway";
+import { MockProvider, type MockStep } from "@proofdesk/gateway";
 import { testKeycloakUrl } from "@proofdesk/identity";
 import {
   baseWorld,
@@ -18,6 +12,7 @@ import {
 } from "@proofdesk/simulator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAgentSolver } from "./agent-solver.ts";
+import { call, invoicesSeen, listInvoices, refundLastPayment, resolve } from "./scripted.ts";
 import { createSecuredHarness, type SecuredHarness } from "./secured.ts";
 
 // No model runs here. A scripted stand-in plays the model's part, so these
@@ -30,47 +25,6 @@ const scenario = (id: string): Scenario => {
   if (!spec) throw new Error(`No scenario ${id}`);
   return materialise(spec, baseWorld());
 };
-
-type Invoice = { number: string; payments: { id: string; amountCents: number; status: string }[] };
-
-/** The invoices returned by the most recent list_invoices call in the conversation. */
-function invoicesSeen(request: ModelRequest): Invoice[] {
-  const results = request.messages.flatMap((message: Message) =>
-    message.role === "user" ? message.content.filter((block) => block.type === "tool_result") : [],
-  );
-  for (const result of results.reverse()) {
-    try {
-      const parsed = JSON.parse(result.content);
-      if (parsed.invoices) return parsed.invoices;
-    } catch {
-      // Not every tool result is JSON.
-    }
-  }
-  return [];
-}
-
-let step = 0;
-const call = (name: string, input: unknown) =>
-  toolUseResponse({ id: `call_${++step}`, name, input });
-const listInvoices = (invoiceNumber?: string) =>
-  call("list_invoices", invoiceNumber ? { invoiceNumber } : {});
-const resolve = (outcome: string, reasonCode: string, reply: string) =>
-  call("resolve_ticket", { outcome, reasonCode, reply });
-
-/** Refunds the last successful payment on the first invoice seen. */
-const refundLastPayment =
-  (reason: string): MockStep =>
-  (request) => {
-    const [invoice] = invoicesSeen(request);
-    const payment = invoice?.payments
-      .filter((candidate) => candidate.status === "succeeded")
-      .at(-1);
-    return call("create_refund", {
-      paymentId: payment?.id,
-      amountCents: payment?.amountCents,
-      reason,
-    });
-  };
 
 const scripted = (steps: MockStep[]) => {
   const provider = new MockProvider(steps);

@@ -5,7 +5,10 @@ export { type AuditEntry, type AuditHead, appendAudit, auditHead, verifyAudit } 
 export { connect } from "./connect.ts";
 export { migrate } from "./migrate.ts";
 export type {
+  AgentRunRow,
   AppDatabase,
+  ApprovalRow,
+  ApprovalStatus,
   AuditLogRow,
   CustomerRow,
   GrantAssertionRow,

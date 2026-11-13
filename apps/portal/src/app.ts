@@ -54,6 +54,7 @@ const toTicket = (row: TicketRow) => ({
   body: row.body,
   status: row.status,
   createdAt: row.createdAt.toISOString(),
+  reply: row.reply,
 });
 
 export function createPortalApp(deps: PortalDeps) {
@@ -96,6 +97,10 @@ export function createPortalApp(deps: PortalDeps) {
       body: input.body,
       status: "open",
       createdAt: now,
+      outcome: null,
+      reasonCode: null,
+      reply: null,
+      resolvedAt: null,
     };
     await withRowScope(deps.db, scope, async (trx) => {
       await trx.insertInto("tickets").values(ticket).execute();

@@ -33,10 +33,12 @@ export {
 export {
   type AgentTool,
   type Authorize,
+  hideIdempotencyKey,
   type ProposedCall,
   type RequestApproval,
   type ToolCallRecord,
   type ToolOutcome,
   type Verdict,
+  withIdempotencyKey,
   withSystemIdempotency,
 } from "./tools.ts";

@@ -1,15 +1,16 @@
 import { TEST_POSTGRES_URL_ENV } from "@proofdesk/db";
 import { TEST_KEYCLOAK_URL_ENV } from "@proofdesk/identity";
 import { prepareTemplates } from "@proofdesk/simulator";
+import { TEST_TEMPORAL_ADDRESS_ENV } from "@proofdesk/worker";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { GenericContainer, Wait } from "testcontainers";
 
 /**
- * Starts one Postgres and one Keycloak for the integration run. Tests isolate
+ * Starts one Postgres, one Keycloak and one Temporal dev server for the integration run. Tests isolate
  * themselves inside them: a database copy per test, a realm per test file.
  */
 export default async function setup() {
-  const [postgres, keycloak] = await Promise.all([
+  const [postgres, keycloak, temporal] = await Promise.all([
     new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17").start(),
     new GenericContainer("quay.io/keycloak/keycloak:26.8.2")
       .withCommand(["start-dev"])
@@ -20,6 +21,11 @@ export default async function setup() {
       .withExposedPorts(8080)
       .withWaitStrategy(Wait.forHttp("/realms/master", 8080))
       .withStartupTimeout(180_000)
+      .start(),
+    new GenericContainer("temporalio/temporal:1.10.0")
+      .withCommand(["server", "start-dev", "--ip", "0.0.0.0"])
+      .withExposedPorts(7233)
+      .withWaitStrategy(Wait.forListeningPorts())
       .start(),
   ]);
 
@@ -41,7 +47,9 @@ export default async function setup() {
   process.env[TEST_KEYCLOAK_URL_ENV] =
     `http://${keycloak.getHost()}:${keycloak.getMappedPort(8080)}`;
 
+  process.env[TEST_TEMPORAL_ADDRESS_ENV] = `${temporal.getHost()}:${temporal.getMappedPort(7233)}`;
+
   return async () => {
-    await Promise.all([postgres.stop(), keycloak.stop()]);
+    await Promise.all([postgres.stop(), keycloak.stop(), temporal.stop()]);
   };
 }

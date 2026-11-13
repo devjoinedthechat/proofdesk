@@ -34,6 +34,10 @@ export type TicketRow = {
   body: string;
   status: TicketStatus;
   createdAt: Date;
+  outcome: string | null;
+  reasonCode: string | null;
+  reply: string | null;
+  resolvedAt: Date | null;
 };
 
 /**
@@ -60,6 +64,39 @@ export type GrantAssertionRow = {
   issuedAt: Date;
 };
 
+/** JSON columns are typed as `unknown`; the code that owns them knows their shape. */
+export type AgentRunRow = {
+  ticketId: string;
+  tenantId: string;
+  customerId: string;
+  step: number;
+  state: unknown;
+  tools: unknown;
+  lastOutput: unknown;
+  versions: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+
+export type ApprovalRow = {
+  id: string;
+  ticketId: string;
+  tenantId: string;
+  customerId: string;
+  step: number;
+  tool: string;
+  summary: unknown;
+  reason: string;
+  status: ApprovalStatus;
+  requestedAt: Date;
+  decidedAt: Date | null;
+  decidedBy: string | null;
+};
+
+export type SpendRow = { key: string; micros: number };
+
 export type AuditLogRow = {
   seq: number;
   tenantId: string;
@@ -80,4 +117,7 @@ export type AppDatabase = {
   ticketGrants: TicketGrantRow;
   grantAssertions: GrantAssertionRow;
   auditLog: AuditLogRow;
+  agentRuns: AgentRunRow;
+  approvals: ApprovalRow;
+  spend: SpendRow;
 };

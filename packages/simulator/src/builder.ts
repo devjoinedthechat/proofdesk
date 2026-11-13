@@ -171,6 +171,10 @@ export class ScenarioBuilder {
       body: input.body,
       status: "open",
       createdAt: this.now,
+      outcome: null,
+      reasonCode: null,
+      reply: null,
+      resolvedAt: null,
     };
     this.added.tickets.push(row);
     return row;

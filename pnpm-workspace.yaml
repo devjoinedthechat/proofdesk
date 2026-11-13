@@ -4,9 +4,11 @@ packages:
   - mcp/*
   - packages/*
 
-# Native add-ons pulled in by Testcontainers. Their build scripts are optional
-# speed-ups, so they are not allowed to run.
+# Install scripts are not allowed to run. These are optional speed-ups pulled
+# in by Testcontainers, and a self-check in the compiler Temporal uses to
+# bundle workflows; the prebuilt binaries work without them.
 allowBuilds:
+  "@swc/core": false
   cpu-features: false
   protobufjs: false
   ssh2: false

@@ -37,40 +37,51 @@ export type ToolCallRecord = {
   outcome: ToolOutcome;
 };
 
-/**
- * Takes the idempotency key out of the model's hands. The model does not see
- * the parameter, and the key is derived from the ticket and the call's own
- * arguments. A retried or repeated identical call therefore reuses its key
- * and cannot pay twice, whatever the model does.
- */
-export function withSystemIdempotency(tool: AgentTool, ticketId: string): AgentTool {
-  const schema = tool.definition.inputSchema as {
-    properties?: Record<string, unknown>;
-    required?: string[];
-  };
-  if (!schema.properties?.idempotencyKey) return tool;
+type ObjectSchema = { properties?: Record<string, unknown>; required?: string[] };
 
+/**
+ * Removes the idempotency key from what the model is shown. The model cannot
+ * choose the key, so it cannot defeat it.
+ */
+export function hideIdempotencyKey(definition: ToolDefinition): ToolDefinition {
+  const schema = definition.inputSchema as ObjectSchema;
+  if (!schema.properties?.idempotencyKey) return definition;
   const { idempotencyKey: _hidden, ...properties } = schema.properties;
   return {
+    ...definition,
+    description: definition.description.replace(/\s*Repeating a call[^.]*\./, ""),
+    inputSchema: {
+      ...schema,
+      properties,
+      required: (schema.required ?? []).filter((name) => name !== "idempotencyKey"),
+    },
+  };
+}
+
+/**
+ * The input a tool actually receives: the model's arguments plus a key
+ * derived from the ticket and those arguments. A retried or repeated
+ * identical call reuses its key and so cannot take effect twice.
+ */
+export function withIdempotencyKey(
+  ticketId: string,
+  tool: string,
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  const { idempotencyKey: _ignored, ...rest } = input;
+  const parts = Object.keys(rest)
+    .sort()
+    .map((key) => `${key}=${JSON.stringify(rest[key])}`);
+  return { ...rest, idempotencyKey: `${ticketId}:${tool}:${parts.join(",")}` };
+}
+
+/** Takes the idempotency key out of the model's hands for one in-process tool. */
+export function withSystemIdempotency(tool: AgentTool, ticketId: string): AgentTool {
+  const schema = tool.definition.inputSchema as ObjectSchema;
+  if (!schema.properties?.idempotencyKey) return tool;
+  return {
     ...tool,
-    definition: {
-      ...tool.definition,
-      description: tool.definition.description.replace(/\s*Repeating a call[^.]*\./, ""),
-      inputSchema: {
-        ...schema,
-        properties,
-        required: (schema.required ?? []).filter((name) => name !== "idempotencyKey"),
-      },
-    },
-    call(input) {
-      const { idempotencyKey: _ignored, ...rest } = input;
-      const parts = Object.keys(rest)
-        .sort()
-        .map((key) => `${key}=${JSON.stringify(rest[key])}`);
-      return tool.call({
-        ...rest,
-        idempotencyKey: `${ticketId}:${tool.definition.name}:${parts.join(",")}`,
-      });
-    },
+    definition: hideIdempotencyKey(tool.definition),
+    call: (input) => tool.call(withIdempotencyKey(ticketId, tool.definition.name, input)),
   };
 }

@@ -1,0 +1,33 @@
+{
+  "name": "@proofdesk/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@proofdesk/agent": "workspace:*",
+    "@proofdesk/db": "workspace:*",
+    "@proofdesk/gateway": "workspace:*",
+    "@proofdesk/identity": "workspace:*",
+    "@proofdesk/policy": "workspace:*",
+    "@temporalio/activity": "1.25.0",
+    "@temporalio/client": "1.25.0",
+    "@temporalio/common": "1.25.0",
+    "@temporalio/worker": "1.25.0",
+    "@temporalio/workflow": "1.25.0",
+    "kysely": "0.29.8"
+  },
+  "devDependencies": {
+    "@proofdesk/billing": "workspace:*",
+    "@proofdesk/evals": "workspace:*",
+    "@proofdesk/mcp-billing": "workspace:*",
+    "@proofdesk/service": "workspace:*",
+    "@proofdesk/simulator": "workspace:*",
+    "zod": "4.6.7"
+  }
+}
