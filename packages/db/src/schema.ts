@@ -15,6 +15,8 @@ export type TenantRow = {
   currency: string;
   refundWindowDays: number;
   refundApprovalLimitCents: number;
+  /** The most the agent may refund for the tenant in 24 hours without approval. */
+  agentDailyRefundCapCents: number;
 };
 
 export type CustomerRow = {
@@ -97,6 +99,15 @@ export type ApprovalRow = {
 
 export type SpendRow = { key: string; micros: number };
 
+/** One refund the agent made, as billing reported it. */
+export type AgentRefundRow = {
+  refundId: string;
+  tenantId: string;
+  ticketId: string;
+  amountCents: number;
+  createdAt: Date;
+};
+
 export type MemoryRow = {
   id: string;
   tenantId: string;
@@ -131,5 +142,6 @@ export type AppDatabase = {
   agentRuns: AgentRunRow;
   approvals: ApprovalRow;
   spend: SpendRow;
+  agentRefunds: AgentRefundRow;
   memories: MemoryRow;
 };

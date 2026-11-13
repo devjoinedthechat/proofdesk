@@ -40,6 +40,7 @@ So every control below is judged by one question: does it still hold if the mode
 | Policy   | Every tool call is decided by Cedar policies; anything not permitted is denied                             | Yes                               |
 | Policy   | Refund rules are checked against billing records the policy layer reads itself                             | Yes                               |
 | Approval | A refund above the limit, or against a payment above the limit, waits for staff                            | Yes                               |
+| Approval | Past a daily total per company, every further refund waits for staff                                       | Yes                               |
 | Service  | Billing refuses refunds beyond what was paid, and on failed or disputed payments                           | Yes                               |
 | Database | Row-level security limits every query to one tenant and customer                                           | Yes                               |
 | Search   | The search runs under row-level security as the public; staff-only pages are never candidates              | Yes                               |
@@ -66,12 +67,13 @@ The last three rows are worth having and are not what safety rests on.
 | One refund on request per year             | Yes    | Yes               |                 |
 | Never more than was paid                   | Yes    |                   | Yes             |
 | Approval above the limit                   | Yes    | Yes               |                 |
+| Approval past the company's daily total    |        | Yes               |                 |
 
 ## What a compromised model can still do
 
 These follow from the design and are pinned by tests, so they cannot be forgotten.
 
-- **Refund an in-window charge the customer did not ask about.** The records allow it, so policy does. The reply guard requires the refund to be reported, and the audit log records it.
+- **Refund an in-window charge the customer did not ask about.** The records allow it, so policy does. The reply guard requires the refund to be reported, the audit log records it, and the daily cap bounds how much of this can happen before staff see every refund ([ADR 12](adr/0012-daily-refund-cap.md)).
 - **Call a refund on request a "service credit" to avoid the yearly limit.** Whether a service fault occurred is a judgment no record holds. The refund is still limited to the window, the amount paid and the approval limit.
 - **Refuse or hand over a ticket that deserved a refund.** Under-acting costs a customer time, not the company money. Staff see handed-over tickets.
 - **Write a reply that is wrong in ways the guard does not check,** such as a false reason. The guard checks amounts and actions, not explanations.

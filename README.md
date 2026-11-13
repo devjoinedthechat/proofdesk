@@ -52,6 +52,7 @@ The agent never holds a customer's credential. Submitting a ticket creates a gra
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Refund rules hold even if the model is compromised | A scripted, attacker-controlled model calls the refund tool directly: outside the window, relabelled, disputed, another customer's ([test](packages/evals/src/compromised.itest.ts)) |
 | A large refund cannot be split around approval     | The same model asks for it in two halves                                                                                                                                             |
+| Many small refunds cannot add up unseen            | The agent's refunds for a company reach the daily cap; the next one waits for staff ([test](apps/worker/src/workflow.itest.ts))                                                      |
 | The reply cannot misstate what was done            | It claims a refund that was not made, hides one that was, and leaks its tool names                                                                                                   |
 | Approval cannot override the kill switch           | The agent is paused after approval is requested ([test](apps/worker/src/workflow.itest.ts))                                                                                          |
 | Anything no policy mentions is denied              | A tool nobody wrote a policy for is called ([test](packages/policy/src/policy.test.ts))                                                                                              |
@@ -171,6 +172,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 9. [A plan change is one tool and a saga](docs/adr/0009-plan-change-saga.md)
 10. [One model provider](docs/adr/0010-one-model-provider.md)
 11. [A schema at every boundary](docs/adr/0011-schemas-at-every-boundary.md)
+12. [A daily cap on the agent's refunds](docs/adr/0012-daily-refund-cap.md)
 
 ## Scope
 

@@ -104,6 +104,8 @@ function toolsShown(tools: McpToolDescriptor[]): ToolDefinition[] {
 
 const HANDOVER_REPLY = "I have passed your request to our team, who will reply to you directly.";
 
+const DAY_MS = 86_400_000;
+
 export function createActivities(deps: ActivityDeps) {
   const scope = (ref: TicketRef) => ({ tenantId: ref.tenantId, customerId: ref.customerId });
   const audit = (ref: TicketRef, event: string, detail: Record<string, unknown>) =>
@@ -170,6 +172,35 @@ export function createActivities(deps: ActivityDeps) {
     );
     // Another attempt of this same step saved first. Its output is the one that counts.
     return saved ? result : ((await load(ref)).lastOutput as Output);
+  }
+
+  /** What the agent has refunded for the ticket's tenant since a moment, across all customers. */
+  async function tenantRefundedSince(ref: TicketRef, since: Date): Promise<number> {
+    const row = await withRowScope(deps.db, scope(ref), (trx) =>
+      trx
+        .selectFrom("agentRefunds")
+        .select((eb) => eb.fn.sum<string | null>("amountCents").as("total"))
+        .where("tenantId", "=", ref.tenantId)
+        .where("createdAt", ">", since)
+        .executeTakeFirst(),
+    );
+    return Number(row?.total ?? 0);
+  }
+
+  async function recordRefund(ref: TicketRef, refund: { id: string; amountCents: number }) {
+    await withRowScope(deps.db, scope(ref), (trx) =>
+      trx
+        .insertInto("agentRefunds")
+        .values({
+          refundId: refund.id,
+          tenantId: ref.tenantId,
+          ticketId: ref.ticketId,
+          amountCents: refund.amountCents,
+          createdAt: deps.clock(),
+        })
+        .onConflict((conflict) => conflict.column("refundId").doNothing())
+        .execute(),
+    );
   }
 
   async function tenantFacts(ref: TicketRef) {
@@ -297,7 +328,10 @@ export function createActivities(deps: ActivityDeps) {
           category: ticket.category,
           approvalLimitCents: tenant.refundApprovalLimitCents,
           refundWindowDays: tenant.refundWindowDays,
+          dailyRefundCapCents: tenant.agentDailyRefundCapCents,
         },
+        tenantRefundedToday: () =>
+          tenantRefundedSince(ref, new Date(deps.clock().getTime() - DAY_MS)),
         now: deps.clock,
         invoices: () => deps.invoices(ref),
         agentPaused: () => agentPaused,
@@ -408,6 +442,9 @@ export function createActivities(deps: ActivityDeps) {
 
         const record = state.toolCalls[before];
         if (record) {
+          // Counted towards the tenant's daily cap, once per refund: a
+          // repeated step gets the same refund back from billing.
+          for (const refund of refundsMade([record])) await recordRefund(ref, refund);
           await audit(ref, "tool_call", {
             step,
             tool: record.tool,

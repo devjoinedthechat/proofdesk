@@ -9,6 +9,9 @@ entity Ticket = {
   approvalLimitCents: Long,
   // How many whole days after a payment a refund on request is allowed.
   refundWindowDays: Long,
+  // The most the agent may refund for this ticket's company in 24 hours
+  // without staff approval.
+  dailyRefundCapCents: Long,
 };
 
 type Common = {
@@ -33,6 +36,9 @@ action create_refund appliesTo {
     reason: String,
     // Refunds this ticket has already paid out.
     ticketRefundedCents: Long,
+    // Refunds the agent made for this company in the last 24 hours, from the
+    // system's own record of them.
+    tenantRefundedTodayCents: Long,
     // True only when staff approved this exact call.
     approved: Bool,
     // The payment exists on this customer's account.

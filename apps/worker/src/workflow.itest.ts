@@ -599,6 +599,70 @@ describe("activities applied twice", () => {
   }, 60_000);
 });
 
+describe("the tenant's daily refund cap", () => {
+  // Refunds the agent made earlier for the same company, on other tickets.
+  const earlier = (run: Awaited<ReturnType<typeof setup>>, amountCents: number, hoursAgo: number) =>
+    run.env.dbs.app
+      .insertInto("agentRefunds")
+      .values({
+        refundId: `re_earlier_${hoursAgo}`,
+        tenantId: run.ref.tenantId,
+        ticketId: "tkt_earlier",
+        amountCents,
+        createdAt: new Date(run.env.now.getTime() - hoursAgo * 3_600_000),
+      })
+      .execute();
+  const counted = (run: Awaited<ReturnType<typeof setup>>) =>
+    run.env.dbs.app
+      .selectFrom("agentRefunds")
+      .select(["ticketId", "amountCents"])
+      .where("ticketId", "=", run.ref.ticketId)
+      .execute();
+
+  it("sends an ordinary refund to staff once the day's refunds reach the cap", async () => {
+    const target = scenario("refund-duplicate-with-invoice");
+    const run = await setup(target, duplicateScript());
+    const { activities, ref } = run;
+    // The cap is $1,000. $950 is already used, and this refund is $87.
+    await earlier(run, 950_00, 2);
+
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.modelTurn({ ref, step: 2 });
+    const held = await activities.executeNext({ ref, step: 3 });
+
+    expect(held.status).toBe("needs_approval");
+    expect(await run.refunds()).toEqual([]);
+
+    const paid = await activities.executeNext({
+      ref,
+      step: 3,
+      approval: { decision: "approved", decidedBy: "staff:test" },
+    });
+    expect(paid.status).toBe("done");
+    expect(await run.refunds()).toEqual(target.expected.refunds);
+  }, 60_000);
+
+  it("leaves out refunds older than a day, and counts a refund once however often its step runs", async () => {
+    const target = scenario("refund-duplicate-with-invoice");
+    const run = await setup(target, duplicateScript());
+    const { activities, ref } = run;
+    await earlier(run, 950_00, 25);
+
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.modelTurn({ ref, step: 2 });
+    const paid = await activities.executeNext({ ref, step: 3 });
+    await activities.executeNext({ ref, step: 3 });
+
+    expect(paid.status).toBe("done");
+    expect(await run.refunds()).toEqual(target.expected.refunds);
+    expect(await counted(run)).toEqual([{ ticketId: ref.ticketId, amountCents: 87_00 }]);
+  }, 60_000);
+});
+
 describe("a model that cannot be reached", () => {
   it("hands the ticket to staff with nothing paid, and says so in the audit log", async () => {
     const down = () => new ProviderError("mock", "unavailable", "connection refused");

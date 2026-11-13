@@ -21,6 +21,7 @@ export const RECORD_BASED_POLICIES = [
   "refund-not-duplicate",
   "refund-goodwill-used",
   "refund-large-payment",
+  "refund-tenant-daily-cap",
 ];
 
 /** The policies as shipped: one file per policy, named by the file. */
@@ -50,7 +51,12 @@ export type TicketFacts = {
   category: string;
   approvalLimitCents: number;
   refundWindowDays: number;
+  /** The tenant's cap on the agent's refunds in 24 hours. Absent means no cap. */
+  dailyRefundCapCents?: number;
 };
+
+/** Stands for "no cap" where a number is required. Far above any real total. */
+const NO_CAP_CENTS = 1_000_000_000_000;
 
 export type ToolRequest = {
   tool: string;
@@ -61,6 +67,8 @@ export type ToolRequest = {
     amountCents: number;
     reason: string;
     ticketRefundedCents: number;
+    /** What the agent has refunded for the tenant in the last 24 hours. */
+    tenantRefundedTodayCents?: number;
     approved: boolean;
     facts: RefundFacts;
   };
@@ -91,6 +99,8 @@ const FORBIDDEN_BECAUSE: Record<string, string> = {
   "refund-over-limit": "The refund total for this ticket is above the approval limit.",
   "refund-large-payment":
     "The payment is larger than the approval limit, so any refund against it needs approval.",
+  "refund-tenant-daily-cap":
+    "The daily total of refunds made without staff has been reached, so this refund needs approval.",
 };
 
 /**
@@ -106,7 +116,12 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
     const context: Record<string, cedar.CedarValueJson> = { agentPaused: request.agentPaused };
     if (request.tool === REFUND && request.refund) {
       const { facts, ...refund } = request.refund;
-      Object.assign(context, { ...refund, ...facts, approved });
+      Object.assign(context, {
+        tenantRefundedTodayCents: 0,
+        ...refund,
+        ...facts,
+        approved,
+      });
     }
     if (request.tool === CHANGE_PLAN && request.planChange)
       context.seats = request.planChange.seats;
@@ -125,6 +140,7 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
             category: request.ticket.category,
             approvalLimitCents: request.ticket.approvalLimitCents,
             refundWindowDays: request.ticket.refundWindowDays,
+            dailyRefundCapCents: request.ticket.dailyRefundCapCents ?? NO_CAP_CENTS,
           },
           parents: [],
         },
@@ -196,6 +212,8 @@ export type PolicyInputs = {
   /** The customer's invoices, fetched from billing by the caller, not supplied by the model. */
   invoices: () => Promise<InvoiceRecords>;
   agentPaused?: () => boolean;
+  /** What the agent has refunded for this tenant in the last 24 hours, from the system's record. */
+  tenantRefundedToday?: () => Promise<number>;
 };
 
 /** Builds the policy request for one refund call from trusted inputs. */
@@ -213,6 +231,7 @@ export async function refundRequest(
       amountCents: input.amountCents as number,
       reason: input.reason as string,
       ticketRefundedCents,
+      tenantRefundedTodayCents: (await inputs.tenantRefundedToday?.()) ?? 0,
       approved,
       facts: refundFacts(await inputs.invoices(), String(input.paymentId), inputs.now()),
     },

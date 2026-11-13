@@ -26,6 +26,7 @@ export const CATALOG: Record<TenantSlug, TenantSpec> = {
       currency: "USD",
       refundWindowDays: 14,
       refundApprovalLimitCents: 200_00,
+      agentDailyRefundCapCents: 1_000_00,
     },
     plans: [
       { code: "starter-monthly", name: "Starter", billingInterval: "month", priceCents: 12_00 },
@@ -42,6 +43,7 @@ export const CATALOG: Record<TenantSlug, TenantSpec> = {
       currency: "USD",
       refundWindowDays: 30,
       refundApprovalLimitCents: 500_00,
+      agentDailyRefundCapCents: 2_500_00,
     },
     plans: [
       { code: "basic-monthly", name: "Basic", billingInterval: "month", priceCents: 19_00 },

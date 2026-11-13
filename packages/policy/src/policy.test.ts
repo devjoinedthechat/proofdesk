@@ -244,6 +244,42 @@ describe("without the record-based rules", () => {
   });
 });
 
+describe("the tenant's daily refund cap", () => {
+  const capped = { ...ticket, dailyRefundCapCents: 1_000_00 };
+
+  it("allows a refund that keeps the day's total within the cap", () => {
+    expect(
+      decide({ ticket: capped, tenantRefundedTodayCents: 950_00, amountCents: 50_00 }),
+    ).toMatchObject({ decision: "allow" });
+  });
+
+  it("asks for approval once the day's total would pass the cap, however small the refund", () => {
+    expect(
+      decide({ ticket: capped, tenantRefundedTodayCents: 950_00, amountCents: 50_01 }),
+    ).toMatchObject({ decision: "needs_approval", policies: ["refund-tenant-daily-cap"] });
+    expect(
+      decide({ ticket: capped, tenantRefundedTodayCents: 5_000_00, amountCents: 1 }),
+    ).toMatchObject({ decision: "needs_approval" });
+  });
+
+  it("lets staff approve past the cap, and not past any other rule", () => {
+    const over = { ticket: capped, tenantRefundedTodayCents: 5_000_00, approved: true };
+    expect(decide(over)).toMatchObject({ decision: "allow" });
+    expect(decide({ ...over, facts: facts({ daysSincePayment: 40 }) })).toMatchObject({
+      decision: "deny",
+    });
+  });
+
+  it("asks for approval on every refund when the cap is zero, and applies no cap when none is set", () => {
+    expect(decide({ ticket: { ...ticket, dailyRefundCapCents: 0 } })).toMatchObject({
+      decision: "needs_approval",
+    });
+    expect(decide({ tenantRefundedTodayCents: 9_000_000_00 })).toMatchObject({
+      decision: "allow",
+    });
+  });
+});
+
 describe("invoiceRecords", () => {
   const payment = {
     id: "pay_1",
