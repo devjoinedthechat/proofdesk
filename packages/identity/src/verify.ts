@@ -11,6 +11,8 @@ export type VerifiedToken = {
   scopes: string[];
   tenantId?: string;
   customerId?: string;
+  /** Set for members of staff, such as `approver`. */
+  staffRole?: string;
 };
 
 export type TokenVerifier = (token: string) => Promise<VerifiedToken | null>;
@@ -47,6 +49,8 @@ export function createTokenVerifier(options: { issuer: string; audience: string 
       const customerId = text(payload.customer_id);
       if (tenantId) verified.tenantId = tenantId;
       if (customerId) verified.customerId = customerId;
+      const staffRole = text(payload.staff_role);
+      if (staffRole) verified.staffRole = staffRole;
       return verified;
     } catch {
       return null;

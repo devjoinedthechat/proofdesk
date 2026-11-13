@@ -1,3 +1,5 @@
+export { env, main, type Served, serve } from "./serve.ts";
+
 import { Hono } from "hono";
 import type { z } from "zod";
 

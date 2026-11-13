@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@proofdesk/db": "workspace:*",
+    "@proofdesk/identity": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "hono": "4.13.18",
     "kysely": "0.29.8",

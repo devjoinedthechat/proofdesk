@@ -129,12 +129,14 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await scope("proofdesk-identity", false, [
     attributeMapper("tenant_id"),
     attributeMapper("customer_id"),
+    attributeMapper("staff_role"),
   ]);
   // Only the MCP server gets this one. It is what lets an exchanged token be
   // addressed to the billing service.
   await scope(BILLING_API_AUDIENCE, false, [audienceMapper(CLIENTS.billingApi)]);
   await scope(SCOPES.tickets, true, [audienceMapper(CLIENTS.portal)]);
   await scope(SCOPES.grantsIssue, true, [audienceMapper(CLIENTS.portal)]);
+  await scope(SCOPES.approvals, true, [audienceMapper(CLIENTS.portal)]);
   await scope(SCOPES.billingRead, true, [audienceMapper(CLIENTS.billingMcp)]);
   await scope(SCOPES.billingRefund, true, [audienceMapper(CLIENTS.billingMcp)]);
 
@@ -181,7 +183,7 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
     redirectUris: ["http://localhost:3000/*"],
     webOrigins: ["+"],
     attributes: { "pkce.code.challenge.method": "S256" },
-    defaultClientScopes: [...IDENTITY_SCOPES, SCOPES.tickets],
+    defaultClientScopes: [...IDENTITY_SCOPES, SCOPES.tickets, SCOPES.approvals],
   });
 
   await client({
@@ -209,7 +211,7 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
       clientId: CLIENTS.devLogin,
       publicClient: true,
       directAccessGrantsEnabled: true,
-      defaultClientScopes: [...IDENTITY_SCOPES, SCOPES.tickets],
+      defaultClientScopes: [...IDENTITY_SCOPES, SCOPES.tickets, SCOPES.approvals],
     });
   }
 
@@ -270,4 +272,28 @@ export async function provisionCustomer(
 
 export async function deleteRealm(admin: KeycloakAdmin, realm: string): Promise<void> {
   await admin.call("DELETE", `/realms/${realm}`);
+}
+
+/** Creates the sign-in account for a member of staff of one tenant. */
+export async function provisionStaff(
+  admin: KeycloakAdmin,
+  staff: { tenantId: string; email: string; name: string; role: string; password?: string },
+  realm: string = REALM,
+): Promise<string> {
+  const [firstName, ...rest] = staff.name.split(" ");
+  const created = await admin.call("POST", `/realms/${realm}/users`, {
+    username: staff.email,
+    email: staff.email,
+    emailVerified: true,
+    enabled: true,
+    firstName,
+    lastName: rest.join(" ") || firstName,
+    attributes: { tenant_id: [staff.tenantId], staff_role: [staff.role] },
+    ...(staff.password
+      ? { credentials: [{ type: "password", value: staff.password, temporary: false }] }
+      : {}),
+  });
+  const userId = created.location?.split("/").pop();
+  if (!userId) throw new Error(`Keycloak did not return an id for ${staff.email}`);
+  return userId;
 }

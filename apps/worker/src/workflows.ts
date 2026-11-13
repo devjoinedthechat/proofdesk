@@ -13,6 +13,10 @@ import type { Activities, ApprovalAnswer, FinishOutput, TicketRef } from "./acti
 
 const { startRun, executeNext, finishRun } = proxyActivities<Activities>({
   startToCloseTimeout: "2 minutes",
+  // Activities report in every few seconds. A worker that goes silent is
+  // presumed lost and its activity is given to another, long before the
+  // overall timeout.
+  heartbeatTimeout: "10 seconds",
   retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
 });
 
@@ -21,6 +25,7 @@ const { startRun, executeNext, finishRun } = proxyActivities<Activities>({
 // provider failures.
 const { modelTurn } = proxyActivities<Activities>({
   startToCloseTimeout: "10 minutes",
+  heartbeatTimeout: "30 seconds",
   retry: { initialInterval: "5 seconds", backoffCoefficient: 2, maximumAttempts: 4 },
 });
 

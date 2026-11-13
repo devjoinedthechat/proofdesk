@@ -23,6 +23,7 @@ export const GRANT_IDP = "ticket-grants";
 export const SCOPES = {
   tickets: "tickets",
   grantsIssue: "grants:issue",
+  approvals: "approvals",
   billingRead: "billing:read",
   billingRefund: "billing:refund",
 } as const;

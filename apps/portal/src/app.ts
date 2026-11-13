@@ -21,6 +21,19 @@ export type PortalDeps = {
   signer: GrantSigner;
   clock: () => Date;
   newId: (prefix: string) => string;
+  /** Hands a new ticket to the agent. In production this starts the ticket's workflow. */
+  onTicketCreated?: (ref: {
+    ticketId: string;
+    tenantId: string;
+    customerId: string;
+  }) => Promise<void>;
+  /** Delivers a staff decision to the ticket's workflow. */
+  decideApproval?: (decision: {
+    ticketId: string;
+    approvalId: string;
+    decision: "approved" | "rejected";
+    decidedBy: string;
+  }) => Promise<void>;
 };
 
 /**
@@ -46,6 +59,8 @@ const submitTicket = z.strictObject({
 });
 
 const requestAssertion = z.strictObject({ scope: z.string().min(1).max(100) });
+
+const decideApproval = z.strictObject({ decision: z.enum(["approved", "rejected"]) });
 
 const toTicket = (row: TicketRow) => ({
   id: row.id,
@@ -81,7 +96,69 @@ export function createPortalApp(deps: PortalDeps) {
     return { tenantId: token.tenantId, customerId: token.customerId };
   }
 
+  /** A signed-in member of staff who may decide approvals, limited to their own tenant. */
+  async function approver(request: Request) {
+    const token = await authenticate(request);
+    if (
+      !SIGN_IN_CLIENTS.has(token.client) ||
+      !token.scopes.includes(SCOPES.approvals) ||
+      token.staffRole !== "approver" ||
+      !token.tenantId
+    ) {
+      throw new HttpError(403, "forbidden", "This action requires an approver");
+    }
+    return { tenantId: token.tenantId, subject: `staff:${token.subject}` };
+  }
+
   app.get("/.well-known/jwks.json", (c) => c.json(deps.signer.jwks()));
+
+  app.get("/staff/approvals", async (c) => {
+    const staff = await approver(c.req.raw);
+    const rows = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+      trx
+        .selectFrom("approvals")
+        .selectAll()
+        .where("status", "=", "pending")
+        .orderBy("requestedAt")
+        .execute(),
+    );
+    return c.json({
+      approvals: rows.map((row) => ({
+        id: row.id,
+        ticketId: row.ticketId,
+        tool: row.tool,
+        summary: row.summary,
+        reason: row.reason,
+        requestedAt: row.requestedAt.toISOString(),
+      })),
+    });
+  });
+
+  app.post("/staff/approvals/:approvalId/decision", async (c) => {
+    const staff = await approver(c.req.raw);
+    const { decision } = await parseBody(c.req.raw, decideApproval);
+    // Row-level security hides other tenants' approvals, so staff of one
+    // company cannot decide, or even find, another company's.
+    const approval = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+      trx
+        .selectFrom("approvals")
+        .select(["id", "ticketId", "status"])
+        .where("id", "=", c.req.param("approvalId"))
+        .executeTakeFirst(),
+    );
+    if (!approval) throw new HttpError(404, "approval_not_found", "Approval not found");
+    if (approval.status !== "pending") {
+      throw new HttpError(409, "already_decided", `This approval is already ${approval.status}`);
+    }
+    if (!deps.decideApproval) throw new Error("No approval delivery is configured");
+    await deps.decideApproval({
+      ticketId: approval.ticketId,
+      approvalId: approval.id,
+      decision,
+      decidedBy: staff.subject,
+    });
+    return c.json({ accepted: true }, 202);
+  });
 
   // Submitting a ticket is also what grants the agent authority to act on it.
   app.post("/tickets", async (c) => {
@@ -116,6 +193,7 @@ export function createPortalApp(deps: PortalDeps) {
         })
         .execute();
     });
+    await deps.onTicketCreated?.({ ticketId: ticket.id, ...scope });
     return c.json({ ticket: toTicket(ticket) }, 201);
   });
 

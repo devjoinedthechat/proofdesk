@@ -5,6 +5,7 @@ export {
   type KeycloakAdmin,
   provisionCustomer,
   provisionRealm,
+  provisionStaff,
   type RealmOptions,
 } from "./keycloak-admin.ts";
 export { CLIENTS, GRANT_IDP, REALM, realmIssuer, SCOPES } from "./names.ts";
