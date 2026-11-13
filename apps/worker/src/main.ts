@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { callMcpTool, listMcpTools, screenTicket } from "@proofdesk/agent";
+import { callMcpTool, listMcpTools, PROMPT_VERSION, screenTicket } from "@proofdesk/agent";
 import { type AppDatabase, connect } from "@proofdesk/db";
 import {
   ANTHROPIC_PRICES,
@@ -19,13 +19,14 @@ import {
   SCOPES,
   TokenError,
 } from "@proofdesk/identity";
-import { createToolPolicy, invoiceRecords } from "@proofdesk/policy";
+import { createToolPolicy, invoiceRecords, policyVersion } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
-import { startTelemetry } from "@proofdesk/telemetry";
+import { startInspection, startTelemetry } from "@proofdesk/telemetry";
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
 import { createDeletionActivities, mcpErasers } from "./deletion.ts";
+import { inspectModelCalls } from "./inspection.ts";
 import { createDbLedger } from "./ledger.ts";
 import { recordModelCall } from "./telemetry.ts";
 import { createWatchdogActivities } from "./watchdog.ts";
@@ -65,7 +66,13 @@ async function start() {
     serviceName: "proofdesk-worker",
     endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
   });
-  const gateway = createGateway({
+  // Full conversations go to the inspection store when one is configured,
+  // and nowhere otherwise.
+  const inspection = startInspection({
+    endpoint: process.env.INSPECTION_URL,
+    apiKey: process.env.INSPECTION_API_KEY,
+  });
+  const meteredGateway = createGateway({
     routes,
     prices,
     onCall: (record) => recordModelCall(telemetry, record, new Date()),
@@ -75,6 +82,7 @@ async function start() {
       perTenantMicros: Number(process.env.BUDGET_PER_TENANT_MICROS ?? 50_000_000),
     },
   });
+  const gateway = inspectModelCalls(meteredGateway, inspection);
 
   const toolTokens = createToolTokenSource({
     worker: createTokenClient({
@@ -119,9 +127,11 @@ async function start() {
     gateway,
     versions: {
       model: env("MODEL"),
-      prompt: process.env.PROMPT_VERSION ?? "dev",
-      policy: process.env.POLICY_VERSION ?? "dev",
+      // What is actually running, unless a release names it otherwise.
+      prompt: process.env.PROMPT_VERSION ?? PROMPT_VERSION,
+      policy: process.env.POLICY_VERSION ?? policyVersion(),
     },
+    inspection,
     policy: createToolPolicy(),
     clock: () => new Date(),
     telemetry,
@@ -173,6 +183,7 @@ async function start() {
           db,
           clock: () => new Date(),
           telemetry,
+          inspection,
           ...mcpErasers(
             (ref, server, tool) =>
               callMcpTool(

@@ -1,6 +1,6 @@
 # 15. Telemetry can carry identifiers and numbers, and nothing else
 
-Status: accepted, 2026-11-13
+Status: accepted, 2026-11-13. This covers the dashboards. Where a person reads a full conversation is decided in [ADR 17](0017-one-store-for-conversations.md).
 
 ## Context
 
@@ -25,7 +25,7 @@ The trace id is derived from the ticket id. Every span about a ticket, from any 
 
 ## What this costs
 
-- **No prompts or replies in traces.** To see what the model was shown for a ticket, a person with access to the application database reads the run there, under its access rules and its deletion.
+- **No prompts or replies in these traces.** To see what the model was shown for a ticket, a person opens the same trace id in the inspection store, which has its own sign-in and is reached by deletion.
 - **Debugging is one step longer.** A trace says which step failed and how; the content is one lookup away.
 - **Only the worker is instrumented.** The portal, the services and the MCP servers do not emit telemetry yet.
 - **The local stack's Grafana is a development image,** with anonymous access.

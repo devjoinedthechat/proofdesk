@@ -45,19 +45,23 @@ import {
   REFUND_SCENARIOS,
   type SimEnv,
 } from "@proofdesk/simulator";
+import { projectFor, startInspection } from "@proofdesk/telemetry";
 import { Client, Connection } from "@temporalio/client";
 import { NativeConnection, type Worker } from "@temporalio/worker";
 import { type Kysely, sql } from "kysely";
+import { GenericContainer, type StartedTestContainer, Wait } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createActivities, type TicketRef } from "./activities.ts";
 import { createDeletionActivities, type DeletionReport, mcpErasers } from "./deletion.ts";
+import { inspectModelCalls } from "./inspection.ts";
 import { testTemporalAddress } from "./testing.ts";
 import { createTicketWorker } from "./worker.ts";
 import { progress } from "./workflows.ts";
 
 // A customer asks to be deleted, and afterwards every store is searched for
-// them. Real Keycloak, Postgres and Temporal; the portal, both services and
-// both MCP servers run in this process; the model is scripted.
+// them. Real Keycloak, Postgres, Temporal and Phoenix, the store of full
+// conversations; the portal, both services and both MCP servers run in this
+// process; the model is scripted.
 //
 // The customer first builds up a history worth deleting: one ticket resolved
 // with a refund, and one still waiting for staff when the request arrives.
@@ -82,6 +86,21 @@ const realm = `del_${randomBytes(4).toString("hex")}`;
 const issuer = realmIssuer(testKeycloakUrl(), realm);
 const taskQueue = `del-${randomBytes(4).toString("hex")}`;
 const suffix = `-${taskQueue}`;
+
+const PHOENIX_KEY = "test-only-phoenix-admin-secret-0123456789";
+let phoenix: StartedTestContainer;
+let phoenixUrl = "";
+let inspection: ReturnType<typeof startInspection>;
+
+/** Every span the inspection store holds for this company, as text. */
+async function conversations(): Promise<string> {
+  const response = await fetch(
+    `${phoenixUrl}/v1/projects/${projectFor(tenant.id)}/spans?limit=1000`,
+    { headers: { authorization: `Bearer ${PHOENIX_KEY}` } },
+  );
+  // No project yet means no conversations yet.
+  return response.status === 404 ? "" : response.text();
+}
 
 let admin: KeycloakAdmin;
 let env: SimEnv;
@@ -222,6 +241,18 @@ beforeAll(async () => {
     insecureHttp: true,
   });
 
+  phoenix = await new GenericContainer("arizephoenix/phoenix:version-21.1.0")
+    .withExposedPorts(6006)
+    .withEnvironment({
+      PHOENIX_ENABLE_AUTH: "true",
+      PHOENIX_SECRET: "test-only-phoenix-signing-secret-0123456789abcdef",
+      PHOENIX_ADMIN_SECRET: PHOENIX_KEY,
+    })
+    .withWaitStrategy(Wait.forHttp("/healthz", 6006))
+    .start();
+  phoenixUrl = `http://${phoenix.getHost()}:${phoenix.getMappedPort(6006)}`;
+  inspection = startInspection({ endpoint: phoenixUrl, apiKey: PHOENIX_KEY });
+
   env = await createSimEnv(testPostgresUrl());
   await loadWorld({ ...target.added, tickets: [] }, env.dbs);
   // Text the customer typed onto their invoices at checkout.
@@ -346,10 +377,11 @@ beforeAll(async () => {
 
   const activities = createActivities({
     db: workerDb,
-    gateway: new MockProvider(script),
+    gateway: inspectModelCalls(new MockProvider(script), inspection),
     versions: { model: "mock-model", prompt: "test", policy: "test" },
     policy: createToolPolicy(),
     clock,
+    inspection,
     async invoices(ref: TicketRef) {
       const result = await callMcpTool(
         server(`${BILLING_MCP}/mcp`, ref.ticketId),
@@ -375,6 +407,7 @@ beforeAll(async () => {
   deletion = createDeletionActivities({
     db: workerDb,
     clock,
+    inspection,
     ...mcpErasers(
       (ref, name, tool) =>
         callMcpTool(
@@ -434,6 +467,8 @@ beforeAll(async () => {
 }, 600_000);
 
 afterAll(async () => {
+  await inspection?.shutdown();
+  await phoenix?.stop();
   worker?.shutdown();
   await running;
   await Promise.all([workerDb?.destroy(), portalDb?.destroy(), grantsDb?.destroy()]);
@@ -452,7 +487,17 @@ describe("before the request", () => {
     expect(await count(app(), "memories", sql`customer_id = ${customer.id}`)).toBe(1);
     expect(await count(app(), "approvals", sql`customer_id = ${customer.id}`)).toBe(1);
     expect(await count(entitlements(), "entitlements", sql`customer_id = ${customer.id}`)).toBe(1);
-  });
+
+    // The inspection store has the conversations in full: that is its job.
+    let stored = "";
+    for (let attempt = 0; attempt < 100 && !stored.includes(`${MARK}-REPLY`); attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      stored = await conversations();
+    }
+    for (const needle of [customer.name, MARK, `${MARK}-REPLY`, firstTicket, secondTicket]) {
+      expect(stored.includes(needle), `${needle} is not in the inspection store`).toBe(true);
+    }
+  }, 60_000);
 
   it("does not let a ticket ask for deletion: it is not something an agent handles", async () => {
     const response = await post("/tickets", {
@@ -538,6 +583,8 @@ describe("the request", () => {
         grantAssertions: expect.any(Number),
       },
       signInAccounts: 1,
+      // Both tickets' conversations. The deletion request itself has none.
+      conversations: 2,
     });
   }, 120_000);
 });
@@ -559,6 +606,20 @@ describe("after the request", () => {
     const withId = stores.app.split("\n").filter((line) => line.includes(customer.id));
     expect(withId.map((line) => line.split(":")[0])).toEqual(["deletion_requests"]);
     expect(stores.entitlements).not.toContain(customer.id);
+  });
+
+  it("finds no trace in the inspection store, which held every word", async () => {
+    const stored = await conversations();
+    for (const needle of [
+      customer.email,
+      customer.name,
+      MARK,
+      firstTicket,
+      secondTicket,
+      customer.id,
+    ]) {
+      expect(stored.includes(needle), `${needle} is still in the inspection store`).toBe(false);
+    }
   });
 
   it("finds no trace in the workflow histories, and the waiting ticket's workflow has stopped", async () => {
@@ -653,6 +714,9 @@ describe("after the request", () => {
     };
     expect(await deletion.eraseRecords(ref)).toEqual(report.records);
     expect(await deletion.eraseIdentity(ref)).toBe(0);
+    expect(await deletion.eraseConversations({ ref, ticketIds: [firstTicket, secondTicket] })).toBe(
+      0,
+    );
     expect(await count(app(), "audit_log", sql`event like 'deletion_%'`)).toBe(2);
   });
 });

@@ -33,6 +33,7 @@
     "@proofdesk/mcp-entitlements": "workspace:*",
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",
-    "@proofdesk/simulator": "workspace:*"
+    "@proofdesk/simulator": "workspace:*",
+    "testcontainers": "12.2.1"
   }
 }

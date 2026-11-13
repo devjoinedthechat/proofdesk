@@ -133,12 +133,18 @@ export async function ticketWorkflow(ref: TicketRef): Promise<FinishOutput> {
   return outcome;
 }
 
-const { beginDeletion, eraseElsewhere, eraseRecords, eraseIdentity, finishDeletion } =
-  proxyActivities<DeletionActivities>({
-    startToCloseTimeout: "2 minutes",
-    heartbeatTimeout: "10 seconds",
-    retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
-  });
+const {
+  beginDeletion,
+  eraseConversations,
+  eraseElsewhere,
+  eraseRecords,
+  eraseIdentity,
+  finishDeletion,
+} = proxyActivities<DeletionActivities>({
+  startToCloseTimeout: "2 minutes",
+  heartbeatTimeout: "10 seconds",
+  retry: { initialInterval: "1 second", backoffCoefficient: 2, maximumInterval: "1 minute" },
+});
 
 /** The workflow id of a ticket. `suffix` exists so tests can run side by side. */
 const ticketWorkflowId = (ticketId: string, suffix = "") => `ticket-${ticketId}${suffix}`;
@@ -148,18 +154,19 @@ const ticketWorkflowId = (ticketId: string, suffix = "") => `ticket-${ticketId}$
  * workflow and no decision: the steps and their order are fixed.
  *
  * 1. Stop any agent still working for the customer.
- * 2. Close the billing account and remove access, on the request's own grant.
- * 3. Erase this system's records, which also removes that grant.
- * 4. Remove the sign-in account.
+ * 2. Remove their conversations from the inspection store.
+ * 3. Close the billing account and remove access, on the request's own grant.
+ * 4. Erase this system's records, which also removes that grant.
+ * 5. Remove the sign-in account.
  *
- * Steps 2 comes before 3 because it needs the grant, and 4 comes last because
- * a token for step 2 can only be issued for an account that still exists.
+ * Step 3 comes before 4 because it needs the grant, and 5 comes last because
+ * a token for step 3 can only be issued for an account that still exists.
  */
 export async function deletionWorkflow(
   ref: DeletionRef,
   options: { ticketWorkflowSuffix?: string } = {},
 ): Promise<DeletionReport> {
-  const { openTicketIds } = await beginDeletion(ref);
+  const { openTicketIds, ticketIds } = await beginDeletion(ref);
   for (const ticketId of openTicketIds) {
     try {
       await getExternalWorkflowHandle(
@@ -169,10 +176,12 @@ export async function deletionWorkflow(
       // Already finished, or never started. Either way no agent is running.
     }
   }
+  // After the agents have stopped, so that no conversation is still being written.
+  const conversations = await eraseConversations({ ref, ticketIds });
   const elsewhere = await eraseElsewhere(ref);
   const records = await eraseRecords(ref);
   const signInAccounts = await eraseIdentity(ref);
-  const report: DeletionReport = { ...elsewhere, records, signInAccounts };
+  const report: DeletionReport = { ...elsewhere, records, signInAccounts, conversations };
   await finishDeletion({ ref, report });
   return report;
 }

@@ -24,12 +24,13 @@ A deletion is requested through its own endpoint and carried out by its own work
 | Step | What it does                                                          | On whose authority                             |
 | ---- | --------------------------------------------------------------------- | ---------------------------------------------- |
 | 1    | Stops the workflows of the customer's open tickets                    | The system's                                   |
-| 2    | Cancels subscriptions and clears the customer's text on invoices      | The request's own grant, one scope, 60 seconds |
-| 3    | Removes access in the entitlements service                            | The request's own grant, likewise              |
-| 4    | Erases the customer from the application database, in one transaction | A database function that requires the request  |
-| 5    | Deletes the sign-in account                                           | An identity administrator's                    |
+| 2    | Removes the customer's conversations from the inspection store        | The system's                                   |
+| 3    | Cancels subscriptions and clears the customer's text on invoices      | The request's own grant, one scope, 60 seconds |
+| 4    | Removes access in the entitlements service                            | The request's own grant, likewise              |
+| 5    | Erases the customer from the application database, in one transaction | A database function that requires the request  |
+| 6    | Deletes the sign-in account                                           | An identity administrator's                    |
 
-Steps 2 and 3 come before step 4 because they need the grant, which step 4 erases. Every step is safe to repeat.
+Steps 3 and 4 come before step 5 because they need the grant, which step 5 erases. Every step is safe to repeat.
 
 ### What the worker cannot do
 
@@ -49,7 +50,7 @@ So a worker that is compromised, or simply wrong, cannot erase someone who did n
 
 ## How it is tested
 
-One test gives a customer a real history: a ticket resolved with a refund, a second ticket waiting for staff, a memory, text on their invoices. The customer then asks to be deleted, and every table of every database, every workflow history and the identity provider are searched for their name, their email address and a marker word from their tickets.
+One test gives a customer a real history: a ticket resolved with a refund, a second ticket waiting for staff, a memory, text on their invoices. The customer then asks to be deleted, and every table of every database, every workflow history, the inspection store and the identity provider are searched for their name, their email address and a marker word from their tickets.
 
 The same test checks that nobody else was touched, that the financial records are all still there, that the audit chain still verifies, and that the waiting ticket's workflow was stopped.
 

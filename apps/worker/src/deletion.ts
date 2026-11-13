@@ -1,5 +1,5 @@
 import { type AppDatabase, appendAudit, withRowScope } from "@proofdesk/db";
-import type { Telemetry } from "@proofdesk/telemetry";
+import type { Inspection, Telemetry } from "@proofdesk/telemetry";
 import { type Kysely, sql } from "kysely";
 import { z } from "zod";
 import { recordEvent } from "./telemetry.ts";
@@ -18,6 +18,8 @@ export type DeletionReport = {
   entitlements: { entitlements: number; writes: number };
   records: Record<string, number>;
   signInAccounts: number;
+  /** Conversations removed from the inspection store. */
+  conversations: number;
 };
 
 export type DeletionDeps = {
@@ -33,6 +35,8 @@ export type DeletionDeps = {
   /** Removes the customer's sign-in account and returns how many were removed. */
   identity: { deleteAccount(customerId: string): Promise<number> };
   telemetry?: Telemetry;
+  /** The store of full conversations, if one is in use. A deletion must reach it. */
+  inspection?: Inspection;
 };
 
 const billingClosed = z.object({
@@ -126,27 +130,42 @@ export function createDeletionActivities(deps: DeletionDeps) {
      * Confirms the request exists and returns the customer's tickets that an
      * agent may still be working on, so their workflows can be stopped first.
      */
-    async beginDeletion(ref: DeletionRef): Promise<{ openTicketIds: string[] }> {
+    async beginDeletion(
+      ref: DeletionRef,
+    ): Promise<{ openTicketIds: string[]; ticketIds: string[] }> {
       const found = await withRowScope(deps.db, scope(ref), async (trx) => {
         const request = await trx
           .selectFrom("deletionRequests")
           .select(["status"])
           .where("id", "=", ref.requestId)
           .executeTakeFirst();
-        const tickets = await trx
-          .selectFrom("tickets")
-          .select("id")
-          .where("status", "in", OPEN_STATUSES)
-          .where("id", "<>", ref.ticketId)
-          .execute();
-        return { request, tickets };
+        const all = await trx.selectFrom("tickets").select(["id", "status"]).execute();
+        const tickets = all.filter(
+          (ticket) =>
+            ticket.id !== ref.ticketId &&
+            (OPEN_STATUSES as readonly string[]).includes(ticket.status),
+        );
+        return { request, tickets, all };
       });
       if (!found.request) throw new Error(`No deletion request ${ref.requestId} for this customer`);
       const openTicketIds = found.tickets.map((ticket) => ticket.id);
       if (found.request.status === "requested") {
         await audit(ref, "deletion_started", { openTickets: openTicketIds.length });
       }
-      return { openTicketIds };
+      // Every ticket the customer ever had, read now: once the records are
+      // erased nothing here will know which conversations were theirs.
+      return { openTicketIds, ticketIds: found.all.map((ticket) => ticket.id) };
+    },
+
+    /** Removes the customer's conversations from the inspection store. */
+    async eraseConversations(input: { ref: DeletionRef; ticketIds: string[] }): Promise<number> {
+      const { inspection } = deps;
+      if (!inspection) return 0;
+      let removed = 0;
+      for (const ticketId of input.ticketIds) {
+        if (await inspection.deleteTicket(input.ref.tenantId, ticketId)) removed += 1;
+      }
+      return removed;
     },
 
     /** Closes the billing account and removes the customer's access. */

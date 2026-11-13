@@ -219,6 +219,8 @@ services:
       MODEL: ${MODEL:-claude-sonnet-5-5}
       MODEL_PROVIDER_MODULE: ${MODEL_PROVIDER_MODULE:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
+      INSPECTION_URL: http://phoenix:6006
+      INSPECTION_API_KEY: ${PHOENIX_ADMIN_SECRET:-local-phoenix-admin-secret-0123456789}
     depends_on:
       provision:
         condition: service_completed_successfully
@@ -227,6 +229,8 @@ services:
       portal:
         condition: service_started
       telemetry:
+        condition: service_healthy
+      phoenix:
         condition: service_healthy
 
   # Traces and metrics. One container with a collector, Tempo, Prometheus
@@ -241,6 +245,32 @@ services:
       - ./grafana/proofdesk.json:/otel-lgtm/proofdesk.json:ro
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+
+  # The inspection store: full conversations, for a person to read. Unlike
+  # the telemetry above it holds customer text, so it requires sign-in, each
+  # company has its own project, and a deletion request removes from it.
+  phoenix:
+    image: arizephoenix/phoenix:version-21.1.0
+    profiles: ["app"]
+    environment:
+      PHOENIX_WORKING_DIR: /mnt/data
+      PHOENIX_ENABLE_AUTH: "true"
+      PHOENIX_SECRET: ${PHOENIX_SECRET:-local-phoenix-signing-secret-0123456789abcdef}
+      PHOENIX_ADMIN_SECRET: ${PHOENIX_ADMIN_SECRET:-local-phoenix-admin-secret-0123456789}
+      PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${DEMO_PASSWORD:-local-demo-password}
+    ports:
+      - "127.0.0.1:${PHOENIX_PORT:-6006}:6006"
+    volumes:
+      - phoenix-data:/mnt/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:6006/healthz")
       interval: 3s
       timeout: 3s
       retries: 60
@@ -262,3 +292,4 @@ services:
 volumes:
   postgres-data:
   app-state:
+  phoenix-data:

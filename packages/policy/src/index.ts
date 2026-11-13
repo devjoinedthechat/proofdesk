@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as cedar from "@cedar-policy/cedar-wasm/nodejs";
@@ -38,6 +39,19 @@ export function loadPolicies(options: { directory?: string; exclude?: string[] }
 }
 
 export type PolicySet = ReturnType<typeof loadPolicies>;
+
+/**
+ * A short fingerprint of a policy set: its schema and every policy's text.
+ * Recorded with each run, so it can be said later exactly which rules were
+ * in force when a decision was made.
+ */
+export function policyVersion(set: PolicySet = loadPolicies()): string {
+  const hash = createHash("sha256").update(set.schema);
+  for (const [id, text] of Object.entries(set.policies).sort(([a], [b]) => a.localeCompare(b))) {
+    hash.update(`\0${id}\0${text}`);
+  }
+  return hash.digest("hex").slice(0, 12);
+}
 
 /** Checks the policies against the schema. Returns one message per problem. */
 export function validatePolicies(set: PolicySet = loadPolicies()): string[] {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   type AgentState,
   CHANGE_PLAN_TOOL,
@@ -26,6 +27,7 @@ import {
   describeMemory,
   recallMemories,
   rememberTicket,
+  type TenantRow,
   type TicketStatus,
   withRowScope,
 } from "@proofdesk/db";
@@ -37,7 +39,7 @@ import {
   refundRequest,
   type ToolPolicy,
 } from "@proofdesk/policy";
-import type { Telemetry } from "@proofdesk/telemetry";
+import type { Inspection, Telemetry } from "@proofdesk/telemetry";
 import type { Kysely } from "kysely";
 import { recordEvent } from "./telemetry.ts";
 
@@ -88,6 +90,8 @@ export type ActivityDeps = {
   clock: () => Date;
   /** Where metrics and traces go. Nothing is recorded without it. */
   telemetry?: Telemetry;
+  /** Where full conversations go, for a person to read. Nothing is sent without it. */
+  inspection?: Inspection;
 };
 
 const TICKET_STATUS: Record<string, TicketStatus> = {
@@ -108,6 +112,17 @@ function toolsShown(tools: McpToolDescriptor[]): ToolDefinition[] {
     ...(planChangeAvailable(names) ? [changePlanTool] : []),
   ];
 }
+
+/** The agent's instructions for one company. */
+const promptFor = (tenant: TenantRow) =>
+  systemPrompt({
+    tenantName: tenant.name,
+    currency: tenant.currency,
+    refundWindowDays: tenant.refundWindowDays,
+    refundApprovalLimitCents: tenant.refundApprovalLimitCents,
+  });
+const promptHash = (tenant: TenantRow) =>
+  createHash("sha256").update(promptFor(tenant)).digest("hex").slice(0, 12);
 
 const HANDOVER_REPLY = "I have passed your request to our team, who will reply to you directly.";
 
@@ -141,6 +156,7 @@ export function createActivities(deps: ActivityDeps) {
       state: row.state as AgentState,
       tools: row.tools as McpToolDescriptor[],
       lastOutput: row.lastOutput,
+      createdAt: row.createdAt,
     };
   }
 
@@ -280,10 +296,13 @@ export function createActivities(deps: ActivityDeps) {
           .executeTakeFirst(),
       );
       if (created) {
+        const { tenant } = await tenantFacts(ref);
         await audit(ref, "run_started", {
           category: ticket.category,
           tools: tools.map((tool) => tool.definition.name),
           ...deps.versions,
+          // The instructions differ per company. This says which text it was.
+          promptHash: promptHash(tenant),
         });
         if (deps.screen) {
           // A screen that fails must not hold up the ticket.
@@ -312,12 +331,7 @@ export function createActivities(deps: ActivityDeps) {
           model,
           gateway: deps.gateway,
           context: { tenantId: ref.tenantId, ticketId: ref.ticketId },
-          system: systemPrompt({
-            tenantName: tenant.name,
-            currency: tenant.currency,
-            refundWindowDays: tenant.refundWindowDays,
-            refundApprovalLimitCents: tenant.refundApprovalLimitCents,
-          }),
+          system: promptFor(tenant),
           tools: toolsShown(tools),
           ...(deps.effort ? { effort: deps.effort } : {}),
         });
@@ -458,6 +472,7 @@ export function createActivities(deps: ActivityDeps) {
         }
 
         const before = state.toolCalls.length;
+        const startedAt = deps.clock();
         await settleNext(
           state,
           next,
@@ -481,6 +496,17 @@ export function createActivities(deps: ActivityDeps) {
 
         const record = state.toolCalls[before];
         if (record) {
+          deps.inspection?.toolCall({
+            tenantId: ref.tenantId,
+            ticketId: ref.ticketId,
+            name: record.tool,
+            input: record.input,
+            verdict: record.verdict,
+            output: record.outcome.content,
+            failed: record.outcome.isError,
+            startedAt,
+            endedAt: deps.clock(),
+          });
           // Counted towards the tenant's daily cap, once per refund: a
           // repeated step gets the same refund back from billing.
           for (const refund of refundsMade([record])) await recordRefund(ref, refund);
@@ -540,7 +566,20 @@ export function createActivities(deps: ActivityDeps) {
         // The memory of this ticket is computed from what happened. No text
         // from the ticket or from the model goes into it, so nothing a
         // customer writes can plant a "fact" for next time.
-        const { ticket } = await tenantFacts(ref);
+        const { ticket, tenant } = await tenantFacts(ref);
+        deps.inspection?.ticket({
+          tenantId: ref.tenantId,
+          ticketId: ref.ticketId,
+          category: ticket.category,
+          input: `${ticket.subject}\n\n${ticket.body}`,
+          output: final.reply,
+          outcome: final.outcome,
+          reason: final.reasonCode,
+          violations,
+          versions: { ...deps.versions, promptHash: promptHash(tenant) },
+          startedAt: run.createdAt,
+          endedAt: deps.clock(),
+        });
         await rememberTicket(deps.db, ref, {
           id: `mem_${ref.ticketId}`,
           ticketId: ref.ticketId,

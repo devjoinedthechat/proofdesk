@@ -332,3 +332,15 @@ export function createTestTelemetry() {
     },
   };
 }
+
+export {
+  type InspectedMessage,
+  type InspectedModelCall,
+  type InspectedTicket,
+  type InspectedToolCall,
+  type Inspection,
+  noInspection,
+  projectFor,
+  startInspection,
+  ticketTraceIds,
+} from "./inspection.ts";

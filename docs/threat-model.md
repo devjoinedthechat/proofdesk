@@ -32,31 +32,32 @@ So every control below is judged by one question: does it still hold if the mode
 
 ## Controls, from the outside in
 
-| Layer    | Control                                                                                                    | Holds if the model is compromised |
-| -------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Identity | The agent acts only under a grant created by a signed-in customer, for scopes their ticket category allows | Yes                               |
-| Identity | Each tool call uses a fresh 60-second token for one audience and one scope                                 | Yes                               |
-| Tools    | No tool takes a customer id; the customer is whoever the token is about                                    | Yes                               |
-| Tools    | The model never sees or sets the idempotency key                                                           | Yes                               |
-| Policy   | Every tool call is decided by Cedar policies; anything not permitted is denied                             | Yes                               |
-| Policy   | Refund rules are checked against billing records the policy layer reads itself                             | Yes                               |
-| Approval | A refund above the limit, or against a payment above the limit, waits for staff                            | Yes                               |
-| Approval | Past a daily total per company, every further refund waits for staff                                       | Yes                               |
-| Service  | Billing refuses refunds beyond what was paid, and on failed or disputed payments                           | Yes                               |
-| Database | Row-level security limits every query to one tenant and customer                                           | Yes                               |
-| Search   | The search runs under row-level security as the public; staff-only pages are never candidates              | Yes                               |
-| Search   | Nothing retrieved can change a refund decision: the rules are enforced on billing records                  | Yes                               |
-| Memory   | A memory holds only facts the system computed; no ticket text and nothing the model wrote                  | Yes                               |
-| Reply    | The reply is checked against what the tools actually did, and for internal terms                           | Yes                               |
-| Tools    | Arguments are constrained to each tool's schema, and results are checked against a declared output         | Yes                               |
-| Runtime  | A ticket whose model cannot be reached goes to staff, with nothing changed                                 | Yes                               |
-| Runtime  | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
-| Runtime  | A kill switch per tenant and per tool, read before every model turn and tool call                          | Yes                               |
-| Runtime  | A watchdog pauses an agent whose replies the guard keeps stopping, and rolls back a worse build            | Yes                               |
-| Deletion | No model takes part; the worker can erase a customer only on a request the portal recorded                 | Yes                               |
-| Prompt   | Ticket text and tool results are declared untrusted                                                        | No                                |
-| Screen   | A small model flags manipulative tickets                                                                   | No                                |
-| Ingest   | A scan quarantines help-centre pages that address an agent                                                 | No                                |
+| Layer      | Control                                                                                                    | Holds if the model is compromised |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Identity   | The agent acts only under a grant created by a signed-in customer, for scopes their ticket category allows | Yes                               |
+| Identity   | Each tool call uses a fresh 60-second token for one audience and one scope                                 | Yes                               |
+| Tools      | No tool takes a customer id; the customer is whoever the token is about                                    | Yes                               |
+| Tools      | The model never sees or sets the idempotency key                                                           | Yes                               |
+| Policy     | Every tool call is decided by Cedar policies; anything not permitted is denied                             | Yes                               |
+| Policy     | Refund rules are checked against billing records the policy layer reads itself                             | Yes                               |
+| Approval   | A refund above the limit, or against a payment above the limit, waits for staff                            | Yes                               |
+| Approval   | Past a daily total per company, every further refund waits for staff                                       | Yes                               |
+| Service    | Billing refuses refunds beyond what was paid, and on failed or disputed payments                           | Yes                               |
+| Database   | Row-level security limits every query to one tenant and customer                                           | Yes                               |
+| Search     | The search runs under row-level security as the public; staff-only pages are never candidates              | Yes                               |
+| Search     | Nothing retrieved can change a refund decision: the rules are enforced on billing records                  | Yes                               |
+| Memory     | A memory holds only facts the system computed; no ticket text and nothing the model wrote                  | Yes                               |
+| Reply      | The reply is checked against what the tools actually did, and for internal terms                           | Yes                               |
+| Tools      | Arguments are constrained to each tool's schema, and results are checked against a declared output         | Yes                               |
+| Runtime    | A ticket whose model cannot be reached goes to staff, with nothing changed                                 | Yes                               |
+| Runtime    | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
+| Runtime    | A kill switch per tenant and per tool, read before every model turn and tool call                          | Yes                               |
+| Runtime    | A watchdog pauses an agent whose replies the guard keeps stopping, and rolls back a worse build            | Yes                               |
+| Deletion   | No model takes part; the worker can erase a customer only on a request the portal recorded                 | Yes                               |
+| Inspection | Full conversations go to one store that requires sign-in, one project per company, and nowhere else        | Yes                               |
+| Prompt     | Ticket text and tool results are declared untrusted                                                        | No                                |
+| Screen     | A small model flags manipulative tickets                                                                   | No                                |
+| Ingest     | A scan quarantines help-centre pages that address an agent                                                 | No                                |
 
 The last three rows are worth having and are not what safety rests on.
 

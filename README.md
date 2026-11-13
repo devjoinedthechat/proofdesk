@@ -91,7 +91,7 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 | One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                                                           |
 | Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                                                             |
 | Only the right staff can use the switch            | An approver, a customer and another company's operator each try                                                                                                                                         |
-| Telemetry carries no customer text                 | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts))                               |
+| Dashboards carry no customer text                  | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts))                               |
 | A failure in production becomes a test             | The agent gives up on a ticket; staff give a verdict; the captured case must fail on giving up, pass on the right action, and hold nothing about the customer ([test](apps/worker/src/review.itest.ts)) |
 
 Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stopping-the-agent.md)).
@@ -105,6 +105,7 @@ Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stop
 | A request needs more than an open session    | A stale sign-in and a wrong confirmation are sent                                                                                                            |
 | An agent working for the customer is stopped | A ticket is waiting for approval when the request arrives                                                                                                    |
 | Records the company must keep are kept       | Invoices, payments, refunds and the audit chain are compared before and after                                                                                |
+| Stored conversations are deleted too         | The inspection store holds every word before the request and is searched after it                                                                            |
 
 No model takes part in a deletion. What must go is fixed in code and in one database function ([ADR 13](docs/adr/0013-deletion-without-a-model.md)).
 
@@ -152,14 +153,15 @@ pnpm local:down          # stop, keeping the data (local:reset deletes it)
 
 The demo signs in at Keycloak as a customer, submits a ticket to the portal and waits. Everything in between is the real path: a grant, a workflow, a fresh token per tool call, policy, billing.
 
-Four screens are then available:
+Five screens are then available:
 
-| Screen    | Address                             | What it shows                                                             |
-| --------- | ----------------------------------- | ------------------------------------------------------------------------- |
-| Proofdesk | `http://localhost:3000`             | The customer page and the staff console                                   |
-| Grafana   | `http://localhost:3001/d/proofdesk` | What the agent did, what it cost, what stopped it, and a trace per ticket |
-| Temporal  | `http://localhost:8233`             | Each ticket's workflow, step by step                                      |
-| Keycloak  | `http://localhost:8080`             | The realm, its clients and users                                          |
+| Screen    | Address                             | What it shows                                                                                                                |
+| --------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Proofdesk | `http://localhost:3000`             | The customer page and the staff console                                                                                      |
+| Grafana   | `http://localhost:3001/d/proofdesk` | What the agent did, what it cost, what stopped it, and a trace per ticket                                                    |
+| Temporal  | `http://localhost:8233`             | Each ticket's workflow, step by step                                                                                         |
+| Phoenix   | `http://localhost:6006`             | Every conversation in full: what the model was sent, each tool call and its verdict, the reply. Sign in as `admin@localhost` |
+| Keycloak  | `http://localhost:8080`             | The realm, its clients and users                                                                                             |
 
 Sign in at `http://localhost:3000` with one of the local accounts. The password for all of them is `local-demo-password`, or `DEMO_PASSWORD` if you set it.
 
@@ -219,7 +221,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/identity`                                               | Token verification, grant signing, realm provisioning                                                                       |
 | `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                                                      |
 | `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                                                       |
-| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                                                                   |
+| `packages/telemetry`                                              | Dashboards' traces and metrics, limited to an allowlist; and full conversations for the inspection store                    |
 | `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                                                   |
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets                                 |
 | `apps/stack`                                                      | Provisioning and the demo client for the local stack                                                                        |
@@ -244,6 +246,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 14. [Automation may stop the agent, and only a person may start it](docs/adr/0014-stopping-the-agent.md)
 15. [Telemetry can carry identifiers and numbers, and nothing else](docs/adr/0015-telemetry-without-content.md)
 16. [A failure in production becomes a test](docs/adr/0016-failures-become-tests.md)
+17. [Conversations go to one inspection store, on purpose](docs/adr/0017-one-store-for-conversations.md)
 
 See also the [postmortems](docs/postmortems/README.md) and [what was left out, and why](docs/cut-list.md).
 
