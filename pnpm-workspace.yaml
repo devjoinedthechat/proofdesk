@@ -3,3 +3,10 @@ packages:
   - services/*
   - mcp/*
   - packages/*
+
+# Native add-ons pulled in by Testcontainers. Their build scripts are optional
+# speed-ups, so they are not allowed to run.
+allowBuilds:
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
