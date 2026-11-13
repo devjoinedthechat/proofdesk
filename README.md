@@ -10,12 +10,13 @@ Three repeats of every scenario on each model, judged on the final state of the 
 
 | Suite                                     | `claude-sonnet-5-5` | `claude-haiku-5-5` |
 | ----------------------------------------- | ------------------- | ------------------ |
-| 32 honest refund tickets                  | 96 of 96 passed     | 95 of 96 passed    |
+| 32 honest refund tickets                  | 95 of 96 passed     | 96 of 96 passed    |
+| 13 plan-change tickets                    | 39 of 39 passed     | 36 of 39 passed    |
 | 7 tickets that need the help centre       | 21 of 21 passed     | 21 of 21 passed    |
 | 24 attack tickets: attacks that succeeded | 0 of 72             | 0 of 72            |
-| Cost per ticket                           | $0.0088             | $0.0006            |
+| Cost per ticket                           | $0.0093             | $0.0007            |
 
-Read these with their limits. Both suites are saturated, and no attack was strong enough to fool the model, so those runs never reached the controls behind it. What a fooled model can and cannot do is tested separately, with a scripted model that is fully under an attacker's control:
+Read these with their limits. The suites are nearly saturated, and no attack was strong enough to fool the model, so those runs never reached the controls behind it. What a fooled model can and cannot do is tested separately, with a scripted model that is fully under an attacker's control:
 
 | A compromised model tries to                                | Result                                          |
 | ----------------------------------------------------------- | ----------------------------------------------- |
@@ -59,7 +60,7 @@ The environment has two tenants with different refund rules, so the same ticket 
 | Tallyfield   | 30 days       | $500                  |
 
 - **Seeded.** One seed always produces the same customers, subscriptions, invoices and payments.
-- **Scenarios.** 32 honest refund tickets and 24 attack tickets, each with a hand-written expected result: the refunds that must exist afterwards, whether approval is requested, and what the reply must say. Fifteen of them must end without a refund.
+- **Scenarios.** 76 tickets (32 honest refunds, 24 attacks, 13 plan changes, 7 that need the help centre), each with a hand-written expected result: the refunds that must exist afterwards, whether approval is requested, and what the reply must say. Fifteen of them must end without a refund.
 - **Judged on final state.** A run passes only if the expected refunds exist and nothing else in the company changed.
 - **Validated without a model.** A scripted oracle reaches the expected result on every scenario, and a solver that always refunds or always refuses fails every one.
 
@@ -112,34 +113,37 @@ Search quality was measured with a stand-in embedder because no embedding API ke
 
 Each ticket is one Temporal workflow. A worker can stop at any point and another continues from the same step.
 
-| Claim                                          | Test that tries to break it                                                                                                                                                                        |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A refund is issued exactly once                | With every service running as its own process, the worker is sent `SIGKILL` at the moment billing has paid. A second worker repeats the call; billing answers 201, then 200, and one refund exists |
-| A repeated or overlapping step changes nothing | The same activity is run twice, and two attempts of one step are run at once                                                                                                                       |
-| A large refund waits for a person              | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes                                                                                   |
-| Only that tenant's staff can approve           | Another company's approver gets an empty list and a 404; the customer gets a 403                                                                                                                   |
-| Approval cannot override the kill switch       | The agent is paused after the request; the approved refund is still denied                                                                                                                         |
-| The model's account is not trusted             | A run that claims a refund it never made is handed to staff                                                                                                                                        |
-| No customer data in workflow history           | The finished history is searched for the ticket text, name, email and amount                                                                                                                       |
-| The audit log is tamper-evident                | Entries are edited, re-hashed and deleted with full database access                                                                                                                                |
+| Claim                                              | Test that tries to break it                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A refund is issued exactly once                    | With every service running as its own process, the worker is sent `SIGKILL` at the moment billing has paid. A second worker repeats the call; billing answers 201, then 200, and one refund exists                             |
+| A repeated or overlapping step changes nothing     | The same activity is run twice, and two attempts of one step are run at once                                                                                                                                                   |
+| A large refund waits for a person                  | The workflow pauses, the worker is shut down, the approval arrives with no worker running, a new worker finishes                                                                                                               |
+| Only that tenant's staff can approve               | Another company's approver gets an empty list and a 404; the customer gets a 403                                                                                                                                               |
+| Approval cannot override the kill switch           | The agent is paused after the request; the approved refund is still denied                                                                                                                                                     |
+| The model's account is not trusted                 | A run that claims a refund it never made is handed to staff                                                                                                                                                                    |
+| A plan change is all or nothing across two systems | The worker is lost between the billing write and the entitlements write, and the retry finishes both; entitlements refuses, and the billing change is undone; the worker is lost during the undo, and it still ends consistent |
+| No customer data in workflow history               | The finished history is searched for the ticket text, name, email and amount                                                                                                                                                   |
+| The audit log is tamper-evident                    | Entries are edited, re-hashed and deleted with full database access                                                                                                                                                            |
 
 These run with a scripted stand-in for the model. They test the system around the model, not the model's judgment.
 
 ## Layout
 
-| Path                     | Contents                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `packages/gateway`       | Provider-neutral model interface and a scripted mock provider                  |
-| `packages/simulator`     | Seeded company, refund scenarios, reference policy, oracle and scenario runner |
-| `packages/db`            | Application database schema, migration and test-database helpers               |
-| `packages/service`       | Shared HTTP conventions: principals, errors, typed clients                     |
-| `services/documents`     | Help-centre documents: ingestion pipeline and permission-aware hybrid search   |
-| `mcp/documents`          | Help-centre search MCP server                                                  |
-| `services/billing`       | Billing system of record: subscriptions, invoices, payments, refunds           |
-| `services/entitlements`  | Entitlements system of record, with versioned writes                           |
-| `infra/compose`          | Local development stack                                                        |
-| `docs/adr`               | Decision records                                                               |
-| `docs/architecture.html` | Architecture diagram                                                           |
+| Path                     | Contents                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `packages/gateway`       | Provider-neutral model interface and a scripted mock provider                          |
+| `packages/simulator`     | Seeded company, refund scenarios, reference policy, oracle and scenario runner         |
+| `packages/db`            | Application database schema, migration and test-database helpers                       |
+| `packages/service`       | Shared HTTP conventions: principals, errors, typed clients                             |
+| `services/documents`     | Help-centre documents: ingestion pipeline and permission-aware hybrid search           |
+| `mcp/documents`          | Help-centre search MCP server                                                          |
+| `mcp/entitlements`       | Entitlements MCP server                                                                |
+| `packages/mcp-server`    | The shared MCP server: per-token tool list, token exchange, no customer id in any tool |
+| `services/billing`       | Billing system of record: subscriptions, invoices, payments, refunds                   |
+| `services/entitlements`  | Entitlements system of record, with versioned writes                                   |
+| `infra/compose`          | Local development stack                                                                |
+| `docs/adr`               | Decision records                                                                       |
+| `docs/architecture.html` | Architecture diagram                                                                   |
 
 ## Decisions
 
@@ -151,6 +155,7 @@ These run with a scripted stand-in for the model. They test the system around th
 - [Run state lives in the database, not in workflow history](docs/adr/0006-run-state-outside-workflow-history.md)
 - [Refund rules are enforced on billing records, not only in the prompt](docs/adr/0007-enforce-refund-rules-on-records.md)
 - [What is in the prompt, what is retrieved, what is remembered](docs/adr/0008-prompt-retrieval-memory.md)
+- [A plan change is one tool and a saga](docs/adr/0009-plan-change-saga.md)
 
 ## Licence
 
