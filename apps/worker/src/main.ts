@@ -58,18 +58,22 @@ async function start() {
     }),
     portalUrl: env("PORTAL_URL"),
   });
-  const mcp = (ref: TicketRef) => ({
-    url: env("BILLING_MCP_URL"),
-    async tokenFor(scope: string) {
-      try {
-        return (await toolTokens.forTool({ ticketId: ref.ticketId, scope })).accessToken;
-      } catch (error) {
-        // The grant does not cover this scope, or no longer holds.
-        if (error instanceof TokenError) return null;
-        throw error;
-      }
-    },
-  });
+  const tokenFor = (ref: TicketRef) => async (scope: string) => {
+    try {
+      return (await toolTokens.forTool({ ticketId: ref.ticketId, scope })).accessToken;
+    } catch (error) {
+      // The grant does not cover this scope, or no longer holds.
+      if (error instanceof TokenError) return null;
+      throw error;
+    }
+  };
+  // The MCP servers the agent may use, and the scopes to try on each.
+  const servers = [
+    { url: env("BILLING_MCP_URL"), scopes: [SCOPES.billingRead, SCOPES.billingRefund] },
+    ...(process.env.DOCUMENTS_MCP_URL
+      ? [{ url: process.env.DOCUMENTS_MCP_URL, scopes: [SCOPES.documentsRead] }]
+      : []),
+  ];
 
   const screenModel = process.env.SCREEN_MODEL;
   const activities = createActivities({
@@ -97,7 +101,7 @@ async function start() {
     // token-scoped path as the agent, with its own fresh read token.
     async invoices(ref) {
       const result = await callMcpTool(
-        mcp(ref),
+        { url: env("BILLING_MCP_URL"), tokenFor: tokenFor(ref) },
         { name: "list_invoices", scope: SCOPES.billingRead },
         {},
       );
@@ -105,10 +109,18 @@ async function start() {
       return (JSON.parse(result.content) as { invoices: InvoiceRecords }).invoices;
     },
     tools: {
-      list: (ref) =>
-        listMcpTools({ ...mcp(ref), scopes: [SCOPES.billingRead, SCOPES.billingRefund] }),
+      async list(ref) {
+        const found = await Promise.all(
+          servers.map((server) => listMcpTools({ ...server, tokenFor: tokenFor(ref) })),
+        );
+        return found.flat();
+      },
       call: (ref, tool, input) =>
-        callMcpTool(mcp(ref), { name: tool.definition.name, scope: tool.scope }, input),
+        callMcpTool(
+          { url: tool.endpoint, tokenFor: tokenFor(ref) },
+          { name: tool.definition.name, scope: tool.scope },
+          input,
+        ),
     },
   });
 

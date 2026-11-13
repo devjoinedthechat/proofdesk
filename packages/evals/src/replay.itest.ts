@@ -4,6 +4,7 @@ import { testPostgresUrl } from "@proofdesk/db";
 import { createReplayProvider } from "@proofdesk/gateway";
 import {
   baseWorld,
+  createDocumentsEnv,
   createSimEnv,
   materialise,
   REFUND_SCENARIOS,
@@ -41,6 +42,7 @@ async function replay(id: string, options: { prompt?: keyof typeof PROMPT_VARIAN
   const system = options.prompt ? PROMPT_VARIANTS[options.prompt] : undefined;
 
   const env = await createSimEnv(testPostgresUrl());
+  const documents = await createDocumentsEnv(testPostgresUrl());
   try {
     return await runScenario(
       env,
@@ -51,8 +53,10 @@ async function replay(id: string, options: { prompt?: keyof typeof PROMPT_VARIAN
         ...effort,
         ...(system ? { system } : {}),
       }),
+      { documents },
     );
   } finally {
+    await documents.dispose();
     await env.dispose();
   }
 }

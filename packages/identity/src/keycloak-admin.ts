@@ -139,6 +139,7 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
   await scope(SCOPES.approvals, true, [audienceMapper(CLIENTS.portal)]);
   await scope(SCOPES.billingRead, true, [audienceMapper(CLIENTS.billingMcp)]);
   await scope(SCOPES.billingRefund, true, [audienceMapper(CLIENTS.billingMcp)]);
+  await scope(SCOPES.documentsRead, true, [audienceMapper(CLIENTS.documentsMcp)]);
 
   await admin.call("POST", `${path}/identity-provider/instances`, {
     alias: GRANT_IDP,
@@ -190,7 +191,12 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
     clientId: CLIENTS.worker,
     secret: options.secrets.worker,
     serviceAccountsEnabled: true,
-    optionalClientScopes: [SCOPES.grantsIssue, SCOPES.billingRead, SCOPES.billingRefund],
+    optionalClientScopes: [
+      SCOPES.grantsIssue,
+      SCOPES.billingRead,
+      SCOPES.billingRefund,
+      SCOPES.documentsRead,
+    ],
     attributes: {
       "oauth2.jwt.authorization.grant.enabled": "true",
       "oauth2.jwt.authorization.grant.idp": GRANT_IDP,

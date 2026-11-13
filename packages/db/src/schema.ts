@@ -97,6 +97,17 @@ export type ApprovalRow = {
 
 export type SpendRow = { key: string; micros: number };
 
+export type MemoryRow = {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  kind: "ticket_summary";
+  sourceTicketId: string;
+  content: unknown;
+  createdAt: Date;
+  expiresAt: Date;
+};
+
 export type AuditLogRow = {
   seq: number;
   tenantId: string;
@@ -120,4 +131,5 @@ export type AppDatabase = {
   agentRuns: AgentRunRow;
   approvals: ApprovalRow;
   spend: SpendRow;
+  memories: MemoryRow;
 };

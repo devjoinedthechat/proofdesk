@@ -16,7 +16,7 @@ type Common = {
   agentPaused: Bool,
 };
 
-action list_invoices, list_subscriptions appliesTo {
+action list_invoices, list_subscriptions, search_help_center appliesTo {
   principal: Agent,
   resource: Ticket,
   context: Common,

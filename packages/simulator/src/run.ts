@@ -1,4 +1,5 @@
-import type { SimEnv } from "./environment.ts";
+import { ingestDocument, searchDocuments } from "@proofdesk/documents";
+import type { DocumentsEnv, SimEnv } from "./environment.ts";
 import { loadWorld } from "./load.ts";
 import type { ApprovalRequest, Scenario, Solver, SolverContext, SolverResult } from "./scenario.ts";
 import { diffSnapshots, takeSnapshot } from "./snapshot.ts";
@@ -35,6 +36,8 @@ export async function runScenario(
      * such as a ticket that was submitted through the real portal.
      */
     prepare?: () => Promise<Partial<SolverContext>>;
+    /** A knowledge base for this run. The solver can then search the help centre. */
+    documents?: DocumentsEnv;
   } = {},
 ): Promise<ScenarioResult> {
   const { expected } = scenario;
@@ -43,6 +46,31 @@ export async function runScenario(
 
   await loadWorld(scenario.added, env.dbs);
   const prepared = (await options.prepare?.()) ?? {};
+
+  const { documents } = options;
+  let extra = 0;
+  for (const document of scenario.documents ?? []) {
+    if (!documents) throw new Error(`Scenario ${scenario.id} needs a knowledge base`);
+    const { bypassScan, ...content } = document;
+    await ingestDocument(
+      {
+        db: documents.ingest,
+        embedder: documents.embedder,
+        clock: () => env.now,
+        newId: (prefix) => `${prefix}_scn${++extra}`,
+        ...(bypassScan ? { unsafeSkipScan: true } : {}),
+      },
+      { ...content, tenantId: scenario.tenant.id },
+    );
+  }
+  const helpCenter = documents
+    ? (query: string) =>
+        searchDocuments(
+          { db: documents.search, embedder: documents.embedder },
+          // A solver acts for the customer, so it searches as the public does.
+          { tenantId: scenario.tenant.id, audience: "public", query, limit: 4 },
+        )
+    : undefined;
   const before = await takeSnapshot(env.dbs);
 
   const clients = env.clientsFor({
@@ -65,6 +93,7 @@ export async function runScenario(
         approvalRequests.push(request);
         return scenario.staffDecision ?? "rejected";
       },
+      ...(helpCenter ? { helpCenter } : {}),
       ...prepared,
     });
   } catch (error) {

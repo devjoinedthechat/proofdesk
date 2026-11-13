@@ -15,6 +15,8 @@ export const CLIENTS = {
   billingMcp: "billing-mcp",
   /** The billing service, as a token audience. Only the MCP server can obtain it. */
   billingApi: "billing-api",
+  /** The help-centre search MCP server, as a token audience. */
+  documentsMcp: "documents-mcp",
 } as const;
 
 /** The identity provider through which Keycloak trusts signed ticket grants. */
@@ -26,6 +28,7 @@ export const SCOPES = {
   approvals: "approvals",
   billingRead: "billing:read",
   billingRefund: "billing:refund",
+  documentsRead: "documents:read",
 } as const;
 
 export function realmIssuer(keycloakUrl: string, realm: string = REALM): string {

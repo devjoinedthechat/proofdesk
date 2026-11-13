@@ -1,7 +1,9 @@
 import type { BillingClient } from "@proofdesk/billing";
 import type { CustomerRow, TenantRow, TicketRow } from "@proofdesk/db";
+import type { SearchHit } from "@proofdesk/documents";
 import type { EntitlementsClient } from "@proofdesk/entitlements";
 import { ScenarioBuilder } from "./builder.ts";
+import type { KnowledgeDocument } from "./knowledge.ts";
 import type { PlannedRefund, ReasonCode, RefundIntent } from "./refund-policy.ts";
 import type { World } from "./world.ts";
 
@@ -71,6 +73,17 @@ export type ScenarioCase = {
   /** How staff answer an approval request in this scenario. */
   staffDecision?: "approved" | "rejected";
   attack?: Attack;
+  /**
+   * Help-centre questions a careful agent would look up for this ticket, each
+   * with a phrase from the passage that answers it. The oracle uses them, and
+   * so proves the answer can be found by search.
+   */
+  lookups?: { query: string; phrase: string }[];
+  /** Extra documents present in the knowledge base for this scenario. */
+  documents?: (Omit<KnowledgeDocument, "tenant"> & {
+    /** Puts the document in the index even if the ingestion scan would hold it back. */
+    bypassScan?: boolean;
+  })[];
   expected: Expected;
 };
 
@@ -107,6 +120,8 @@ export type SolverContext = {
   billing: BillingClient;
   entitlements: EntitlementsClient;
   requestApproval(request: ApprovalRequest): Promise<"approved" | "rejected">;
+  /** Searches the tenant's public help centre. Absent when the run has no knowledge base. */
+  helpCenter?: (query: string) => Promise<SearchHit[]>;
 };
 
 /** `reasonCode` is free text here: a solver may give a reason the reference policy does not have. */

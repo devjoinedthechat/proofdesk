@@ -15,7 +15,15 @@ import {
   ticketMessage,
   withIdempotencyKey,
 } from "@proofdesk/agent";
-import { type AppDatabase, appendAudit, type TicketStatus, withRowScope } from "@proofdesk/db";
+import {
+  type AppDatabase,
+  appendAudit,
+  describeMemory,
+  recallMemories,
+  rememberTicket,
+  type TicketStatus,
+  withRowScope,
+} from "@proofdesk/db";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
 import {
   type InvoiceRecords,
@@ -169,8 +177,15 @@ export function createActivities(deps: ActivityDeps) {
       const { ticket } = await tenantFacts(ref);
       const tools = await deps.tools.list(ref);
       const now = deps.clock();
+      // What the system recorded about this customer's earlier tickets.
+      const memories = await recallMemories(deps.db, ref, { now, excludeTicketId: ref.ticketId });
       const state = initialState(
-        ticketMessage({ now: ticket.createdAt, subject: ticket.subject, body: ticket.body }),
+        ticketMessage({
+          now: ticket.createdAt,
+          subject: ticket.subject,
+          body: ticket.body,
+          history: memories.map(describeMemory),
+        }),
       );
       const created = await withRowScope(deps.db, scope(ref), (trx) =>
         trx
@@ -397,6 +412,25 @@ export function createActivities(deps: ActivityDeps) {
           .executeTakeFirst(),
       );
       if (updated) {
+        // The memory of this ticket is computed from what happened. No text
+        // from the ticket or from the model goes into it, so nothing a
+        // customer writes can plant a "fact" for next time.
+        const { ticket } = await tenantFacts(ref);
+        await rememberTicket(deps.db, ref, {
+          id: `mem_${ref.ticketId}`,
+          ticketId: ref.ticketId,
+          now: deps.clock(),
+          summary: {
+            category: ticket.category,
+            outcome: final.outcome,
+            reasonCode: final.reasonCode,
+            refundedCents: refundsMade(state.toolCalls).reduce(
+              (sum, refund) => sum + refund.amountCents,
+              0,
+            ),
+            closedAt: deps.clock().toISOString(),
+          },
+        });
         await audit(ref, "run_finished", {
           outcome: final.outcome,
           reasonCode: final.reasonCode,

@@ -10,6 +10,7 @@ import {
 } from "@proofdesk/policy";
 import {
   ADVERSARIAL_SCENARIOS,
+  KNOWLEDGE_SCENARIOS,
   prepareTemplates,
   REFUND_SCENARIOS,
   type ScenarioSpec,
@@ -61,6 +62,7 @@ if (promptName && !promptSystem) fail(`Unknown prompt "${promptName}"`);
 const SUITES: Record<string, ScenarioSpec[]> = {
   refund: REFUND_SCENARIOS,
   adversarial: ADVERSARIAL_SCENARIOS,
+  knowledge: KNOWLEDGE_SCENARIOS,
 };
 const suiteName = values.suite ?? "refund";
 const suiteSpecs = SUITES[suiteName] ?? fail(`Unknown suite "${suiteName}"`);

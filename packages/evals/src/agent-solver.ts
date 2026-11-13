@@ -10,6 +10,7 @@ import {
 } from "@proofdesk/agent";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
+import { SEARCH_TOOL, toToolResult } from "@proofdesk/mcp-documents";
 import { createToolPolicy, policyAuthorizer, type ToolPolicy } from "@proofdesk/policy";
 import { ServiceApiError } from "@proofdesk/service";
 import type { Solver, SolverContext } from "@proofdesk/simulator";
@@ -44,6 +45,32 @@ export function directBillingTools(context: SolverContext): AgentTool[] {
 
 const productionPolicy = createToolPolicy();
 
+/** The help-centre search, called on the simulation's knowledge base without the MCP hop. */
+export function directHelpCenterTool(context: SolverContext): AgentTool[] {
+  const { helpCenter } = context;
+  if (!helpCenter) return [];
+  return [
+    {
+      definition: {
+        name: SEARCH_TOOL.name,
+        description: SEARCH_TOOL.description,
+        inputSchema: z.toJSONSchema(SEARCH_TOOL.input) as Record<string, unknown>,
+      },
+      writes: false,
+      async call(input) {
+        const parsed = SEARCH_TOOL.input.safeParse(input);
+        if (!parsed.success) {
+          return { content: JSON.stringify({ error: { code: "invalid_input" } }), isError: true };
+        }
+        return {
+          content: JSON.stringify(toToolResult(await helpCenter(parsed.data.query))),
+          isError: false,
+        };
+      },
+    },
+  ];
+}
+
 export type AgentSolverOptions = {
   gateway: ModelProvider;
   model: string;
@@ -68,7 +95,10 @@ export type AgentSolverOptions = {
 export function createAgentSolver(options: AgentSolverOptions): Solver {
   return async (context) => {
     const { tenant, ticket } = context;
-    const tools = await (options.tools ?? directBillingTools)(context);
+    const tools = [
+      ...(await (options.tools ?? directBillingTools)(context)),
+      ...directHelpCenterTool(context),
+    ];
 
     const result = await runAgent({
       model: options.model,

@@ -1,0 +1,26 @@
+{
+  "name": "@proofdesk/mcp-documents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@proofdesk/db": "workspace:*",
+    "@proofdesk/documents": "workspace:*",
+    "@proofdesk/identity": "workspace:*",
+    "@proofdesk/service": "workspace:*",
+    "kysely": "0.29.8",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@proofdesk/agent": "workspace:*",
+    "@proofdesk/portal": "workspace:*",
+    "@proofdesk/simulator": "workspace:*"
+  }
+}

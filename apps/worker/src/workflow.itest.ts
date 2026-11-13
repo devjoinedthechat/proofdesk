@@ -5,6 +5,7 @@ import {
   asRole,
   connect,
   DB_ROLES,
+  purgeExpiredMemories,
   TEST_ROLE_PASSWORD,
   testPostgresUrl,
   verifyAudit,
@@ -82,6 +83,7 @@ async function setup(target: Scenario, steps: MockStep[]) {
     },
     writes: tool.writes,
     scope: tool.scope,
+    endpoint: "direct",
   }));
 
   const activities = createActivities({
@@ -601,5 +603,160 @@ describe("ticket screening", () => {
       suspicious: true,
       signals: ["claims_prior_approval_or_exception"],
     });
+  }, 60_000);
+});
+
+describe("memory across tickets", () => {
+  const refuse = () => [
+    call("resolve_ticket", {
+      outcome: "refused",
+      reasonCode: "outside_window",
+      reply: "That charge is too old to refund.",
+    }),
+  ];
+
+  /** A second ticket from the same customer, written straight into the database. */
+  async function secondTicket(run: Setup, id: string) {
+    const first = await run.ticket();
+    await run.env.dbs.app
+      .insertInto("tickets")
+      .values({
+        ...first,
+        id,
+        status: "open",
+        outcome: null,
+        reasonCode: null,
+        reply: null,
+        resolvedAt: null,
+      })
+      .execute();
+    return { ...run.ref, ticketId: id };
+  }
+
+  it("stores a summary with an owner, a source and an expiry, and none of the ticket's words", async () => {
+    const target = scenario("refund-pressure-outside-window");
+    const run = await setup(target, refuse());
+    const { activities, ref } = run;
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.finishRun(ref);
+
+    const [memory] = await run.env.dbs.app.selectFrom("memories").selectAll().execute();
+    expect(memory).toMatchObject({
+      tenantId: ref.tenantId,
+      customerId: ref.customerId,
+      sourceTicketId: ref.ticketId,
+      kind: "ticket_summary",
+      content: {
+        category: "refund",
+        outcome: "refused",
+        reasonCode: "outside_window",
+        refundedCents: 0,
+      },
+    });
+    const lifetimeDays =
+      ((memory?.expiresAt.getTime() ?? 0) - (memory?.createdAt.getTime() ?? 0)) / 86_400_000;
+    expect(lifetimeDays).toBe(365);
+    // The ticket claims a manager promised the refund. That claim is not a fact and is not kept.
+    const stored = JSON.stringify(memory?.content);
+    for (const words of ["promised", "lawyer", "manager", target.ticket.subject]) {
+      expect(stored).not.toContain(words);
+    }
+    expect(Object.keys(memory?.content as object).sort()).toEqual([
+      "category",
+      "closedAt",
+      "outcome",
+      "reasonCode",
+      "refundedCents",
+    ]);
+  }, 60_000);
+
+  it("shows the next ticket what happened on the last one, as the system's record", async () => {
+    const run = await setup(scenario("refund-outside-window"), [...refuse(), ...refuse()]);
+    const { activities, ref } = run;
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.finishRun(ref);
+
+    const next = await secondTicket(run, "tkt_second");
+    await activities.startRun(next);
+    await activities.modelTurn({ ref: next, step: 0 });
+
+    const firstMessage = (index: number) => {
+      const block = run.provider.calls[index]?.request.messages[0]?.content[0];
+      return block?.type === "text" ? block.text : "";
+    };
+    expect(firstMessage(0)).not.toContain("Earlier tickets");
+    expect(firstMessage(1)).toContain("Earlier tickets from this customer, from our own records");
+    expect(firstMessage(1)).toContain(
+      "refund ticket, outcome refused (outside_window), nothing refunded.",
+    );
+  }, 60_000);
+
+  it("leaves out expired memories and other customers' memories", async () => {
+    const run = await setup(scenario("refund-outside-window"), refuse());
+    const { activities, ref } = run;
+    const stranger = await run.env.dbs.app
+      .selectFrom("customers")
+      .selectAll()
+      .where("tenantId", "=", ref.tenantId)
+      .where("id", "!=", ref.customerId)
+      .executeTakeFirstOrThrow();
+    const strangersTicket = await run.env.dbs.app
+      .selectFrom("tickets")
+      .select("id")
+      .where("customerId", "=", stranger.id)
+      .executeTakeFirst();
+    const old = new Date(run.env.now.getTime() - 400 * 86_400_000);
+    const content = JSON.stringify({
+      category: "refund",
+      outcome: "refunded",
+      reasonCode: "within_window",
+      refundedCents: 999,
+      closedAt: old.toISOString(),
+    });
+    const first = await run.ticket();
+    await run.env.dbs.app
+      .insertInto("tickets")
+      .values({ ...first, id: "tkt_old", status: "resolved" })
+      .execute();
+    await run.env.dbs.app
+      .insertInto("memories")
+      .values([
+        {
+          id: "mem_expired",
+          tenantId: ref.tenantId,
+          customerId: ref.customerId,
+          kind: "ticket_summary",
+          sourceTicketId: "tkt_old",
+          content,
+          createdAt: old,
+          expiresAt: new Date(run.env.now.getTime() - 86_400_000),
+        },
+        ...(strangersTicket
+          ? [
+              {
+                id: "mem_stranger",
+                tenantId: ref.tenantId,
+                customerId: stranger.id,
+                kind: "ticket_summary" as const,
+                sourceTicketId: strangersTicket.id,
+                content,
+                createdAt: run.env.now,
+                expiresAt: new Date(run.env.now.getTime() + 86_400_000),
+              },
+            ]
+          : []),
+      ])
+      .execute();
+
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+
+    const block = run.provider.calls[0]?.request.messages[0]?.content[0];
+    expect(block?.type === "text" ? block.text : "").not.toContain("Earlier tickets");
+    expect(await purgeExpiredMemories(run.env.dbs.app, run.env.now)).toBe(1);
   }, 60_000);
 });

@@ -17,6 +17,7 @@
     "@proofdesk/gateway": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/mcp-billing": "workspace:*",
+    "@proofdesk/mcp-documents": "workspace:*",
     "@proofdesk/policy": "workspace:*",
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",

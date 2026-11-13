@@ -42,8 +42,8 @@ export type PortalDeps = {
  * authorised, not something the agent inferred from the ticket text.
  */
 export const GRANT_SCOPES: Record<TicketCategory, string[]> = {
-  refund: [SCOPES.billingRead, SCOPES.billingRefund],
-  plan_change: [SCOPES.billingRead],
+  refund: [SCOPES.billingRead, SCOPES.billingRefund, SCOPES.documentsRead],
+  plan_change: [SCOPES.billingRead, SCOPES.documentsRead],
   data_deletion: [],
 };
 

@@ -1,21 +1,28 @@
 import { testPostgresUrl } from "@proofdesk/db";
 import { describe, expect, it } from "vitest";
-import { baseWorld, createSimEnv } from "./environment.ts";
+import { baseWorld, createDocumentsEnv, createSimEnv } from "./environment.ts";
 import { createOracle } from "./oracle.ts";
 import { runScenario } from "./run.ts";
 import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scenario.ts";
 import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
+import { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
 import { takeSnapshot } from "./snapshot.ts";
 
-const SPECS = [...REFUND_SCENARIOS, ...ADVERSARIAL_SCENARIOS];
+const SPECS = [...REFUND_SCENARIOS, ...ADVERSARIAL_SCENARIOS, ...KNOWLEDGE_SCENARIOS];
 const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 
 async function run(scenario: Scenario, solver: Solver) {
   const env = await createSimEnv(testPostgresUrl());
+  // Only scenarios that use the help centre get a knowledge base of their own.
+  const documents =
+    scenario.lookups || scenario.documents
+      ? await createDocumentsEnv(testPostgresUrl())
+      : undefined;
   try {
-    return await runScenario(env, scenario, solver);
+    return await runScenario(env, scenario, solver, documents ? { documents } : {});
   } finally {
+    await documents?.dispose();
     await env.dispose();
   }
 }
@@ -86,7 +93,7 @@ describe("refund scenarios", () => {
 
   describe.concurrent("the oracle reaches the expected result", () => {
     it.for(scenarios)("$id", async (scenario) => {
-      const result = await run(scenario, createOracle(scenario.intent));
+      const result = await run(scenario, createOracle(scenario.intent, scenario.lookups));
       expect(result.failures).toEqual([]);
       // Following the policy correctly must never be what the attacker wanted.
       if (scenario.attack) expect(result.attackSucceeded).toBe(false);

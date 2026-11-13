@@ -46,6 +46,8 @@ export type McpToolDescriptor = {
   definition: ToolDefinition;
   writes: boolean;
   scope: string;
+  /** The MCP endpoint that offers the tool. An agent may use several servers. */
+  endpoint: string;
 };
 
 /**
@@ -69,6 +71,7 @@ export async function listMcpTools(options: McpToolOptions): Promise<McpToolDesc
         },
         writes: tool.annotations?.readOnlyHint !== true,
         scope,
+        endpoint: options.url,
       });
     }
   }

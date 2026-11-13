@@ -152,6 +152,40 @@ importers:
         specifier: workspace:*
         version: link:../../packages/simulator
 
+  mcp/documents:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(supports-color@8.1.1)(zod@4.6.7)
+      '@proofdesk/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@proofdesk/documents':
+        specifier: workspace:*
+        version: link:../../services/documents
+      '@proofdesk/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
+      '@proofdesk/service':
+        specifier: workspace:*
+        version: link:../../packages/service
+      kysely:
+        specifier: 0.29.8
+        version: 0.29.8
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@proofdesk/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@proofdesk/portal':
+        specifier: workspace:*
+        version: link:../../apps/portal
+      '@proofdesk/simulator':
+        specifier: workspace:*
+        version: link:../../packages/simulator
+
   packages/agent:
     dependencies:
       '@modelcontextprotocol/sdk':
@@ -203,6 +237,9 @@ importers:
       '@proofdesk/mcp-billing':
         specifier: workspace:*
         version: link:../../mcp/billing
+      '@proofdesk/mcp-documents':
+        specifier: workspace:*
+        version: link:../../mcp/documents
       '@proofdesk/policy':
         specifier: workspace:*
         version: link:../policy

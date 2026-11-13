@@ -12,21 +12,21 @@ The second half of this report does not depend on the embedder at all.
 
 28 questions with a known answer passage, across two tenants and two audiences. A question counts as answered at rank k if the passage holding the answer is among the first k results.
 
-| Ranking | Answered at 1 | Answered at 3 | Answered at 5 |
-| --- | --- | --- | --- |
-| Hybrid (default) | 20 | 23 | 25 |
-| Vector only | 19 | 21 | 24 |
-| Full-text only | 20 | 20 | 22 |
+| Ranking          | Answered at 1 | Answered at 3 | Answered at 5 |
+| ---------------- | ------------- | ------------- | ------------- |
+| Hybrid (default) | 20            | 23            | 25            |
+| Vector only      | 19            | 21            | 24            |
+| Full-text only   | 20            | 20            | 22            |
 
 Hybrid is at least as good as either signal alone at every depth.
 
 ### By how the question is worded
 
-| Wording | Questions | Hybrid, answered at 5 |
-| --- | --- | --- |
-| Uses the passage's own words | 14 | 14 |
-| Hinges on one exact term, such as "SAML" | 3 | 3 |
-| Paraphrase that avoids the passage's words | 11 | 8 |
+| Wording                                    | Questions | Hybrid, answered at 5 |
+| ------------------------------------------ | --------- | --------------------- |
+| Uses the passage's own words               | 14        | 14                    |
+| Hinges on one exact term, such as "SAML"   | 3         | 3                     |
+| Paraphrase that avoids the passage's words | 11        | 8                     |
 
 **Every miss is a paraphrase.** "Where do I send a customer who says they will take us to court?" does not find the passage about "legal threats", because no word matches. This is the gap a real embedding model exists to close, and the place to look first once one is connected.
 
@@ -38,11 +38,11 @@ The benchmark: 12,000 chunks in one index, with one tenant owning a share of the
 
 ### What Postgres does by itself
 
-| Tenant's share | Plan chosen | Found of true top 10 |
-| --- | --- | --- |
-| 50% | Vector index | 100% |
-| 10% | Exact sort of the tenant's rows | 100% |
-| 1% | Exact sort of the tenant's rows | 100% |
+| Tenant's share | Plan chosen                     | Found of true top 10 |
+| -------------- | ------------------------------- | -------------------- |
+| 50%            | Vector index                    | 100%                 |
+| 10%            | Exact sort of the tenant's rows | 100%                 |
+| 1%             | Exact sort of the tenant's rows | 100%                 |
 
 When the tenant's share is small, the planner skips the vector index, reads that tenant's rows through an ordinary index, and sorts them exactly. At this size that is both correct and fast.
 
@@ -50,11 +50,11 @@ When the tenant's share is small, the planner skips the vector index, reads that
 
 On a table too large to sort, the planner will use the vector index. Forcing that here shows what is waiting:
 
-| Tenant's share | Plain index scan | With iterative scan |
-| --- | --- | --- |
-| 50% | 100% found, 10 results | 100% found, 10 results |
-| 10% | 43% found, 4.3 results | 100% found, 10 results |
-| 1% | 3.5% found, 0.35 results | 98% found, 10 results |
+| Tenant's share | Plain index scan         | With iterative scan    |
+| -------------- | ------------------------ | ---------------------- |
+| 50%            | 100% found, 10 results   | 100% found, 10 results |
+| 10%            | 43% found, 4.3 results   | 100% found, 10 results |
+| 1%             | 3.5% found, 0.35 results | 98% found, 10 results  |
 
 - **Without iterative scan, a small tenant gets almost nothing.** At a 1% share the search returns fewer than one result on average.
 - **With it, the index keeps scanning until enough permitted rows are found.** Recall returns to 98% or better.

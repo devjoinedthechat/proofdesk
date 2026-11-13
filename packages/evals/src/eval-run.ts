@@ -12,6 +12,7 @@ import {
 import type { ToolPolicy } from "@proofdesk/policy";
 import {
   baseWorld,
+  createDocumentsEnv,
   createSimEnv,
   materialise,
   REFUND_SCENARIOS,
@@ -172,8 +173,10 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
 
     const started = Date.now();
     const env = await createSimEnv(options.postgresUrl);
+    // Every attempt gets the help centre, as the agent has in production.
+    const documents = await createDocumentsEnv(options.postgresUrl);
     try {
-      const result = await runScenario(env, scenario, solver);
+      const result = await runScenario(env, scenario, solver, { documents });
       record.passed = result.passed;
       record.failures = result.failures;
       record.actual = result.result ?? null;
@@ -188,6 +191,7 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
       record.error = error instanceof Error ? error.message : String(error);
       record.failures = [`run error: ${record.error}`];
     } finally {
+      await documents.dispose();
       await env.dispose();
     }
     record.latencyMs = Date.now() - started;

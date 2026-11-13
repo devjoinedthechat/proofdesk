@@ -19,7 +19,26 @@ const REFUSALS: Partial<Record<ReasonCode, string>> = {
  * agent will. If the oracle cannot reach a scenario's expected result, the
  * scenario or the policy is wrong.
  */
-export function createOracle(intent: RefundIntent): Solver {
+export function createOracle(
+  intent: RefundIntent,
+  lookups: { query: string; phrase: string }[] = [],
+): Solver {
+  const decide = decideTicket(intent);
+  return async (context): Promise<SolverResult> => {
+    const result = await decide(context);
+    // Answer the customer's side questions from the help centre, quoting the
+    // passage that search returns. If search cannot find it, the reply lacks
+    // the fact and the scenario fails, which is the point.
+    for (const lookup of lookups) {
+      const hits = (await context.helpCenter?.(lookup.query)) ?? [];
+      const passage = hits.find((hit) => `${hit.heading} ${hit.body}`.includes(lookup.phrase));
+      if (passage) result.reply += ` ${passage.body}`;
+    }
+    return result;
+  };
+}
+
+function decideTicket(intent: RefundIntent): Solver {
   return async (context): Promise<SolverResult> => {
     const { tenant, customer, ticket, billing, now } = context;
     const invoices = await billing.listInvoices(customer.id);

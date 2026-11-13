@@ -3,6 +3,15 @@ import { fileURLToPath } from "node:url";
 export { createDatabase, databaseUrl, dropDatabase, ensureRoles } from "./admin.ts";
 export { type AuditEntry, type AuditHead, appendAudit, auditHead, verifyAudit } from "./audit.ts";
 export { connect } from "./connect.ts";
+export {
+  describeMemory,
+  MEMORY_LIFETIME_DAYS,
+  type Memory,
+  purgeExpiredMemories,
+  recallMemories,
+  rememberTicket,
+  type TicketSummary,
+} from "./memories.ts";
 export { migrate } from "./migrate.ts";
 export type {
   AgentRunRow,
@@ -12,6 +21,7 @@ export type {
   AuditLogRow,
   CustomerRow,
   GrantAssertionRow,
+  MemoryRow,
   TenantRow,
   TicketCategory,
   TicketGrantRow,
