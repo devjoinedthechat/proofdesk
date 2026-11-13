@@ -11,7 +11,11 @@ import { GenericContainer, Wait } from "testcontainers";
  */
 export default async function setup() {
   const [postgres, keycloak, temporal] = await Promise.all([
-    new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17").start(),
+    // Many tests run at once, each on its own databases with its own pools.
+    // The default of 100 connections is not enough for that.
+    new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17")
+      .withCommand(["postgres", "-c", "max_connections=400"])
+      .start(),
     new GenericContainer("quay.io/keycloak/keycloak:26.8.2")
       .withCommand(["start-dev"])
       .withEnvironment({

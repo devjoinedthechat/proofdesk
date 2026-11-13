@@ -1,4 +1,4 @@
-import type { TenantPolicy } from "@proofdesk/agent";
+import { PROMPT_VERSION, type TenantPolicy } from "@proofdesk/agent";
 import {
   type CallRecord,
   createGateway,
@@ -9,6 +9,7 @@ import {
   type PriceTable,
   type Recording,
 } from "@proofdesk/gateway";
+import type { ToolPolicy } from "@proofdesk/policy";
 import {
   baseWorld,
   createSimEnv,
@@ -16,6 +17,7 @@ import {
   REFUND_SCENARIOS,
   runScenario,
   type Scenario,
+  type ScenarioSpec,
 } from "@proofdesk/simulator";
 import { createAgentSolver } from "./agent-solver.ts";
 
@@ -31,7 +33,9 @@ export type RunRecord = {
   stopped: string;
   violations: string[];
   turns: number;
-  toolCalls: { tool: string; verdict: string; failed: boolean }[];
+  toolCalls: { tool: string; verdict: string; failed: boolean; error?: string }[];
+  /** Present for attack scenarios. */
+  attack?: { class: string; technique: string; succeeded: boolean };
   modelCalls: number;
   inputTokens: number;
   outputTokens: number;
@@ -47,6 +51,12 @@ export type EvalResults = {
   model: string;
   effort: Effort | "default";
   prompt: string;
+  /** The version of the production prompt text at the time of the run. */
+  promptVersion: string;
+  /** Which scenarios were run. */
+  suite: string;
+  /** Which policy set was enforced. */
+  policy: string;
   startedAt: string;
   repeats: number;
   scenarios: number;
@@ -70,6 +80,10 @@ export type EvalOptions = {
   /** The most one ticket may spend. */
   perTicketMicros?: number;
   scenarioIds?: string[];
+  /** The scenarios to run. Defaults to the refund suite. */
+  suite?: { name: string; specs: ScenarioSpec[] };
+  /** A different policy set, for measuring what the enforced rules are worth. */
+  policy?: { name: string; policy: ToolPolicy };
   /** A different system prompt, for measuring what a prompt change does. */
   prompt?: { name: string; system: (policy: TenantPolicy) => string };
   /** Filled with every model response of repeat 1, for replay tests. */
@@ -83,9 +97,9 @@ export type EvalOptions = {
  * attempt cost in money, time and turns.
  */
 export async function runEval(options: EvalOptions): Promise<EvalResults> {
-  const scenarios: Scenario[] = REFUND_SCENARIOS.filter(
-    (spec) => !options.scenarioIds || options.scenarioIds.includes(spec.id),
-  ).map((spec) => materialise(spec, baseWorld()));
+  const scenarios: Scenario[] = (options.suite?.specs ?? REFUND_SCENARIOS)
+    .filter((spec) => !options.scenarioIds || options.scenarioIds.includes(spec.id))
+    .map((spec) => materialise(spec, baseWorld()));
 
   const jobs = scenarios.flatMap((scenario) =>
     Array.from({ length: options.repeats }, (_, index) => ({ scenario, repeat: index + 1 })),
@@ -142,6 +156,7 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
       model: options.model,
       ...(options.effort ? { effort: options.effort } : {}),
       ...(options.prompt ? { system: options.prompt.system } : {}),
+      ...(options.policy ? { policy: options.policy.policy } : {}),
       onResult(result, violations) {
         record.stopped = result.stopped;
         record.violations = violations;
@@ -150,6 +165,7 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
           tool: call.tool,
           verdict: call.verdict,
           failed: call.outcome.isError,
+          ...(call.outcome.isError ? { error: call.outcome.content.slice(0, 160) } : {}),
         }));
       },
     });
@@ -161,6 +177,13 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
       record.passed = result.passed;
       record.failures = result.failures;
       record.actual = result.result ?? null;
+      if (scenario.attack && result.attackSucceeded !== undefined) {
+        record.attack = {
+          class: scenario.attack.class,
+          technique: scenario.attack.technique,
+          succeeded: result.attackSucceeded,
+        };
+      }
     } catch (error) {
       record.error = error instanceof Error ? error.message : String(error);
       record.failures = [`run error: ${record.error}`];
@@ -206,6 +229,9 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
     model: options.model,
     effort: options.effort ?? "default",
     prompt: options.prompt?.name ?? "production",
+    promptVersion: PROMPT_VERSION,
+    suite: options.suite?.name ?? "refund",
+    policy: options.policy?.name ?? "production",
     startedAt,
     repeats: options.repeats,
     scenarios: scenarios.length,

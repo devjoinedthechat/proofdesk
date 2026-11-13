@@ -80,23 +80,32 @@ export class ScenarioBuilder {
       canceledAt: status === "canceled" ? daysBefore(this.now, 1) : null,
     };
     this.added.subscriptions.push(row);
-    this.added.entitlements.push({
-      tenantId: customer.tenantId,
-      customerId: customer.id,
-      planCode: plan.code,
-      seats: row.seats,
-      status: status === "canceled" ? "suspended" : "active",
-      version: 1,
-      updatedAt: startedAt,
-      updatedBy: "system:billing-sync",
-    });
+    // A customer has one entitlement, taken from their first subscription.
+    if (!this.added.entitlements.some((entry) => entry.customerId === customer.id)) {
+      this.added.entitlements.push({
+        tenantId: customer.tenantId,
+        customerId: customer.id,
+        planCode: plan.code,
+        seats: row.seats,
+        status: status === "canceled" ? "suspended" : "active",
+        version: 1,
+        updatedAt: startedAt,
+        updatedBy: "system:billing-sync",
+      });
+    }
     return row;
   }
 
   /** An invoice for one period of the subscription. The amount defaults to price times seats. */
   invoice(
     subscription: SubscriptionRow,
-    input: { issuedDaysAgo: number; status?: InvoiceStatus; amountCents?: number },
+    input: {
+      issuedDaysAgo: number;
+      status?: InvoiceStatus;
+      amountCents?: number;
+      /** Text the customer typed at checkout. */
+      reference?: string;
+    },
   ): InvoiceRow {
     const plan = this.#base.plans.find((candidate) => candidate.id === subscription.planId);
     if (!plan) throw new Error(`Subscription ${subscription.id} has no plan`);
@@ -116,6 +125,7 @@ export class ScenarioBuilder {
       periodStart: issuedAt,
       periodEnd: addMonths(issuedAt, plan.billingInterval === "year" ? 12 : 1),
       issuedAt,
+      reference: input.reference ?? null,
     };
     this.added.invoices.push(row);
     return row;

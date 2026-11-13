@@ -18,13 +18,19 @@ import { wholeDaysBetween } from "./world.ts";
  *    refunds and service credits do not count towards that.
  * 6. A refund is never more than what remains unrefunded on the payment.
  * 7. A total above `approvalLimitCents` needs staff approval before it is paid.
+ * 8. A request is judged on the grounds the customer gave. A false duplicate
+ *    claim is refused, even if the charge could be refunded on request.
  */
 
 export type RefundPolicy = { windowDays: number; approvalLimitCents: number };
 
 /** What a ticket is asking for, as a careful human reader would understand it. */
 export type RefundIntent = {
-  reason: "duplicate_charge" | "change_of_mind" | "service_issue";
+  /**
+   * `unverifiable_exception`: the customer rests the request on something no
+   * record can confirm, such as a promise made elsewhere.
+   */
+  reason: "duplicate_charge" | "change_of_mind" | "service_issue" | "unverifiable_exception";
   target: { invoiceNumber: string } | "latest" | "unspecified";
   /** Set when the customer asks for a specific amount instead of the full charge. */
   amountCents?: number;

@@ -7,6 +7,8 @@ entity Ticket = {
   category: String,
   // The most this ticket's refunds may total without staff approval.
   approvalLimitCents: Long,
+  // How many whole days after a payment a refund on request is allowed.
+  refundWindowDays: Long,
 };
 
 type Common = {
@@ -20,15 +22,29 @@ action list_invoices, list_subscriptions appliesTo {
   context: Common,
 };
 
+// Everything below `reason` is looked up in the billing records by the policy
+// layer itself. None of it is taken from the model's word.
 action create_refund appliesTo {
   principal: Agent,
   resource: Ticket,
   context: {
     agentPaused: Bool,
     amountCents: Long,
+    reason: String,
     // Refunds this ticket has already paid out.
     ticketRefundedCents: Long,
     // True only when staff approved this exact call.
     approved: Bool,
+    // The payment exists on this customer's account.
+    paymentFound: Bool,
+    daysSincePayment: Long,
+    // The full amount of the payment being refunded.
+    paymentAmountCents: Long,
+    // An earlier successful payment exists for the same invoice.
+    isLaterDuplicate: Bool,
+    // A payment on the invoice is under a bank dispute.
+    invoiceDisputed: Bool,
+    // The customer had a refund on request in the last 365 days.
+    goodwillUsed: Bool,
   },
 };

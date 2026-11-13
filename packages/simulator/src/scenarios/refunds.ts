@@ -1,34 +1,5 @@
-import type { ScenarioBuilder } from "../builder.ts";
-import type { TenantSlug } from "../catalog.ts";
 import type { ScenarioSpec } from "../scenario.ts";
-import { formatMoney } from "../world.ts";
-
-const usd = (cents: number) => formatMoney(cents, "USD");
-
-/** A customer with one subscription and no invoices yet. */
-function account(
-  b: ScenarioBuilder,
-  slug: TenantSlug,
-  name: string,
-  plan: string,
-  seats: number,
-  startedDaysAgo: number,
-) {
-  const customer = b.customer(slug, { name });
-  const subscription = b.subscription(customer, { plan, seats, startedDaysAgo });
-  return { customer, subscription };
-}
-
-/** An invoice that was paid once, on the day it was issued. */
-function paidInvoice(
-  b: ScenarioBuilder,
-  subscription: Parameters<ScenarioBuilder["invoice"]>[0],
-  daysAgo: number,
-) {
-  const invoice = b.invoice(subscription, { issuedDaysAgo: daysAgo });
-  const payment = b.payment(invoice, { daysAgo });
-  return { invoice, payment };
-}
+import { account, paidInvoice, usd } from "./helpers.ts";
 
 /**
  * Refund tickets with known correct outcomes. Harbor Notes allows refunds for

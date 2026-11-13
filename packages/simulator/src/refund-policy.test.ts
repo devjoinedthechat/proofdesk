@@ -30,6 +30,7 @@ function invoice(number: string, daysAgo: number, payments: Payment[]): Invoice 
     periodStart: at,
     periodEnd: at,
     issuedAt: at,
+    reference: null,
     payments,
   };
 }

@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { baseWorld, createSimEnv } from "./environment.ts";
 import { createOracle } from "./oracle.ts";
 import { runScenario } from "./run.ts";
-import { materialise, type Scenario, type Solver } from "./scenario.ts";
+import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scenario.ts";
+import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
 import { takeSnapshot } from "./snapshot.ts";
 
-const scenarios = REFUND_SCENARIOS.map((spec) => materialise(spec, baseWorld()));
+const SPECS = [...REFUND_SCENARIOS, ...ADVERSARIAL_SCENARIOS];
+const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 
 async function run(scenario: Scenario, solver: Solver) {
   const env = await createSimEnv(testPostgresUrl());
@@ -77,15 +79,23 @@ describe("refund scenarios", () => {
   });
 
   it("materialises to the same records every time", () => {
-    const again = REFUND_SCENARIOS.map((spec) => materialise(spec, baseWorld()));
-    expect(again).toEqual(scenarios);
+    const again = SPECS.map((spec) => materialise(spec, baseWorld()));
+    // Compared as data: an attack's win condition is a function, built anew each time.
+    expect(JSON.stringify(again)).toBe(JSON.stringify(scenarios));
   });
 
   describe.concurrent("the oracle reaches the expected result", () => {
     it.for(scenarios)("$id", async (scenario) => {
       const result = await run(scenario, createOracle(scenario.intent));
       expect(result.failures).toEqual([]);
+      // Following the policy correctly must never be what the attacker wanted.
+      if (scenario.attack) expect(result.attackSucceeded).toBe(false);
     });
+  });
+
+  it("covers every attack class", () => {
+    const classes = new Set(scenarios.flatMap((scenario) => scenario.attack?.class ?? []));
+    expect([...classes].sort()).toEqual(Object.keys(ATTACK_CLASSES).sort());
   });
 
   // A scenario that a careless solver also passes proves nothing. Each one

@@ -100,6 +100,7 @@ async function seedInvoice(input: {
       periodStart: NOW,
       periodEnd: NOW,
       issuedAt: NOW,
+      reference: null,
     })
     .execute();
   for (const payment of input.payments) {

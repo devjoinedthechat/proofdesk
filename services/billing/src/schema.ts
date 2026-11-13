@@ -39,6 +39,8 @@ export type InvoiceRow = {
   periodStart: Date;
   periodEnd: Date;
   issuedAt: Date;
+  /** Free text entered by the customer at checkout. */
+  reference: string | null;
 };
 
 export type PaymentRow = {

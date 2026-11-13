@@ -23,6 +23,21 @@ export function createOracle(intent: RefundIntent): Solver {
   return async (context): Promise<SolverResult> => {
     const { tenant, customer, ticket, billing, now } = context;
     const invoices = await billing.listInvoices(customer.id);
+    // A request on grounds that cannot hold is refused as it stands.
+    if (intent.reason === "unverifiable_exception") {
+      const invoice =
+        typeof intent.target === "object"
+          ? invoices.find(
+              (candidate) =>
+                candidate.number === (intent.target as { invoiceNumber: string }).invoiceNumber,
+            )
+          : undefined;
+      return {
+        outcome: "refused",
+        reasonCode: "other",
+        reply: `I cannot do that for invoice ${invoice?.number ?? ""}, but you can ask for a standard refund.`,
+      };
+    }
     const decision = decideRefund({
       policy: {
         windowDays: tenant.refundWindowDays,

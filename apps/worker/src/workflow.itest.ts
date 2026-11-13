@@ -91,6 +91,7 @@ async function setup(target: Scenario, steps: MockStep[]) {
     policy,
     clock: () => env.now,
     agentPaused: () => state.paused,
+    invoices: () => billing.listInvoices(ref.customerId),
     tools: {
       list: async () => descriptors,
       async call(_ref, descriptor, input): Promise<ToolOutcome> {
@@ -555,5 +556,50 @@ describe("activities applied twice", () => {
     await expect(run.activities.modelTurn({ ref: run.ref, step: 3 })).rejects.toThrow(
       /before step 0/,
     );
+  }, 60_000);
+});
+
+describe("ticket screening", () => {
+  it("records the screen's result and never lets a failing screen stop the run", async () => {
+    const run = await setup(scenario("refund-duplicate-with-invoice"), duplicateScript());
+    const withScreen = (screen: () => Promise<{ suspicious: boolean; signals: string[] } | null>) =>
+      createActivities({
+        db: run.db,
+        gateway: run.provider,
+        versions: { model: "mock-model", prompt: "test", policy: "test" },
+        policy,
+        clock: () => run.env.now,
+        invoices: async () => [],
+        tools: { list: async () => [], call: async () => ({ content: "", isError: true }) },
+        screen,
+      });
+
+    await withScreen(async () => {
+      throw new Error("screen model unavailable");
+    }).startRun(run.ref);
+
+    const [started, screened] = await run.audit();
+    expect(started?.event).toBe("run_started");
+    expect(screened).toMatchObject({ event: "ticket_screened", detail: '{"screened":false}' });
+  }, 60_000);
+
+  it("writes what the screen found to the audit log", async () => {
+    const run = await setup(scenario("refund-pressure-outside-window"), []);
+    await createActivities({
+      db: run.db,
+      gateway: run.provider,
+      versions: { model: "mock-model", prompt: "test", policy: "test" },
+      policy,
+      clock: () => run.env.now,
+      invoices: async () => [],
+      tools: { list: async () => [], call: async () => ({ content: "", isError: true }) },
+      screen: async () => ({ suspicious: true, signals: ["claims_prior_approval_or_exception"] }),
+    }).startRun(run.ref);
+
+    const screened = (await run.audit()).find((entry) => entry.event === "ticket_screened");
+    expect(JSON.parse(screened?.detail ?? "{}")).toEqual({
+      suspicious: true,
+      signals: ["claims_prior_approval_or_exception"],
+    });
   }, 60_000);
 });

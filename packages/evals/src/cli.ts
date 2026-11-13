@@ -2,7 +2,18 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import { ANTHROPIC_PRICES, createAnthropicProvider, type Effort } from "@proofdesk/gateway";
-import { prepareTemplates } from "@proofdesk/simulator";
+import {
+  createToolPolicy,
+  loadPolicies,
+  RECORD_BASED_POLICIES,
+  type ToolPolicy,
+} from "@proofdesk/policy";
+import {
+  ADVERSARIAL_SCENARIOS,
+  prepareTemplates,
+  REFUND_SCENARIOS,
+  type ScenarioSpec,
+} from "@proofdesk/simulator";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { runEval } from "./eval-run.ts";
 import { GATE_SAMPLE, PROMPT_VARIANTS } from "./prompts.ts";
@@ -29,6 +40,8 @@ const { values } = parseArgs({
     out: { type: "string" },
     record: { type: "string" },
     "min-pass-rate": { type: "string" },
+    suite: { type: "string", default: "refund" },
+    policy: { type: "string", default: "production" },
   },
 });
 
@@ -44,6 +57,22 @@ if (!(maxSpend > 0)) fail("--max-spend must be a positive number of dollars");
 const promptName = values.prompt;
 const promptSystem = promptName ? PROMPT_VARIANTS[promptName] : undefined;
 if (promptName && !promptSystem) fail(`Unknown prompt "${promptName}"`);
+
+const SUITES: Record<string, ScenarioSpec[]> = {
+  refund: REFUND_SCENARIOS,
+  adversarial: ADVERSARIAL_SCENARIOS,
+};
+const suiteName = values.suite ?? "refund";
+const suiteSpecs = SUITES[suiteName] ?? fail(`Unknown suite "${suiteName}"`);
+
+// "prompt-only" drops the rules enforced on billing records, leaving them to
+// the model's prompt alone. It exists to measure what that enforcement is worth.
+const POLICIES: Record<string, () => ToolPolicy> = {
+  production: () => createToolPolicy(),
+  "prompt-only": () => createToolPolicy(loadPolicies({ exclude: RECORD_BASED_POLICIES })),
+};
+const policyName = values.policy ?? "production";
+const buildPolicy = POLICIES[policyName] ?? fail(`Unknown policy "${policyName}"`);
 
 const postgres = await new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17").start();
 try {
@@ -65,8 +94,10 @@ try {
       : {}),
     ...(promptName && promptSystem ? { prompt: { name: promptName, system: promptSystem } } : {}),
     ...(recordings ? { recordings } : {}),
+    suite: { name: suiteName, specs: suiteSpecs },
+    policy: { name: policyName, policy: buildPolicy() },
     onProgress(done, total, record) {
-      const mark = record.passed ? "pass" : "FAIL";
+      const mark = `${record.passed ? "pass" : "FAIL"}${record.attack?.succeeded ? " ATTACK-SUCCEEDED" : ""}`;
       const cost = (record.costMicros / 1_000_000).toFixed(4);
       console.log(
         `[${done}/${total}] ${mark} ${record.scenario} #${record.repeat} $${cost} ${record.latencyMs}ms ${record.passed ? "" : record.failures[0]}`,

@@ -2,15 +2,35 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as cedar from "@cedar-policy/cedar-wasm/nodejs";
 import { type Authorize, refundsMade } from "@proofdesk/agent";
+import { type InvoiceRecords, type RefundFacts, refundFacts } from "./facts.ts";
+
+export { type InvoiceRecords, type RefundFacts, refundFacts } from "./facts.ts";
 
 const POLICY_DIR = fileURLToPath(new URL("../policies", import.meta.url));
 
+/**
+ * The refund rules that are enforced on facts from the billing records.
+ * Leaving them out gives the weaker configuration in which those rules exist
+ * only in the model's prompt. That configuration is for measuring what the
+ * enforcement is worth, never for production.
+ */
+export const RECORD_BASED_POLICIES = [
+  "refund-unknown-payment",
+  "refund-disputed",
+  "refund-outside-window",
+  "refund-not-duplicate",
+  "refund-goodwill-used",
+  "refund-large-payment",
+];
+
 /** The policies as shipped: one file per policy, named by the file. */
-export function loadPolicies(directory: string = POLICY_DIR) {
+export function loadPolicies(options: { directory?: string; exclude?: string[] } = {}) {
+  const directory = options.directory ?? POLICY_DIR;
   const policies: Record<string, string> = {};
   for (const file of readdirSync(directory).sort()) {
-    if (file.endsWith(".cedar")) {
-      policies[file.replace(/\.cedar$/, "")] = readFileSync(`${directory}/${file}`, "utf8");
+    const id = file.replace(/\.cedar$/, "");
+    if (file.endsWith(".cedar") && !options.exclude?.includes(id)) {
+      policies[id] = readFileSync(`${directory}/${file}`, "utf8");
     }
   }
   return { schema: readFileSync(`${directory}/schema.cedarschema`, "utf8"), policies };
@@ -29,6 +49,7 @@ export type TicketFacts = {
   id: string;
   category: string;
   approvalLimitCents: number;
+  refundWindowDays: number;
 };
 
 export type ToolRequest = {
@@ -36,9 +57,13 @@ export type ToolRequest = {
   ticket: TicketFacts;
   agentPaused: boolean;
   /** For create_refund. */
-  amountCents?: number;
-  ticketRefundedCents?: number;
-  approved?: boolean;
+  refund?: {
+    amountCents: number;
+    reason: string;
+    ticketRefundedCents: number;
+    approved: boolean;
+    facts: RefundFacts;
+  };
 };
 
 export type PolicyDecision = {
@@ -49,6 +74,20 @@ export type PolicyDecision = {
 };
 
 const REFUND = "create_refund";
+
+/** What the model is told when a policy forbids its call, so it can explain the refusal. */
+const FORBIDDEN_BECAUSE: Record<string, string> = {
+  "agent-paused": "The agent is paused for this company.",
+  "refund-unknown-payment": "That payment is not on this customer's account.",
+  "refund-disputed": "A payment on this invoice is under a bank dispute; staff must handle it.",
+  "refund-outside-window": "The payment is older than the refund window.",
+  "refund-not-duplicate":
+    "That payment is not a duplicate: no earlier successful payment exists for the invoice.",
+  "refund-goodwill-used": "The customer already had a refund on request in the last 12 months.",
+  "refund-over-limit": "The refund total for this ticket is above the approval limit.",
+  "refund-large-payment":
+    "The payment is larger than the approval limit, so any refund against it needs approval.",
+};
 
 /**
  * Decides tool calls with Cedar. A call is allowed only if some policy
@@ -61,10 +100,9 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
 
   function evaluate(request: ToolRequest, approved: boolean) {
     const context: Record<string, cedar.CedarValueJson> = { agentPaused: request.agentPaused };
-    if (request.tool === REFUND) {
-      context.amountCents = request.amountCents ?? 0;
-      context.ticketRefundedCents = request.ticketRefundedCents ?? 0;
-      context.approved = approved;
+    if (request.tool === REFUND && request.refund) {
+      const { facts, ...refund } = request.refund;
+      Object.assign(context, { ...refund, ...facts, approved });
     }
     const answer = cedar.isAuthorized({
       principal: { type: "Agent", id: "agent-worker" },
@@ -80,6 +118,7 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
           attrs: {
             category: request.ticket.category,
             approvalLimitCents: request.ticket.approvalLimitCents,
+            refundWindowDays: request.ticket.refundWindowDays,
           },
           parents: [],
         },
@@ -97,40 +136,39 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
 
   return {
     decide(request: ToolRequest): PolicyDecision {
+      const refund = request.tool === REFUND ? request.refund : undefined;
       if (
         request.tool === REFUND &&
-        (!Number.isSafeInteger(request.amountCents) ||
-          !Number.isSafeInteger(request.ticketRefundedCents ?? 0))
+        (!refund ||
+          !Number.isSafeInteger(refund.amountCents) ||
+          !Number.isSafeInteger(refund.ticketRefundedCents) ||
+          typeof refund.reason !== "string")
       ) {
-        return {
-          decision: "deny",
-          policies: [],
-          reason: "The refund amount is not a whole number of cents.",
-        };
+        return { decision: "deny", policies: [], reason: "The refund request is malformed." };
       }
 
-      const actual = evaluate(request, request.approved === true);
+      const actual = evaluate(request, refund?.approved === true);
       if (actual.allowed) {
         return { decision: "allow", policies: actual.policies, reason: "Permitted." };
       }
       // Would a person's approval change the answer? If so, ask for it.
-      if (request.tool === REFUND && request.approved !== true) {
+      // Approval only lifts the amount limit; every other rule still applies.
+      if (refund && !refund.approved) {
         const withApproval = evaluate(request, true);
         if (withApproval.allowed) {
+          // Everything that forbade the call was a rule approval can lift.
           return {
             decision: "needs_approval",
-            policies: withApproval.policies,
-            reason: "The refund total for this ticket is above the approval limit.",
+            policies: actual.policies,
+            reason: actual.policies.map((id) => FORBIDDEN_BECAUSE[id] ?? id).join(" "),
           };
         }
       }
+      const reasons = actual.policies.map((id) => FORBIDDEN_BECAUSE[id] ?? `Forbidden by ${id}.`);
       return {
         decision: "deny",
         policies: actual.policies,
-        reason:
-          actual.policies.length > 0
-            ? `Forbidden by ${actual.policies.join(", ")}.`
-            : "No policy permits this action.",
+        reason: reasons.length > 0 ? reasons.join(" ") : "No policy permits this action.",
       };
     },
   };
@@ -138,24 +176,48 @@ export function createToolPolicy(set: PolicySet = loadPolicies()) {
 
 export type ToolPolicy = ReturnType<typeof createToolPolicy>;
 
+export type PolicyInputs = {
+  ticket: TicketFacts;
+  now: () => Date;
+  /** The customer's invoices, fetched from billing by the caller, not supplied by the model. */
+  invoices: () => Promise<InvoiceRecords>;
+  agentPaused?: () => boolean;
+};
+
+/** Builds the policy request for one refund call from trusted inputs. */
+export async function refundRequest(
+  inputs: PolicyInputs,
+  input: Record<string, unknown>,
+  ticketRefundedCents: number,
+  approved: boolean,
+): Promise<ToolRequest> {
+  return {
+    tool: REFUND,
+    ticket: inputs.ticket,
+    agentPaused: inputs.agentPaused?.() ?? false,
+    refund: {
+      amountCents: input.amountCents as number,
+      reason: input.reason as string,
+      ticketRefundedCents,
+      approved,
+      facts: refundFacts(await inputs.invoices(), String(input.paymentId), inputs.now()),
+    },
+  };
+}
+
 /**
  * Adapts the policy to the agent loop. What the ticket has refunded so far is
- * taken from the run's own tool results, never from the model.
+ * taken from the run's own tool results, and the facts about the payment from
+ * the billing records. Nothing the policy relies on comes from the model.
  */
-export function policyAuthorizer(
-  policy: ToolPolicy,
-  facts: { ticket: TicketFacts; agentPaused?: () => boolean },
-): Authorize {
-  return (call, history) => {
+export function policyAuthorizer(policy: ToolPolicy, inputs: PolicyInputs): Authorize {
+  return async (call, history) => {
     const refunded = refundsMade(history).reduce((sum, refund) => sum + refund.amountCents, 0);
-    const result = policy.decide({
-      tool: call.tool,
-      ticket: facts.ticket,
-      agentPaused: facts.agentPaused?.() ?? false,
-      ...(call.tool === REFUND
-        ? { amountCents: call.input.amountCents as number, ticketRefundedCents: refunded }
-        : {}),
-    });
+    const request: ToolRequest =
+      call.tool === REFUND
+        ? await refundRequest(inputs, call.input, refunded, false)
+        : { tool: call.tool, ticket: inputs.ticket, agentPaused: inputs.agentPaused?.() ?? false };
+    const result = policy.decide(request);
     return result.decision === "allow"
       ? { decision: "allow" }
       : { decision: result.decision, reason: result.reason };

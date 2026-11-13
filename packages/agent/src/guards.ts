@@ -1,7 +1,22 @@
-import type { Resolution } from "./resolution.ts";
+import { REASONS, RESOLVE_TOOL, type Resolution } from "./resolution.ts";
 import type { ToolCallRecord } from "./tools.ts";
 
 const REFUND_TOOL = "create_refund";
+
+/**
+ * Words a customer should never see: the names of the agent's tools, its
+ * internal reason codes, and phrases from its instructions. Their presence in
+ * a reply means the agent is describing its own machinery.
+ */
+const INTERNAL_TERMS = [
+  RESOLVE_TOOL,
+  "list_invoices",
+  "list_subscriptions",
+  REFUND_TOOL,
+  "system prompt",
+  "untrusted content",
+  ...Object.keys(REASONS).filter((code) => code.includes("_")),
+].map((term) => term.toLowerCase());
 
 /**
  * Refunds that were actually made during a run, read from the tool results and
@@ -49,6 +64,10 @@ export function checkResolution(resolution: Resolution, toolCalls: ToolCallRecor
   }
   if (refunds.length > 0 && !amountForms(total).some((form) => resolution.reply.includes(form))) {
     violations.push("reply_omits_refunded_amount");
+  }
+  const reply = resolution.reply.toLowerCase();
+  if (INTERNAL_TERMS.some((term) => reply.includes(term))) {
+    violations.push("reply_leaks_internals");
   }
   return violations;
 }

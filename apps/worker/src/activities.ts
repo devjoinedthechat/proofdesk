@@ -8,6 +8,7 @@ import {
   modelStep,
   type NextCall,
   refundsMade,
+  type Screening,
   settleNext,
   systemPrompt,
   type ToolOutcome,
@@ -16,7 +17,13 @@ import {
 } from "@proofdesk/agent";
 import { type AppDatabase, appendAudit, type TicketStatus, withRowScope } from "@proofdesk/db";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
-import { policyAuthorizer, type ToolPolicy } from "@proofdesk/policy";
+import {
+  type InvoiceRecords,
+  type PolicyInputs,
+  policyAuthorizer,
+  refundRequest,
+  type ToolPolicy,
+} from "@proofdesk/policy";
 import type { Kysely } from "kysely";
 
 /** Identifiers only. This is all that ever travels through the workflow engine. */
@@ -51,6 +58,13 @@ export type ActivityDeps = {
       input: Record<string, unknown>,
     ): Promise<ToolOutcome>;
   };
+  /** The customer's invoices, read by the policy layer itself to judge a refund. */
+  invoices(ref: TicketRef): Promise<InvoiceRecords>;
+  /**
+   * An optional first look at the ticket for signs of manipulation. Its
+   * result is recorded for staff and metrics; it never decides anything.
+   */
+  screen?: (ref: TicketRef, ticket: { subject: string; body: string }) => Promise<Screening | null>;
   /** The kill switch, read at the moment of each tool call. */
   agentPaused?: (tenantId: string) => boolean | Promise<boolean>;
   clock: () => Date;
@@ -181,6 +195,11 @@ export function createActivities(deps: ActivityDeps) {
           tools: tools.map((tool) => tool.definition.name),
           ...deps.versions,
         });
+        if (deps.screen) {
+          // A screen that fails must not hold up the ticket.
+          const screening = await deps.screen(ref, ticket).catch(() => null);
+          await audit(ref, "ticket_screened", screening ?? { screened: false });
+        }
       }
     },
 
@@ -219,12 +238,18 @@ export function createActivities(deps: ActivityDeps) {
     }): Promise<CallOutput> {
       const { ref, step, approval } = input;
       const { ticket, tenant } = await tenantFacts(ref);
-      const facts = {
-        id: ticket.id,
-        category: ticket.category,
-        approvalLimitCents: tenant.refundApprovalLimitCents,
-      };
       const agentPaused = (await deps.agentPaused?.(ref.tenantId)) ?? false;
+      const inputs: PolicyInputs = {
+        ticket: {
+          id: ticket.id,
+          category: ticket.category,
+          approvalLimitCents: tenant.refundApprovalLimitCents,
+          refundWindowDays: tenant.refundWindowDays,
+        },
+        now: deps.clock,
+        invoices: () => deps.invoices(ref),
+        agentPaused: () => agentPaused,
+      };
       const approvalId = `${ref.ticketId}:${step}`;
 
       return advance<CallOutput>(ref, step, async (state, tools) => {
@@ -232,7 +257,7 @@ export function createActivities(deps: ActivityDeps) {
         let next: NextCall = await inspectNext(
           state,
           (name) => byName.has(name),
-          policyAuthorizer(deps.policy, { ticket: facts, agentPaused: () => agentPaused }),
+          policyAuthorizer(deps.policy, inputs),
         );
 
         if (next.kind === "tool" && next.verdict.decision === "needs_approval") {
@@ -292,17 +317,13 @@ export function createActivities(deps: ActivityDeps) {
           // approval as a fact. It cannot override a rule that forbids the
           // call outright, such as the kill switch.
           if (approval.decision === "approved") {
-            const recheck = deps.policy.decide({
-              tool: next.tool,
-              ticket: facts,
-              agentPaused,
-              amountCents: next.input.amountCents as number,
-              ticketRefundedCents: refundsMade(state.toolCalls).reduce(
-                (sum, refund) => sum + refund.amountCents,
-                0,
-              ),
-              approved: true,
-            });
+            const refunded = refundsMade(state.toolCalls).reduce(
+              (sum, refund) => sum + refund.amountCents,
+              0,
+            );
+            const recheck = deps.policy.decide(
+              await refundRequest(inputs, next.input, refunded, true),
+            );
             if (recheck.decision !== "allow") {
               next = { ...next, verdict: { decision: "deny", reason: recheck.reason } };
             }

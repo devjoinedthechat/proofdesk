@@ -1,5 +1,5 @@
 import { pathToFileURL } from "node:url";
-import { callMcpTool, listMcpTools } from "@proofdesk/agent";
+import { callMcpTool, listMcpTools, screenTicket } from "@proofdesk/agent";
 import { type AppDatabase, connect } from "@proofdesk/db";
 import {
   ANTHROPIC_PRICES,
@@ -15,7 +15,7 @@ import {
   SCOPES,
   TokenError,
 } from "@proofdesk/identity";
-import { createToolPolicy } from "@proofdesk/policy";
+import { createToolPolicy, type InvoiceRecords } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
@@ -71,6 +71,7 @@ async function start() {
     },
   });
 
+  const screenModel = process.env.SCREEN_MODEL;
   const activities = createActivities({
     db,
     gateway,
@@ -81,6 +82,28 @@ async function start() {
     },
     policy: createToolPolicy(),
     clock: () => new Date(),
+    ...(screenModel
+      ? {
+          screen: (ref: TicketRef, ticket: { subject: string; body: string }) =>
+            screenTicket({
+              gateway,
+              model: screenModel,
+              context: { tenantId: ref.tenantId, ticketId: ref.ticketId },
+              ...ticket,
+            }),
+        }
+      : {}),
+    // The policy layer reads the customer's invoices through the same
+    // token-scoped path as the agent, with its own fresh read token.
+    async invoices(ref) {
+      const result = await callMcpTool(
+        mcp(ref),
+        { name: "list_invoices", scope: SCOPES.billingRead },
+        {},
+      );
+      if (result.isError) throw new Error(`Could not read invoices for policy: ${result.content}`);
+      return (JSON.parse(result.content) as { invoices: InvoiceRecords }).invoices;
+    },
     tools: {
       list: (ref) =>
         listMcpTools({ ...mcp(ref), scopes: [SCOPES.billingRead, SCOPES.billingRefund] }),

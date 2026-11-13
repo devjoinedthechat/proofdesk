@@ -152,6 +152,7 @@ export function generateCompany(options: GenerateOptions): World {
           periodStart,
           periodEnd,
           issuedAt: periodStart,
+          reference: null,
         };
         world.invoices.push(invoice);
 

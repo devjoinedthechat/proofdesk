@@ -58,9 +58,10 @@ export function baseWorld(): World {
 
 function open(urls: Record<"app" | "billing" | "entitlements", string>): Databases {
   return {
-    app: connect<AppDatabase>(urls.app),
-    billing: connect<BillingDatabase>(urls.billing),
-    entitlements: connect<EntitlementsDatabase>(urls.entitlements),
+    // Small pools: many environments exist at once and share one server.
+    app: connect<AppDatabase>(urls.app, { maxConnections: 2 }),
+    billing: connect<BillingDatabase>(urls.billing, { maxConnections: 2 }),
+    entitlements: connect<EntitlementsDatabase>(urls.entitlements, { maxConnections: 2 }),
   };
 }
 
@@ -123,7 +124,9 @@ export async function createSimEnv(
   // The services connect as their own restricted roles, like in production.
   const dbs = open(urls);
   const serviceDbs = {
-    billing: connect<BillingDatabase>(asRole(urls.billing, DB_ROLES.billing, SIM_ROLE_PASSWORD)),
+    billing: connect<BillingDatabase>(asRole(urls.billing, DB_ROLES.billing, SIM_ROLE_PASSWORD), {
+      maxConnections: 3,
+    }),
     entitlements: connect<EntitlementsDatabase>(
       asRole(urls.entitlements, DB_ROLES.entitlements, SIM_ROLE_PASSWORD),
     ),

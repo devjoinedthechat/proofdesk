@@ -35,6 +35,8 @@ export const invoice = z.object({
   periodStart: timestamp,
   periodEnd: timestamp,
   issuedAt: timestamp,
+  /** The customer's own reference for this purchase, as they typed it. */
+  reference: z.string().nullable(),
   payments: z.array(payment),
 });
 

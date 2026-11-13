@@ -140,6 +140,7 @@ export async function listInvoices(
     periodStart: inv.periodStart.toISOString(),
     periodEnd: inv.periodEnd.toISOString(),
     issuedAt: inv.issuedAt.toISOString(),
+    reference: inv.reference,
     payments: payments
       .filter((pay) => pay.invoiceId === inv.id)
       .map((pay) => {

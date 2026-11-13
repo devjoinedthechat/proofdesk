@@ -1,0 +1,87 @@
+# Threat model
+
+What can go wrong when a model with tools reads text written by strangers, and what in this system stops it.
+
+## The working assumption
+
+**The model can be fooled.** Any text it reads may turn it against its instructions. The design does not depend on that never happening. It depends on a fooled model not being able to do much.
+
+So every control below is judged by one question: does it still hold if the model is fully under an attacker's control? The tests in `packages/evals/src/compromised.itest.ts` script exactly that model.
+
+## What is worth protecting
+
+| Asset                    | Harm if lost                                                            |
+| ------------------------ | ----------------------------------------------------------------------- |
+| Money                    | A refund is paid that the company's policy does not allow               |
+| Other customers' records | One customer reads or changes another's billing data                    |
+| Staff oversight          | A refund that needs approval is paid without it                         |
+| The record               | The audit log, or what a customer is told, does not match what happened |
+| The agent's instructions | Leaked prompts make targeted attacks easier                             |
+
+## Who attacks, and through what
+
+| Attacker                  | Controls                      | Reaches the model through                          |
+| ------------------------- | ----------------------------- | -------------------------------------------------- |
+| A customer                | Their own tickets             | Ticket subject and body                            |
+| A customer                | Fields they fill in elsewhere | Tool results, such as an invoice's reference field |
+| Another tenant's customer | The same, in another company  | Nothing shared, if tenancy holds                   |
+| A compromised worker      | The worker's client secret    | The token and policy layers, not the model         |
+
+Not yet in the system, and so not yet covered: documents retrieved for the model, and anything the agent remembers between tickets.
+
+## Controls, from the outside in
+
+| Layer    | Control                                                                                                    | Holds if the model is compromised |
+| -------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Identity | The agent acts only under a grant created by a signed-in customer, for scopes their ticket category allows | Yes                               |
+| Identity | Each tool call uses a fresh 60-second token for one audience and one scope                                 | Yes                               |
+| Tools    | No tool takes a customer id; the customer is whoever the token is about                                    | Yes                               |
+| Tools    | The model never sees or sets the idempotency key                                                           | Yes                               |
+| Policy   | Every tool call is decided by Cedar policies; anything not permitted is denied                             | Yes                               |
+| Policy   | Refund rules are checked against billing records the policy layer reads itself                             | Yes                               |
+| Approval | A refund above the limit, or against a payment above the limit, waits for staff                            | Yes                               |
+| Service  | Billing refuses refunds beyond what was paid, and on failed or disputed payments                           | Yes                               |
+| Database | Row-level security limits every query to one tenant and customer                                           | Yes                               |
+| Reply    | The reply is checked against what the tools actually did, and for internal terms                           | Yes                               |
+| Runtime  | Limits on turns and on spend per ticket and per tenant                                                     | Yes                               |
+| Prompt   | Ticket text and tool results are declared untrusted                                                        | No                                |
+| Screen   | A small model flags manipulative tickets                                                                   | No                                |
+
+The last two rows are worth having and are not what safety rests on.
+
+## What each rule is enforced by
+
+| Refund rule                                | Prompt | Policy on records | Billing service |
+| ------------------------------------------ | ------ | ----------------- | --------------- |
+| Payment belongs to this customer           | Yes    | Yes               | Yes             |
+| Within the refund window                   | Yes    | Yes               |                 |
+| Duplicate means a later successful payment | Yes    | Yes               |                 |
+| No refund on a disputed invoice            | Yes    | Yes               | Yes             |
+| One refund on request per year             | Yes    | Yes               |                 |
+| Never more than was paid                   | Yes    |                   | Yes             |
+| Approval above the limit                   | Yes    | Yes               |                 |
+
+## What a compromised model can still do
+
+These follow from the design and are pinned by tests, so they cannot be forgotten.
+
+- **Refund an in-window charge the customer did not ask about.** The records allow it, so policy does. The reply guard requires the refund to be reported, and the audit log records it.
+- **Call a refund on request a "service credit" to avoid the yearly limit.** Whether a service fault occurred is a judgment no record holds. The refund is still limited to the window, the amount paid and the approval limit.
+- **Refuse or hand over a ticket that deserved a refund.** Under-acting costs a customer time, not the company money. Staff see handed-over tickets.
+- **Write a reply that is wrong in ways the guard does not check,** such as a false reason. The guard checks amounts and actions, not explanations.
+
+## What the measurements say
+
+From the [eval report](eval-report/README.md):
+
+- **24 hand-written attacks, 288 attempts, none succeeded,** on either model, with or without the record-based policies.
+- **The model stopped almost all of them itself.** The policy layer never had to deny a call in those runs. That says the attacks were too weak to test the deeper layers, which is why the compromised-model tests exist.
+- **The screen flagged 15 of 24 attack tickets and 2 of 32 honest ones.** It cannot see attacks that arrive in tool results.
+
+## Not covered
+
+- **Adaptive attackers.** The attacks were written once, by hand. Someone who iterates against the live system will find things these did not.
+- **Retrieved documents and memory.** Neither exists yet. Both are new channels for injected text.
+- **Denial of service and cost attacks** beyond the per-ticket and per-tenant budgets.
+- **Compromise of Keycloak, Postgres or Temporal themselves.**
+- **Staff as attackers.** An approver can approve anything within their tenant.

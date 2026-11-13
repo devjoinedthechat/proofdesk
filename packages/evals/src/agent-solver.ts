@@ -10,7 +10,7 @@ import {
 } from "@proofdesk/agent";
 import type { Effort, ModelProvider } from "@proofdesk/gateway";
 import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
-import { createToolPolicy, policyAuthorizer } from "@proofdesk/policy";
+import { createToolPolicy, policyAuthorizer, type ToolPolicy } from "@proofdesk/policy";
 import { ServiceApiError } from "@proofdesk/service";
 import type { Solver, SolverContext } from "@proofdesk/simulator";
 import { z } from "zod";
@@ -42,13 +42,15 @@ export function directBillingTools(context: SolverContext): AgentTool[] {
   }));
 }
 
-const toolPolicy = createToolPolicy();
+const productionPolicy = createToolPolicy();
 
 export type AgentSolverOptions = {
   gateway: ModelProvider;
   model: string;
   effort?: Effort;
   maxTurns?: number;
+  /** The policy set to enforce. Defaults to the production policies. */
+  policy?: ToolPolicy;
   /** Builds the system prompt. Defaults to the production prompt. */
   system?: (policy: TenantPolicy) => string;
   /** Called with the full result of each run, for metrics. */
@@ -80,12 +82,16 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       }),
       ticket: ticketMessage({ now: context.now, subject: ticket.subject, body: ticket.body }),
       tools: tools.map((tool) => withSystemIdempotency(tool, ticket.id)),
-      authorize: policyAuthorizer(toolPolicy, {
+      authorize: policyAuthorizer(options.policy ?? productionPolicy, {
         ticket: {
           id: ticket.id,
           category: ticket.category,
           approvalLimitCents: tenant.refundApprovalLimitCents,
+          refundWindowDays: tenant.refundWindowDays,
         },
+        now: () => context.now,
+        // The policy layer reads the records itself, on its own connection.
+        invoices: () => context.billing.listInvoices(context.customer.id),
       }),
       requestApproval: (call) => {
         const amountCents = Number(call.input.amountCents);
