@@ -25,7 +25,8 @@
     "local:demo": "scripts/local.sh demo",
     "local:logs": "scripts/local.sh logs",
     "local:down": "scripts/local.sh down",
-    "local:reset": "scripts/local.sh reset"
+    "local:reset": "scripts/local.sh reset",
+    "evals:capture": "node --env-file-if-exists=.env packages/evals/src/capture-cli.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

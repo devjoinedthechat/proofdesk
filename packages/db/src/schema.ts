@@ -149,6 +149,19 @@ export type AlertRow = {
   raisedAt: Date;
 };
 
+/** A member of staff's verdict on a ticket the agent handed over. */
+export type TicketReviewRow = {
+  ticketId: string;
+  tenantId: string;
+  verdict: "agent_right" | "agent_wrong";
+  expectedOutcome: string;
+  expectedReason: string;
+  /** Payment ids and amounts: `{ paymentId, amountCents }[]`. */
+  expectedRefunds: unknown;
+  reviewedBy: string;
+  reviewedAt: Date;
+};
+
 /** One setting of the kill switch: the whole agent, or one tool, for a tenant. */
 export type AgentControlRow = {
   tenantId: string;
@@ -199,6 +212,7 @@ export type AppDatabase = {
   agentRefunds: AgentRefundRow;
   deletionRequests: DeletionRequestRow;
   agentControls: AgentControlRow;
+  ticketReviews: TicketReviewRow;
   rollout: RolloutRow;
   alerts: AlertRow;
   memories: MemoryRow;

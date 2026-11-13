@@ -17,6 +17,7 @@ import {
   type ScenarioSpec,
 } from "@proofdesk/simulator";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import { loadCapturedCases } from "./cases.ts";
 import { runEval } from "./eval-run.ts";
 import { GATE_SAMPLE, PROMPT_VARIANTS } from "./prompts.ts";
 import { toReplayFixture } from "./replay-fixture.ts";
@@ -66,6 +67,8 @@ const SUITES: Record<string, ScenarioSpec[]> = {
   adversarial: ADVERSARIAL_SCENARIOS,
   knowledge: KNOWLEDGE_SCENARIOS,
   plan: PLAN_CHANGE_SCENARIOS,
+  // Cases captured from tickets the agent got wrong and staff reviewed.
+  captured: loadCapturedCases(),
 };
 const suiteName = values.suite ?? "refund";
 const suiteSpecs = SUITES[suiteName] ?? fail(`Unknown suite "${suiteName}"`);

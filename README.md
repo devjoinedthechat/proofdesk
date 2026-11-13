@@ -84,14 +84,15 @@ Rules that matter are enforced on facts the policy layer reads from billing itse
 
 ### Operations
 
-| Property                                           | How the test tries to break it                                                                                                                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A bad build is rolled back without anyone acting   | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back ([test](apps/worker/src/canary.itest.ts))  |
-| The kill switch stops work already in progress     | An operator pauses the agent after the model has read the invoices and before it refunds ([test](apps/worker/src/controls.itest.ts))                                      |
-| One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                             |
-| Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                               |
-| Only the right staff can use the switch            | An approver, a customer and another company's operator each try                                                                                                           |
-| Telemetry carries no customer text                 | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts)) |
+| Property                                           | How the test tries to break it                                                                                                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A bad build is rolled back without anyone acting   | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back ([test](apps/worker/src/canary.itest.ts))                                |
+| The kill switch stops work already in progress     | An operator pauses the agent after the model has read the invoices and before it refunds ([test](apps/worker/src/controls.itest.ts))                                                                    |
+| One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                                                           |
+| Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                                                             |
+| Only the right staff can use the switch            | An approver, a customer and another company's operator each try                                                                                                                                         |
+| Telemetry carries no customer text                 | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts))                               |
+| A failure in production becomes a test             | The agent gives up on a ticket; staff give a verdict; the captured case must fail on giving up, pass on the right action, and hold nothing about the customer ([test](apps/worker/src/review.itest.ts)) |
 
 Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stopping-the-agent.md)).
 
@@ -187,24 +188,24 @@ The systems of record run as a seeded environment, so every ticket has a known c
 
 ## Repository layout
 
-| Path                                                              | Contents                                                                               |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `apps/portal`                                                     | Ticket submission and routing, grants, staff approvals, kill switch, deletion requests |
-| `apps/worker`                                                     | The ticket, deletion and watchdog workflows, and their activities                      |
-| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                                   |
-| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                              |
-| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                                      |
-| `packages/gateway`                                                | Model access: budgets, retries, failover between models, record and replay             |
-| `packages/policy`                                                 | Cedar policies and the facts they are decided on                                       |
-| `packages/identity`                                               | Token verification, grant signing, realm provisioning                                  |
-| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                 |
-| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                  |
-| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                              |
-| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                              |
-| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay                                    |
-| `apps/stack`                                                      | Provisioning and the demo client for the local stack                                   |
-| `infra`                                                           | Compose file and the image every service runs from                                     |
-| `docs`                                                            | Decision records, eval report, threat model                                            |
+| Path                                                              | Contents                                                                                             |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `apps/portal`                                                     | Ticket submission and routing, grants, staff approvals, review queue, kill switch, deletion requests |
+| `apps/worker`                                                     | The ticket, deletion and watchdog workflows, and their activities                                    |
+| `mcp/billing`, `mcp/entitlements`, `mcp/documents`                | MCP servers in front of each service                                                                 |
+| `services/billing`, `services/entitlements`, `services/documents` | The systems of record and the help centre                                                            |
+| `packages/agent`                                                  | Agent loop, prompt, plan-change saga, reply guard                                                    |
+| `packages/gateway`                                                | Model access: budgets, retries, failover between models, record and replay                           |
+| `packages/policy`                                                 | Cedar policies and the facts they are decided on                                                     |
+| `packages/identity`                                               | Token verification, grant signing, realm provisioning                                                |
+| `packages/mcp-server`                                             | Shared MCP server: per-token tool list, token exchange                                               |
+| `packages/db`                                                     | Schema, row-level security helpers, audit log, memory                                                |
+| `packages/telemetry`                                              | Traces and metrics, limited to an allowlist of attributes                                            |
+| `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                            |
+| `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets          |
+| `apps/stack`                                                      | Provisioning and the demo client for the local stack                                                 |
+| `infra`                                                           | Compose file and the image every service runs from                                                   |
+| `docs`                                                            | Decision records, eval report, threat model                                                          |
 
 ## Design decisions
 
@@ -223,6 +224,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 13. [Deletion is a fixed procedure, with no model in it](docs/adr/0013-deletion-without-a-model.md)
 14. [Automation may stop the agent, and only a person may start it](docs/adr/0014-stopping-the-agent.md)
 15. [Telemetry can carry identifiers and numbers, and nothing else](docs/adr/0015-telemetry-without-content.md)
+16. [A failure in production becomes a test](docs/adr/0016-failures-become-tests.md)
 
 ## Scope
 

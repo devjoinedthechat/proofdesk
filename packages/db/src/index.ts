@@ -25,6 +25,7 @@ export type {
   TenantRow,
   TicketCategory,
   TicketGrantRow,
+  TicketReviewRow,
   TicketRoute,
   TicketRow,
   TicketStatus,

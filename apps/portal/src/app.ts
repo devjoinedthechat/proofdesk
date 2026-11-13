@@ -101,6 +101,29 @@ const requestAssertion = z.strictObject({ scope: z.string().min(1).max(100) });
 
 const decideApproval = z.strictObject({ decision: z.enum(["approved", "rejected"]) });
 
+const reviewTicket = z.strictObject({
+  verdict: z.enum(["agent_right", "agent_wrong"]),
+  expectedOutcome: z.enum([
+    "refunded",
+    "plan_changed",
+    "refused",
+    "needs_clarification",
+    "handed_to_staff",
+  ]),
+  /** A reason code, such as `duplicate_charge`. */
+  expectedReason: z.string().regex(/^[a-z][a-z_]{1,60}$/),
+  /** The refunds that should have been made, by payment id. */
+  expectedRefunds: z
+    .array(
+      z.strictObject({
+        paymentId: z.string().regex(/^[A-Za-z0-9_]{3,80}$/),
+        amountCents: z.number().int().positive(),
+      }),
+    )
+    .max(10)
+    .default([]),
+});
+
 const setControl = z.strictObject({
   /** Leave out to pause or resume the whole agent. */
   tool: z
@@ -184,6 +207,86 @@ export function createPortalApp(deps: PortalDeps) {
   }
 
   app.get("/.well-known/jwks.json", (c) => c.json(deps.signer.jwks()));
+
+  // Tickets the agent gave up on, waiting for a person to say what should
+  // have happened. Staff see their own company's tickets and no others.
+  app.get("/staff/review-queue", async (c) => {
+    const staff = await approver(c.req.raw);
+    const rows = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+      trx
+        .selectFrom("tickets as t")
+        .leftJoin("ticketReviews as r", "r.ticketId", "t.id")
+        .select(["t.id", "t.category", "t.subject", "t.body", "t.reasonCode", "t.resolvedAt"])
+        .where("t.outcome", "=", "handed_to_staff")
+        .where("t.category", "<>", "data_deletion")
+        .where("r.ticketId", "is", null)
+        .orderBy("t.resolvedAt")
+        .execute(),
+    );
+    return c.json({
+      tickets: rows.map((row) => ({
+        id: row.id,
+        category: row.category,
+        subject: row.subject,
+        body: row.body,
+        reasonCode: row.reasonCode,
+        resolvedAt: row.resolvedAt?.toISOString() ?? null,
+      })),
+    });
+  });
+
+  // The verdict is fixed words, identifiers and amounts. It is the input to
+  // a new eval case, so it must be exact, and it holds no free text.
+  app.post("/staff/review-queue/:ticketId", async (c) => {
+    const staff = await approver(c.req.raw);
+    const input = await parseBody(c.req.raw, reviewTicket);
+    const ticketId = c.req.param("ticketId");
+    const now = deps.clock();
+
+    await withRowScope(deps.db, { tenantId: staff.tenantId }, async (trx) => {
+      const ticket = await trx
+        .selectFrom("tickets")
+        .select(["id", "outcome"])
+        .where("id", "=", ticketId)
+        .executeTakeFirst();
+      if (!ticket) throw new HttpError(404, "ticket_not_found", "Ticket not found");
+      if (ticket.outcome !== "handed_to_staff") {
+        throw new HttpError(409, "not_in_review", "Only a ticket handed to staff is reviewed");
+      }
+      const existing = await trx
+        .selectFrom("ticketReviews")
+        .select("ticketId")
+        .where("ticketId", "=", ticketId)
+        .executeTakeFirst();
+      if (existing) throw new HttpError(409, "already_reviewed", "This ticket has a verdict");
+      await trx
+        .insertInto("ticketReviews")
+        .values({
+          ticketId,
+          tenantId: staff.tenantId,
+          verdict: input.verdict,
+          expectedOutcome: input.expectedOutcome,
+          expectedReason: input.expectedReason,
+          expectedRefunds: JSON.stringify(input.expectedRefunds),
+          reviewedBy: staff.subject,
+          reviewedAt: now,
+        })
+        .execute();
+    });
+    await appendAudit(deps.db, {
+      tenantId: staff.tenantId,
+      ticketId,
+      at: now,
+      actor: staff.subject,
+      event: "ticket_reviewed",
+      detail: {
+        verdict: input.verdict,
+        expectedOutcome: input.expectedOutcome,
+        expectedReason: input.expectedReason,
+      },
+    });
+    return c.json({ reviewed: true }, 201);
+  });
 
   app.get("/staff/agent-controls", async (c) => {
     const staff = await operator(c.req.raw);
