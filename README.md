@@ -1,4 +1,11 @@
-# Proofdesk
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo-light.svg" alt="" width="112" height="112">
+  </picture>
+</p>
+
+<h1 align="center">Proofdesk</h1>
 
 A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself: it reads the customer's billing records, applies the company's policy, and issues the refund or makes the change. It also carries out data-deletion requests, with no model involved.
 

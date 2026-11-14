@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" width="112" height="112" fill="none" role="img" aria-label="proofdesk">
+  <title>proofdesk</title>
+  <!-- the desk: a support conversation -->
+  <path d="M30 18 H82 A14 14 0 0 1 96 32 V64 A14 14 0 0 1 82 78 H54 L34 96 V78 H30 A14 14 0 0 1 16 64 V32 A14 14 0 0 1 30 18 Z" stroke="#1f2328" stroke-width="6" stroke-linejoin="round"/>
+  <!-- the proof: the action checked out -->
+  <path d="M40 49 L51 60 L73 37" stroke="#15803d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
