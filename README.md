@@ -261,7 +261,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                                        |
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets                      |
 | `infra`                                                           | Compose file, dashboards and the image every service runs from                                                   |
-| `docs`                                                            | Decision records, eval report, threat model, postmortems                                                         |
+| `docs`                                                            | Decision records, eval report, threat model, cut list                                                            |
 
 ## Design decisions
 
@@ -284,7 +284,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 17. [Conversations go to one inspection store, on purpose](docs/adr/0017-one-store-for-conversations.md)
 18. [A ticket is a conversation, and a promise](docs/adr/0018-a-ticket-is-a-conversation-and-a-promise.md)
 
-See also the [postmortems](docs/postmortems/README.md) and [what was left out, and why](docs/cut-list.md).
+See also [what was left out, and why](docs/cut-list.md).
 
 ## Scope
 
