@@ -596,8 +596,29 @@ export function createActivities(deps: ActivityDeps) {
               reply: HANDOVER_REPLY,
             };
 
-      const updated = await withRowScope(deps.db, scope(ref), (trx) =>
-        trx
+      // The memory of this ticket is computed from what happened. No text
+      // from the ticket or from the model goes into it, so nothing a
+      // customer writes can plant a "fact" for next time.
+      const { ticket, tenant } = await tenantFacts(ref);
+      const round = state.followUps?.length ?? 0;
+      const refundedCents = refundsMade(state.toolCalls).reduce(
+        (sum, refund) => sum + refund.amountCents,
+        0,
+      );
+      const finished = {
+        outcome: final.outcome,
+        reasonCode: final.reasonCode,
+        turns: state.turns,
+        toolCalls: state.toolCalls.length,
+        refundedCents,
+        violations,
+      };
+
+      // The ticket closes, its reply joins the thread, and the audit entry
+      // is written in one transaction. A worker lost part-way leaves none of
+      // them, and nobody sees a closed ticket whose record is incomplete.
+      const closed = await withRowScope(deps.db, scope(ref), async (trx) => {
+        const updated = await trx
           .updateTable("tickets")
           .set({
             status: TICKET_STATUS[final.outcome] ?? "handed_to_staff",
@@ -609,31 +630,48 @@ export function createActivities(deps: ActivityDeps) {
           .where("id", "=", ref.ticketId)
           .where("outcome", "is", null)
           .returning("id")
-          .executeTakeFirst(),
-      );
-      if (updated) {
-        // The memory of this ticket is computed from what happened. No text
-        // from the ticket or from the model goes into it, so nothing a
-        // customer writes can plant a "fact" for next time.
-        const { ticket, tenant } = await tenantFacts(ref);
-        const round = state.followUps?.length ?? 0;
-        // The reply joins the ticket's thread. One per round, however often
-        // this step runs.
-        await withRowScope(deps.db, scope(ref), (trx) =>
-          trx
-            .insertInto("ticketMessages")
-            .values({
-              id: `msg_${ref.ticketId}_agent_${round}`,
-              ticketId: ref.ticketId,
-              tenantId: ref.tenantId,
-              customerId: ref.customerId,
-              author: "agent",
-              body: final.reply,
-              createdAt: deps.clock(),
-            })
-            .onConflict((conflict) => conflict.column("id").doNothing())
-            .execute(),
-        );
+          .executeTakeFirst();
+        if (!updated) return false;
+        // One message per round, however often this step runs.
+        await trx
+          .insertInto("ticketMessages")
+          .values({
+            id: `msg_${ref.ticketId}_agent_${round}`,
+            ticketId: ref.ticketId,
+            tenantId: ref.tenantId,
+            customerId: ref.customerId,
+            author: "agent",
+            body: final.reply,
+            createdAt: deps.clock(),
+          })
+          .onConflict((conflict) => conflict.column("id").doNothing())
+          .execute();
+        await rememberTicket(trx, ref, {
+          id: `mem_${ref.ticketId}`,
+          ticketId: ref.ticketId,
+          now: deps.clock(),
+          summary: {
+            category: ticket.category,
+            outcome: final.outcome,
+            reasonCode: final.reasonCode,
+            refundedCents,
+            closedAt: deps.clock().toISOString(),
+          },
+        });
+        await appendAudit(trx, {
+          tenantId: ref.tenantId,
+          ticketId: ref.ticketId,
+          at: deps.clock(),
+          actor: "agent",
+          event: "run_finished",
+          detail: finished,
+        });
+        return true;
+      });
+      if (closed) {
+        if (deps.telemetry) {
+          recordEvent(deps.telemetry, { ...ref, event: "run_finished", detail: finished });
+        }
         deps.inspection?.ticket({
           round,
           tenantId: ref.tenantId,
@@ -647,32 +685,6 @@ export function createActivities(deps: ActivityDeps) {
           versions: { ...deps.versions, promptHash: promptHash(tenant) },
           startedAt: run.createdAt,
           endedAt: deps.clock(),
-        });
-        await rememberTicket(deps.db, ref, {
-          id: `mem_${ref.ticketId}`,
-          ticketId: ref.ticketId,
-          now: deps.clock(),
-          summary: {
-            category: ticket.category,
-            outcome: final.outcome,
-            reasonCode: final.reasonCode,
-            refundedCents: refundsMade(state.toolCalls).reduce(
-              (sum, refund) => sum + refund.amountCents,
-              0,
-            ),
-            closedAt: deps.clock().toISOString(),
-          },
-        });
-        await audit(ref, "run_finished", {
-          outcome: final.outcome,
-          reasonCode: final.reasonCode,
-          turns: state.turns,
-          toolCalls: state.toolCalls.length,
-          refundedCents: refundsMade(state.toolCalls).reduce(
-            (sum, refund) => sum + refund.amountCents,
-            0,
-          ),
-          violations,
         });
       }
       return { outcome: final.outcome, reasonCode: final.reasonCode };

@@ -28,7 +28,7 @@ export async function rememberTicket(
   scope: Required<RowScope>,
   input: { id: string; ticketId: string; summary: TicketSummary; now: Date },
 ): Promise<void> {
-  await withRowScope(db, scope, (trx) =>
+  const write = (trx: Kysely<AppDatabase>) =>
     trx
       .insertInto("memories")
       .values({
@@ -48,8 +48,11 @@ export async function rememberTicket(
           expiresAt: new Date(input.now.getTime() + MEMORY_LIFETIME_DAYS * DAY_MS),
         }),
       )
-      .execute(),
-  );
+      .execute();
+  // Inside a caller's transaction the row scope is already set, and the
+  // write joins that transaction.
+  if (db.isTransaction) await write(db);
+  else await withRowScope(db, scope, write);
 }
 
 /** A customer's unexpired memories, newest first, leaving out one ticket's own. */
