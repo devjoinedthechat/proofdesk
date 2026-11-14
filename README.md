@@ -38,9 +38,9 @@ flowchart LR
 
 ## Walkthrough
 
-[![A customer's request, the agent's question, the customer's answer and the refund](docs/walkthrough/poster.png)](docs/walkthrough/proofdesk-walkthrough.mp4)
+![A customer's request, the agent's question, the answer and the refund; a refund that waits for staff approval; the kill switch](docs/walkthrough/proofdesk-walkthrough.svg)
 
-A [two-minute recording](docs/walkthrough/proofdesk-walkthrough.mp4) of the system running locally with Claude as the agent: a request the agent has to ask about, a refund that waits for staff approval, the kill switch, and the workflow and dashboard screens. [What it shows, and how it was recorded](docs/walkthrough/README.md).
+The system running locally with Claude as the agent: a request the agent has to ask about, a refund that waits for staff approval, and the kill switch. Every picture is the real interface and every reply is the model's. [How it was made](docs/walkthrough/README.md).
 
 ## What it proves
 

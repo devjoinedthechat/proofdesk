@@ -1,213 +1,203 @@
-import { mkdirSync, renameSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { type Browser, type BrowserContext, chromium, type Page } from "playwright-core";
+import { writeFileSync } from "node:fs";
+import { type Browser, chromium, type Locator, type Page } from "playwright-core";
 
-// Records a walkthrough of the running local stack as a series of short
-// videos, one per scene, in a real browser. Start the stack first with
+// Makes the walkthrough in the README: one animated SVG, built from stills of
+// the running local stack taken in a real browser. Start the stack first with
 // `pnpm local:up`, on fresh data (`pnpm local:reset`), with a model key so
 // that the agent's replies are a real model's.
 //
-//   node apps/stack/src/walkthrough.ts <output directory>
+//   node apps/stack/src/walkthrough.ts [output file]
 //
-// The scenes are joined afterwards; see docs/walkthrough/README.md.
+// Each still is the browser window at the moment that matters, scrolled to
+// the part of the page the caption is about. The window is as wide as the
+// page's own column, so nothing is cropped away and nothing is empty.
 
-const OUT = process.argv[2] ?? "walkthrough";
+const OUT = process.argv[2] ?? "docs/walkthrough/proofdesk-walkthrough.svg";
 const PORTAL = "http://localhost:3000";
 const PASSWORD = process.env.DEMO_PASSWORD ?? "local-demo-password";
-const SIZE = { width: 1280, height: 800 };
+const SIZE = { width: 860, height: 600 };
+/** Seconds each still is shown, and how long one fades into the next. */
+const HOLD = 6;
+const FADE = 0.5;
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+type Still = { caption: string; png: Buffer };
+const stills: Still[] = [];
 
-/** A line of text across the bottom of the page, saying what is being shown. */
-async function caption(page: Page, text: string) {
+/** Takes a still with `target` at the top of the window. */
+async function still(page: Page, target: Locator, caption: string) {
+  // Room below the page, so that a short page can still be scrolled to its target.
+  await page.evaluate(`document.body.style.minHeight = "${SIZE.height * 3}px"`);
+  const box = await target.boundingBox();
+  if (!box) throw new Error(`Nothing to show for: ${caption}`);
   // Passed as source text: this file is not compiled against browser types.
-  // The style is set through script, which the page's content security
-  // policy allows.
-  await page.evaluate(`(() => {
-    let bar = document.getElementById("walkthrough-caption");
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "walkthrough-caption";
-      Object.assign(bar.style, {
-        position: "fixed",
-        left: "0",
-        right: "0",
-        bottom: "0",
-        padding: "14px 24px",
-        background: "rgba(16, 18, 22, 0.92)",
-        color: "#ffffff",
-        font: "500 18px/1.4 system-ui, sans-serif",
-        zIndex: "2147483647",
-      });
-      document.body.append(bar);
-    }
-    bar.textContent = ${JSON.stringify(text)};
-  })()`);
+  await page.evaluate(`window.scrollBy(0, ${box.y - 40})`);
+  // Lets the scroll and any transition finish before the picture is taken.
+  await page.waitForTimeout(400);
+  stills.push({ caption, png: await page.screenshot({ type: "png" }) });
+  console.log(`still ${stills.length}: ${caption}`);
 }
 
-let scene = 0;
-/** Runs one scene in its own browser session and saves its recording. */
-async function record(
-  browser: Browser,
-  name: string,
-  run: (page: Page, context: BrowserContext) => Promise<void>,
-) {
+/** Runs one part in its own browser session, as one person. */
+async function as(browser: Browser, email: string, run: (page: Page) => Promise<void>) {
   const context = await browser.newContext({
     viewport: SIZE,
-    // Fixed, so that a recording shows nothing about the machine it was made on.
+    deviceScaleFactor: 2,
+    // Fixed, so that a still shows nothing about the machine it was made on.
     timezoneId: "UTC",
     locale: "en-US",
-    recordVideo: { dir: join(OUT, "raw"), size: SIZE },
   });
   const page = await context.newPage();
   try {
-    await run(page, context);
-    await pause(1200);
+    await page.goto(PORTAL);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.locator('input[name="username"]').fill(email);
+    await page.locator('input[name="password"]').fill(PASSWORD);
+    await page.locator('[type="submit"]').first().click();
+    await page.waitForURL(`${PORTAL}/`);
+    await page.getByText("Signed in as").waitFor();
+    await run(page);
   } finally {
-    const video = page.video();
     await context.close();
-    const file = `${String(++scene).padStart(2, "0")}-${name}.webm`;
-    if (video) renameSync(await video.path(), join(OUT, file));
-    console.log(`recorded ${file}`);
   }
 }
 
-async function signIn(page: Page, email: string, say: string) {
-  await page.goto(PORTAL);
-  await caption(page, say);
-  await pause(1500);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.locator('input[name="username"]').pressSequentially(email, { delay: 25 });
-  await page.locator('input[name="password"]').pressSequentially(PASSWORD, { delay: 15 });
-  await caption(page, "Sign-in happens at Keycloak. The page never sees the password.");
-  await pause(1200);
-  await page.locator('[type="submit"]').first().click();
-  await page.waitForURL(`${PORTAL}/`);
-  await page.getByText("Signed in as").waitFor();
+const section = (page: Page, heading: string) =>
+  page.locator("section", { has: page.getByRole("heading", { name: heading }) });
+const requests = (page: Page) => section(page, "Your requests");
+const requestsHeading = (page: Page) => page.getByRole("heading", { name: "Your requests" });
+
+async function fill(page: Page, subject: string, body: string) {
+  const form = section(page, "New request");
+  await form.locator('input[type="text"]').fill(subject);
+  await form.locator("textarea").fill(body);
+  return form;
 }
 
-async function fileRequest(page: Page, subject: string, body: string) {
-  const form = page.locator("section", { has: page.getByRole("heading", { name: "New request" }) });
-  await form.locator('input[type="text"]').pressSequentially(subject, { delay: 30 });
-  await form.locator("textarea").pressSequentially(body, { delay: 18 });
-  await pause(600);
-  await form.getByRole("button", { name: "Send" }).click();
-}
-
-const requests = (page: Page) =>
-  page.locator("section", { has: page.getByRole("heading", { name: "Your requests" }) });
-
-mkdirSync(OUT, { recursive: true });
-rmSync(join(OUT, "raw"), { recursive: true, force: true });
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 try {
-  await record(browser, "customer-asks-and-answers", async (page) => {
-    await signIn(page, "maya.okafor@example.org", "A customer signs in to file a request.");
-    await caption(page, "The request does not say which charge it is about.");
-    await fileRequest(page, "i want a refund", "i dont like my item i paid 20$ can i have refund");
-    await requests(page).getByText("We asked you a question").waitFor({ timeout: 120_000 });
-    await requests(page).locator(".reply").first().scrollIntoViewIfNeeded();
-    await caption(
+  await as(browser, "maya.okafor@example.org", async (page) => {
+    const form = await fill(
       page,
+      "i want a refund",
+      "i dont like my item i paid 20$ can i have refund",
+    );
+    await still(
+      page,
+      page.locator("header"),
+      "A customer files a request. It does not say which charge it is about.",
+    );
+    await form.getByRole("button", { name: "Send" }).click();
+    await requests(page).getByText("We asked you a question").waitFor({ timeout: 120_000 });
+    await still(
+      page,
+      requestsHeading(page),
       "The agent read the billing records, found no $20 charge, and asked instead of guessing.",
     );
-    await pause(6000);
-    const answer = requests(page).getByPlaceholder("Your answer");
-    await answer.pressSequentially(
-      "Sorry, I meant this month's $87 invoice. It was charged twice, please refund the second payment.",
-      { delay: 18 },
-    );
-    await caption(page, "The customer answers. The same conversation carries on.");
-    await pause(800);
+    await requests(page)
+      .getByPlaceholder("Your answer")
+      .fill(
+        "Sorry, I meant this month's $87 invoice. It was charged twice, please refund the second payment.",
+      );
     await requests(page).getByRole("button", { name: "Reply" }).click();
     await requests(page).getByText("Resolved", { exact: true }).waitFor({ timeout: 120_000 });
-    await requests(page).locator(".reply").last().scrollIntoViewIfNeeded();
-    await caption(
+    await still(
       page,
-      "Policy allowed the refund, billing paid it once, and the reply was checked against what was done.",
+      requestsHeading(page),
+      "The customer answers in the same conversation. The refund is allowed, and paid once.",
     );
-    await pause(6500);
   });
 
-  await record(browser, "large-refund-waits", async (page) => {
-    await signIn(page, "mateus.rocha@example.org", "Another customer, at a second company.");
-    await fileRequest(
+  await as(browser, "mateus.rocha@example.org", async (page) => {
+    const form = await fill(
       page,
       "Annual renewal charged twice",
       "Our renewal was charged to the company card twice, $980.00 each. Please refund the duplicate.",
     );
+    await form.getByRole("button", { name: "Send" }).click();
     await requests(page).getByText("Waiting for our team to approve").waitFor({ timeout: 120_000 });
-    await caption(
+    await still(
       page,
-      "$980 is above this company's limit. The refund is not paid. It waits for a person.",
+      requestsHeading(page),
+      "At a second company, $980 is above the limit. Nothing is paid until a person approves.",
     );
-    await pause(5000);
   });
 
-  await record(browser, "staff-approve", async (page) => {
-    await signIn(page, "approver@tallyfield.example", "A member of staff signs in.");
-    await page.getByRole("heading", { name: "Waiting for approval" }).waitFor();
-    await caption(page, "The staff console: the refund, its amount, and why it needs approval.");
-    await pause(4000);
-    await page.getByRole("button", { name: "Approve" }).first().click();
-    await caption(
+  await as(browser, "approver@tallyfield.example", async (page) => {
+    const waiting = section(page, "Waiting for approval");
+    await waiting.getByRole("button", { name: "Approve" }).first().waitFor();
+    await still(
       page,
-      "Approved. The ticket's workflow has waited for this, however long it took.",
+      page.locator("header"),
+      "The staff console shows the refund, its amount, and why it needs approval.",
     );
+    await waiting.getByRole("button", { name: "Approve" }).first().click();
     await page.getByText("Nothing is waiting.").waitFor({ timeout: 60_000 });
-    await pause(2500);
   });
 
-  await record(browser, "customer-sees-refund", async (page) => {
-    await signIn(page, "mateus.rocha@example.org", "Back as the customer.");
+  await as(browser, "mateus.rocha@example.org", async (page) => {
     await requests(page).getByText("Resolved", { exact: true }).waitFor({ timeout: 120_000 });
-    await requests(page).locator(".reply").last().scrollIntoViewIfNeeded();
-    await caption(page, "The refund was paid after approval, exactly once.");
-    await pause(5000);
+    await still(
+      page,
+      requestsHeading(page),
+      "Approved, then paid exactly once. The ticket's workflow waited for the decision.",
+    );
   });
 
-  await record(browser, "kill-switch", async (page) => {
-    await signIn(page, "operator@harbor.example", "An operator signs in.");
+  await as(browser, "operator@harbor.example", async (page) => {
     await page.getByRole("heading", { name: "Kill switch" }).waitFor();
-    await caption(page, "The kill switch stops the agent at its next step, for this company.");
-    await pause(2500);
-    await page.getByPlaceholder("Reason").pressSequentially("Refunds look wrong", { delay: 30 });
+    await page.getByPlaceholder("Reason").fill("Refunds look wrong");
     await page.getByRole("button", { name: "Pause" }).click();
     await page.getByText("The agent is paused").waitFor();
-    await caption(page, "Paused. A paused agent makes no model calls; its tickets go to staff.");
-    await pause(4000);
+    await still(
+      page,
+      page.locator("header"),
+      "An operator's kill switch stops the agent at its next step. Only a person can resume it.",
+    );
     await page.getByRole("button", { name: "Resume" }).click();
     await page.getByText("The agent is running").waitFor();
-    await caption(
-      page,
-      "Only a person can resume it. Automation can pause the agent, never restart it.",
-    );
-    await pause(3500);
-  });
-
-  await record(browser, "workflows", async (page) => {
-    await page.goto("http://localhost:8233/namespaces/proofdesk/workflows");
-    await page.getByText("ticketWorkflow").first().waitFor({ timeout: 30_000 });
-    await caption(
-      page,
-      "Temporal: each ticket is a durable workflow. A worker can die at any step.",
-    );
-    await pause(5000);
-  });
-
-  // Metrics are exported every ten seconds. Give the last ticket's time to arrive.
-  await pause(25_000);
-  await record(browser, "dashboard", async (page) => {
-    await page.goto("http://localhost:3001/d/proofdesk?kiosk");
-    await page.getByText("Tickets finished").first().waitFor({ timeout: 30_000 });
-    await pause(2500);
-    await caption(
-      page,
-      "Grafana: what the agent did and what it cost. Counts only, no customer text.",
-    );
-    await pause(6000);
   });
 } finally {
   await browser.close();
-  rmSync(join(OUT, "raw"), { recursive: true, force: true });
 }
+
+// ------------------------------------------------------------------ the SVG
+
+const CAPTION = 60;
+const { width, height } = SIZE;
+const total = stills.length * HOLD;
+const percent = (seconds: number) => `${((seconds / total) * 100).toFixed(3)}%`;
+const escapeXml = (text: string) =>
+  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const gap = 6;
+const tick = (width - 48 - gap * (stills.length - 1)) / stills.length;
+const parts = stills.map(({ caption, png }, index) => {
+  const delay = `animation-delay:${index * HOLD}s`;
+  return {
+    image: `<image class="s" style="${delay}" width="${width}" height="${height}" href="data:image/png;base64,${png.toString("base64")}"/>`,
+    caption: `<text class="s c" style="${delay}" x="24" y="${height + 41}">${escapeXml(caption)}</text>`,
+    tick: `<rect class="s" style="${delay}" x="${24 + index * (tick + gap)}" y="${height + 12}" width="${tick}" height="3" rx="1.5" fill="#fff"/>`,
+    track: `<rect x="${24 + index * (tick + gap)}" y="${height + 12}" width="${tick}" height="3" rx="1.5" fill="#fff" opacity=".22"/>`,
+  };
+});
+
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height + CAPTION}" width="${width}" role="img" aria-label="${escapeXml(stills.map((one) => one.caption).join(" "))}">
+<style>
+.s{opacity:0;animation:show ${total}s linear infinite both}
+.c{font:500 16px/1 system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;fill:#fff}
+@keyframes show{0%{opacity:0}${percent(FADE)}{opacity:1}${percent(HOLD)}{opacity:1}${percent(HOLD + FADE)}{opacity:0}100%{opacity:0}}
+</style>
+<clipPath id="frame"><rect width="${width}" height="${height + CAPTION}" rx="10"/></clipPath>
+<g clip-path="url(#frame)">
+<rect width="${width}" height="${height}" fill="#fff"/>
+${parts.map((part) => part.image).join("\n")}
+<rect y="${height}" width="${width}" height="${CAPTION}" fill="#101216"/>
+${parts.map((part) => part.track).join("")}
+${parts.map((part) => part.tick).join("")}
+${parts.map((part) => part.caption).join("\n")}
+</g>
+<rect x=".5" y=".5" width="${width - 1}" height="${height + CAPTION - 1}" rx="10" fill="none" stroke="#8b949e" stroke-opacity=".4"/>
+</svg>
+`;
+writeFileSync(OUT, svg);
+console.log(`wrote ${OUT}: ${stills.length} stills, ${Math.round(svg.length / 1024)} KB`);

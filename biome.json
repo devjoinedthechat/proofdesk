@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**"]
+    "includes": ["**", "!docs/walkthrough/*.svg"]
   },
   "formatter": {
     "indentStyle": "space",
