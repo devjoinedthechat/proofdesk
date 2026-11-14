@@ -424,7 +424,7 @@ function approverView() {
               type: "number",
               min: "1",
               value: String(payment.amountCents),
-              style: "width: 120px",
+              class: "amount",
             });
             return {
               read: () =>

@@ -202,3 +202,7 @@ code {
 .author {
   font-size: 12px;
 }
+
+input.amount {
+  width: 120px;
+}
