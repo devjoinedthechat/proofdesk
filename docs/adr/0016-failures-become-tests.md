@@ -10,7 +10,7 @@ Those failures are the most valuable test cases there are, and they are usually 
 
 ## Decision
 
-A ticket the agent hands to staff goes into a review queue. A member of staff gives a verdict, and one command turns the reviewed ticket into an eval case that runs with the others.
+A ticket the agent hands to staff goes into a review queue, and so does a random share of the tickets it resolved by itself. A member of staff gives a verdict, and one command turns the reviewed ticket into an eval case that runs with the others.
 
 ### The verdict
 
@@ -36,5 +36,5 @@ So a case is written with `textReviewed: false`. A person reads the subject and 
 
 - **It captures refund tickets.** A plan-change case would also need the subscription and entitlement the agent saw.
 - **Staff can be wrong.** A verdict is one person's judgment. A case that contradicts the written policy should change the policy first, or be dropped.
-- **Only handed-over tickets are reviewed.** A ticket the agent resolved wrongly and confidently never enters the queue. Finding those needs sampling of resolved tickets, which is not built.
+- **Confident mistakes are found only by sampling.** A ticket the agent resolved by itself enters the queue only if it falls in the sample: one in ten, chosen by the ticket's id so that neither the agent nor the customer can steer it. A wrong answer outside the sample is not seen.
 - **No screen.** The queue and the verdict are HTTP endpoints.

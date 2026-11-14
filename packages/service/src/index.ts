@@ -20,7 +20,7 @@ export type Authenticate = (request: Request) => Principal | null | Promise<Prin
 
 export type ServiceEnv = { Variables: { principal: Principal } };
 
-type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422;
+type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429;
 
 /** An error with a stable machine-readable code, returned as `{ error: { code, message } }`. */
 export class HttpError extends Error {

@@ -269,6 +269,9 @@ beforeAll(async () => {
     }),
     clock: () => env.now,
     newId: (prefix) => `${prefix}_${randomBytes(6).toString("hex")}`,
+    limits: { ticketsPerHour: 6, openTickets: 5 },
+    // Every ticket the agent resolved by itself is put up for a check here.
+    reviewSamplePercent: 100,
     dispatch: async (job) => {
       if (engineDown) throw new Error("connect ECONNREFUSED: the workflow engine is unreachable");
       return dispatch(job);
@@ -534,4 +537,62 @@ describe("a ticket accepted while the workflow engine is unreachable", () => {
       .execute();
     expect(waiting).toEqual([]);
   });
+});
+
+describe("tickets the agent resolved by itself", () => {
+  it("are put in front of staff as a check, next to the ones it handed over", async () => {
+    const { body } = await as(staff.approver.email, "GET", "/staff/review-queue");
+    const byWhy = (why: string) =>
+      body.tickets.filter((candidate: { why: string }) => candidate.why === why);
+
+    // The refund the agent made after the customer answered, with its reply
+    // and the invoices it read, so a person can judge it.
+    expect(byWhy("sample")).toMatchObject([
+      {
+        outcome: "refunded",
+        reasonCode: "duplicate_charge",
+        reply: "I have refunded $87.00 for the duplicate charge.",
+      },
+    ]);
+    expect(byWhy("sample")[0].invoices.length).toBeGreaterThan(0);
+    expect(byWhy("handed_over").length).toBe(2);
+
+    // A verdict on a sampled ticket is taken like any other.
+    const verdict = await as(
+      staff.approver.email,
+      "POST",
+      `/staff/review-queue/${byWhy("sample")[0].id}`,
+      { verdict: "agent_right", expectedOutcome: "refunded", expectedReason: "duplicate_charge" },
+    );
+    expect(verdict.status).toBe(201);
+  }, 60_000);
+});
+
+describe("one customer asking too much", () => {
+  it("is told to wait, and nobody else is affected", async () => {
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const response = await as(stranger.email, "POST", "/tickets", {
+        category: "refund",
+        subject: `Request ${attempt}`,
+        body: "PLEASE ESCALATE this one.",
+      });
+      statuses.push(response.status);
+      if (response.status === 429) {
+        expect(response.body.error.code).toBe("too_many_requests");
+      }
+    }
+    // Some are accepted, then the limit holds for the rest.
+    expect(statuses.filter((status) => status === 201).length).toBeGreaterThan(0);
+    expect(statuses.filter((status) => status === 201).length).toBeLessThanOrEqual(6);
+    expect(statuses.at(-1)).toBe(429);
+
+    // The limit is per customer. Another customer of the same company files as usual.
+    const other = await as(customer.email, "POST", "/tickets", {
+      category: "refund",
+      subject: "One more",
+      body: "PLEASE ESCALATE this one as well.",
+    });
+    expect(other.status).toBe(201);
+  }, 120_000);
 });

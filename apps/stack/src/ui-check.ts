@@ -70,7 +70,7 @@ async function approver(browser: Browser) {
   for (const heading of [
     "Waiting for approval",
     "Waiting for a reply from staff",
-    "Review what the agent handed over",
+    "Review the agent's work",
   ]) {
     await page.getByRole("heading", { name: heading }).waitFor();
   }

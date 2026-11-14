@@ -26,6 +26,7 @@ import { startInspection, startTelemetry } from "@proofdesk/telemetry";
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
+import { alertSender } from "./alerts.ts";
 import { createDeletionActivities, mcpErasers } from "./deletion.ts";
 import { inspectModelCalls } from "./inspection.ts";
 import { createDbLedger } from "./ledger.ts";
@@ -227,9 +228,9 @@ async function start() {
         db,
         clock: () => new Date(),
         telemetry,
-        // Until an alerting channel is connected, an alert is a log line, a
-        // row in the alerts table and an audit entry.
-        notify: async (alert) => console.warn("ALERT", JSON.stringify(alert)),
+        // An alert is a row in the alerts table, an audit entry and a log
+        // line, and goes to a webhook when one is configured.
+        notify: alertSender(process.env.ALERT_WEBHOOK_URL),
         // The sweeper starts work the portal recorded and could not start.
         dispatch: createDispatch(client, {
           taskQueue: env("TEMPORAL_TASK_QUEUE"),

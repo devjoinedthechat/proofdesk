@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeFor } from "./app.ts";
+import { routeFor, sampledForReview } from "./app.ts";
 
 const ids = Array.from({ length: 5000 }, (_, index) => `tkt_${index.toString(16)}x${index * 7}`);
 
@@ -20,5 +20,25 @@ describe("routeFor", () => {
       expect(routeFor(id, 25)).toBe(routeFor(id, 25));
       if (routeFor(id, 10) === "canary") expect(routeFor(id, 25)).toBe("canary");
     }
+  });
+});
+
+describe("sampledForReview", () => {
+  it("picks about the given share of tickets, none at 0 and all at 100", () => {
+    const share = ids.filter((id) => sampledForReview(id, 10)).length / ids.length;
+    expect(share).toBeGreaterThan(0.08);
+    expect(share).toBeLessThan(0.12);
+    expect(ids.some((id) => sampledForReview(id, 0))).toBe(false);
+    expect(ids.every((id) => sampledForReview(id, 100))).toBe(true);
+  });
+
+  it("is decided by the ticket alone, and independently of which build handled it", () => {
+    expect(sampledForReview("tkt_1", 10)).toBe(sampledForReview("tkt_1", 10));
+    // If the sample followed the canary split, a canary would be checked
+    // either always or never.
+    const canary = ids.filter((id) => routeFor(id, 50) === "canary");
+    const sampled = canary.filter((id) => sampledForReview(id, 50)).length / canary.length;
+    expect(sampled).toBeGreaterThan(0.4);
+    expect(sampled).toBeLessThan(0.6);
   });
 });

@@ -178,6 +178,8 @@ beforeAll(async () => {
       key,
     }),
     clock: () => env.now,
+    // One customer stands in for a day's traffic here.
+    limits: { ticketsPerHour: 1000, openTickets: 1000 },
     // Fixed ids, so which tickets go to the canary is the same on every run.
     newId: (prefix) => `${prefix}_canary_${String(++ticketNumber).padStart(4, "0")}`,
     dispatch: async (job) => {

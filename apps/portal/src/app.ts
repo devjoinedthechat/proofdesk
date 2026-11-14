@@ -36,6 +36,13 @@ export type PortalDeps = {
    * so if it fails, or is absent, nothing is lost and a sweeper starts it.
    */
   dispatch?: Dispatch;
+  /**
+   * How much one customer may ask of the agent. Budgets cap what a ticket and
+   * a company can spend; these stop one account from using up the company's.
+   */
+  limits?: { ticketsPerHour?: number; openTickets?: number };
+  /** The share of tickets the agent resolved itself that staff are asked to check, in percent. */
+  reviewSamplePercent?: number;
   /** The real time, for judging how old a sign-in is. Defaults to the system clock. */
   wallClock?: () => Date;
   /** Delivers a staff decision to the ticket's workflow. */
@@ -195,6 +202,20 @@ function invoicesSeen(state: unknown): z.infer<typeof seenInvoices>["invoices"] 
   }
 }
 
+/**
+ * Whether a ticket the agent resolved by itself is put in front of a person.
+ * Tickets handed to staff are always reviewed. These are the others: the
+ * ones where the agent was confident, which nobody would otherwise look at.
+ * The ticket's id decides, so the sample cannot be steered.
+ */
+export function sampledForReview(ticketId: string, percent: number): boolean {
+  const bucket = createHash("sha256").update(`review:${ticketId}`).digest().readUInt32BE(0) % 100;
+  return bucket < percent;
+}
+
+/** Outcomes the agent reaches without a person. */
+const AGENT_RESOLVED: ReadonlySet<string> = new Set(["refunded", "plan_changed", "refused"]);
+
 const toTicket = (row: TicketRow) => ({
   id: row.id,
   category: row.category,
@@ -301,6 +322,13 @@ export function createPortalApp(deps: PortalDeps) {
     }
   }
 
+  /** A ticket staff are asked to judge: handed over, or sampled from what the agent resolved. */
+  const inReview = (ticket: { id: string; outcome: string | null }) =>
+    ticket.outcome === "handed_to_staff" ||
+    (ticket.outcome !== null &&
+      AGENT_RESOLVED.has(ticket.outcome) &&
+      sampledForReview(ticket.id, deps.reviewSamplePercent ?? 10));
+
   app.get("/.well-known/jwks.json", (c) => c.json(deps.signer.jwks()));
 
   // Tickets the agent gave up on, waiting for a person to say what should
@@ -317,23 +345,29 @@ export function createPortalApp(deps: PortalDeps) {
           "t.category",
           "t.subject",
           "t.body",
+          "t.outcome",
           "t.reasonCode",
+          "t.reply",
           "t.resolvedAt",
           "a.state",
         ])
-        .where("t.outcome", "=", "handed_to_staff")
+        .where("t.outcome", "is not", null)
         .where("t.category", "<>", "data_deletion")
         .where("r.ticketId", "is", null)
         .orderBy("t.resolvedAt")
         .execute(),
     );
     return c.json({
-      tickets: rows.map((row) => ({
+      tickets: rows.filter(inReview).map((row) => ({
         id: row.id,
         category: row.category,
         subject: row.subject,
         body: row.body,
+        // Handed over by the agent, or picked as a check on what it resolved.
+        why: row.outcome === "handed_to_staff" ? "handed_over" : "sample",
+        outcome: row.outcome,
         reasonCode: row.reasonCode,
+        reply: row.reply,
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
         // What the agent read, so the reviewer can name the payment that
         // should have been refunded.
@@ -357,8 +391,8 @@ export function createPortalApp(deps: PortalDeps) {
         .where("id", "=", ticketId)
         .executeTakeFirst();
       if (!ticket) throw new HttpError(404, "ticket_not_found", "Ticket not found");
-      if (ticket.outcome !== "handed_to_staff") {
-        throw new HttpError(409, "not_in_review", "Only a ticket handed to staff is reviewed");
+      if (!inReview(ticket)) {
+        throw new HttpError(409, "not_in_review", "This ticket is not up for review");
       }
       const existing = await trx
         .selectFrom("ticketReviews")
@@ -702,6 +736,27 @@ export function createPortalApp(deps: PortalDeps) {
       resolvedAt: null,
     };
     const job = await withRowScope(deps.db, scope, async (trx) => {
+      // One customer cannot flood the agent. Both counts are of their own
+      // tickets only, which is all this transaction can see.
+      const mine = await trx
+        .selectFrom("tickets")
+        .select(["status", "createdAt"])
+        .where("category", "<>", "data_deletion")
+        .execute();
+      const lastHour = mine.filter(
+        (row) => row.createdAt.getTime() > now.getTime() - 3_600_000,
+      ).length;
+      const open = mine.filter((row) => row.status === "open").length;
+      if (
+        lastHour >= (deps.limits?.ticketsPerHour ?? 20) ||
+        open >= (deps.limits?.openTickets ?? 5)
+      ) {
+        throw new HttpError(
+          429,
+          "too_many_requests",
+          "You have several requests in progress. Please wait for a reply before sending more.",
+        );
+      }
       const rollout = await trx
         .selectFrom("rollout")
         .select("canaryShare")

@@ -110,6 +110,8 @@ A ticket is one run, however many rounds it takes: turns and spend are counted a
 | Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                                                             |
 | Dashboards carry no customer text                  | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts))                               |
 | A failure in production becomes a test             | The agent gives up on a ticket; staff give a verdict; the captured case must fail on giving up, pass on the right action, and hold nothing about the customer ([test](apps/worker/src/review.itest.ts)) |
+| Confident answers are checked too                  | A share of tickets the agent resolved itself is put in front of staff, chosen by ticket id                                                                                                              |
+| One customer cannot use up the agent               | A customer files request after request; another customer of the same company is unaffected                                                                                                              |
 | The whole system starts from nothing and works     | Every service in its own container; a real browser signs in as a customer, an approver and an operator; six journeys are run and checked ([script](scripts/smoke.sh))                                   |
 
 Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stopping-the-agent.md)).

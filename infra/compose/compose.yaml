@@ -218,6 +218,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       MODEL: ${MODEL:-claude-sonnet-5-5}
       MODEL_PROVIDER_MODULE: ${MODEL_PROVIDER_MODULE:-}
+      # Where the watchdog's alerts are posted, such as a chat channel's webhook.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       INSPECTION_URL: http://phoenix:6006
       INSPECTION_API_KEY: ${PHOENIX_ADMIN_SECRET:-local-phoenix-admin-secret-0123456789}

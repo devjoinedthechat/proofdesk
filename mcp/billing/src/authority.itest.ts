@@ -215,6 +215,8 @@ beforeAll(async () => {
   const newId = (prefix: string) => `${prefix}_e2e${String(++sequence).padStart(4, "0")}`;
 
   portal = createPortalApp({
+    // These tests file many tickets as one customer, with no agent handling them.
+    limits: { ticketsPerHour: 1000, openTickets: 1000 },
     db: portalDb,
     grantsDb,
     verify: createTokenVerifier({ issuer, audience: CLIENTS.portal }),

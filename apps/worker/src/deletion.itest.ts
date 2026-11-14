@@ -478,7 +478,8 @@ describe("before the request", () => {
 
     // The inspection store has the conversations in full: that is its job.
     let stored = "";
-    for (let attempt = 0; attempt < 100 && !stored.includes(`${MARK}-REPLY`); attempt++) {
+    const complete = () => stored.includes(`${MARK}-REPLY`) && stored.includes(secondTicket);
+    for (let attempt = 0; attempt < 100 && !complete(); attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 200));
       stored = await conversations();
     }

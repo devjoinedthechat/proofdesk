@@ -141,6 +141,8 @@ beforeAll(async () => {
   grantsDb = connect<AppDatabase>(asRole(env.urls.app, DB_ROLES.grants, TEST_ROLE_PASSWORD));
   let sequence = 0;
   portal = createPortalApp({
+    // These tests file many tickets as one customer, with no agent handling them.
+    limits: { ticketsPerHour: 1000, openTickets: 1000 },
     db: portalDb,
     grantsDb,
     verify: createTokenVerifier({ issuer, audience: CLIENTS.portal }),

@@ -454,9 +454,15 @@ function approverView() {
             "div",
             { class: "row" },
             el("strong", {}, ticket.subject),
-            el("span", { class: "pill warn" }, ticket.reasonCode ?? "handed over"),
+            ticket.why === "sample"
+              ? el("span", { class: "pill good" }, `random check: ${ticket.outcome}`)
+              : el("span", { class: "pill warn" }, ticket.reasonCode ?? "handed over"),
           ),
           el("p", { class: "muted" }, ticket.body),
+          // For a random check, what the agent told the customer.
+          ticket.why === "sample" && ticket.reply
+            ? el("div", { class: "reply" }, ticket.reply)
+            : null,
           el("label", {}, "Verdict"),
           verdict,
           el("label", {}, "What the result should have been"),
@@ -520,13 +526,13 @@ function approverView() {
       el(
         "div",
         { class: "row" },
-        el("h2", {}, "Review what the agent handed over"),
+        el("h2", {}, "Review the agent's work"),
         action("Refresh", loadQueue),
       ),
       el(
         "p",
         { class: "muted" },
-        "Say what should have happened. A verdict can be turned into a test the agent must pass from then on.",
+        "Tickets the agent handed over, and a random share of the ones it resolved itself. Say what should have happened. A verdict can be turned into a test the agent must pass from then on.",
       ),
       queue,
     ),
