@@ -70,6 +70,25 @@ flowchart LR
 
 The system running locally with Claude as the agent: a request the agent has to ask about, a refund that waits for staff approval, and the kill switch. Every picture is the real interface and every reply is the model's. [How it was made](docs/walkthrough/README.md).
 
+## Stack
+
+| Layer             | Choice                                               | What it does here                                             |
+| ----------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| Language          | TypeScript on Node 22, pnpm workspace                | One language across services, agent, evals and tests          |
+| Model             | Claude Sonnet and Haiku, Anthropic SDK               | Own agent loop with strict tool schemas; no agent framework   |
+| Model gateway     | Own, thin                                            | Budgets per ticket and tenant, retries, failover, fault tests |
+| Durable execution | Temporal                                             | One workflow per ticket; survives a worker dying mid-refund   |
+| Tools             | Three MCP servers (billing, entitlements, documents) | Typed inputs and outputs; each call carries a scoped token    |
+| Identity          | Keycloak, OAuth token exchange (RFC 8693)            | The agent acts as the customer, never as itself               |
+| Policy            | Cedar                                                | Allow, deny or require approval, decided outside the model    |
+| Data              | PostgreSQL, Kysely, dbmate, row-level security       | Tenant isolation enforced by the database; hash-chained audit |
+| Validation        | Zod                                                  | Every boundary: tool input, tool output, model output         |
+| Telemetry         | OpenTelemetry to Grafana                             | One trace per ticket; counts and costs, no customer text      |
+| Inspection        | Arize Phoenix                                        | Full conversations, per tenant, deleted with the customer     |
+| Evals             | Own runner on Vitest                                 | Judged on the final state of the databases                    |
+| Tests             | Vitest, Testcontainers, Playwright                   | Real Postgres, Keycloak and Temporal; a real browser          |
+| Local and CI      | Docker Compose, GitHub Actions                       | The whole system from nothing on every push                   |
+
 ## What it proves
 
 Each row is a property and the test that attacks it. Where a control was added, the test was also run with the control removed, to confirm it fails.
