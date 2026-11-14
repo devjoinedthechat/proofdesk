@@ -7,6 +7,27 @@
 
 <h1 align="center">Proofdesk</h1>
 
+<p align="center">
+  <b>An AI support agent that issues refunds and changes plans itself.</b><br>
+  Every claim is backed by a test that tries to break it.
+</p>
+
+<p align="center">
+  <a href="https://github.com/devjoinedthechat/proofdesk/actions/workflows/ci.yml"><img src="https://github.com/devjoinedthechat/proofdesk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-15803d" alt="MIT licence"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A5%2022.18-15803d" alt="node >= 22.18">
+  <img src="https://img.shields.io/badge/typescript-strict-15803d" alt="TypeScript strict">
+</p>
+
+<p align="center">
+  <a href="#walkthrough">Walkthrough</a> ·
+  <a href="#what-it-proves">What it proves</a> ·
+  <a href="#results-on-real-models">Results</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-a-ticket-is-handled">How a ticket is handled</a> ·
+  <a href="#design-decisions">Design decisions</a>
+</p>
+
 A production-grade AI support agent for subscription billing. It resolves refund and plan-change tickets by acting on the systems of record itself: it reads the customer's billing records, applies the company's policy, and issues the refund or makes the change. It also carries out data-deletion requests, with no model involved.
 
 The repo is organised around one question: what happens when the model is wrong? Every property it claims is backed by a test that tries to break it, and a run is judged on the final state of the databases, not on what the model says it did.
