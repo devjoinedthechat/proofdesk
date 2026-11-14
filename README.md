@@ -36,6 +36,12 @@ flowchart LR
   loop -- conversations --> phoenix[Phoenix]
 ```
 
+## Walkthrough
+
+[![A customer's request, the agent's question, the customer's answer and the refund](docs/walkthrough/poster.png)](docs/walkthrough/proofdesk-walkthrough.mp4)
+
+A [two-minute recording](docs/walkthrough/proofdesk-walkthrough.mp4) of the system running locally with Claude as the agent: a request the agent has to ask about, a refund that waits for staff approval, the kill switch, and the workflow and dashboard screens. [What it shows, and how it was recorded](docs/walkthrough/README.md).
+
 ## What it proves
 
 Each row is a property and the test that attacks it. Where a control was added, the test was also run with the control removed, to confirm it fails.

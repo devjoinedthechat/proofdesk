@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -16,7 +17,7 @@ jobs:
   check:
     name: Lint, types, tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,19 +31,23 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-  stack:
-    name: Stack comes up
+  smoke:
+    name: Whole system, from nothing
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      - run: pnpm stack:up
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Every service in its own container, a real browser, six journeys.
+      # The model is a scripted stand-in, so this needs no key and costs nothing.
+      - run: pnpm local:smoke
       - name: Show logs on failure
         if: failure()
-        run: docker compose -f infra/compose/compose.yaml logs --no-color
-      - run: pnpm stack:reset
+        run: docker compose -f infra/compose/compose.yaml --profile app logs --no-color --tail 200
+      - run: pnpm local:reset
         if: always()
