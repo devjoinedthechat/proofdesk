@@ -10,6 +10,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The types follow the Node version in .nvmrc, which is moved by hand.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
@@ -23,6 +27,11 @@ updates:
     directory: /infra/docker
     schedule:
       interval: weekly
+    ignore:
+      # A new major version of Node is a decision, taken together with
+      # .nvmrc and the engines field, not an update.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: docker-compose
     directory: /infra/compose
