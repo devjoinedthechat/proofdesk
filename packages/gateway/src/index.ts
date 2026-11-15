@@ -9,6 +9,7 @@ export {
   createMemoryLedger,
   type GatewayOptions,
   type GatewayRoute,
+  type Reservation,
   type SpendLedger,
 } from "./gateway.ts";
 export {

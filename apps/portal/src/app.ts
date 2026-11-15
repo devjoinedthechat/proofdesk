@@ -609,8 +609,28 @@ export function createPortalApp(deps: PortalDeps) {
       decidedBy: staff.subject,
     });
     // The ticket ended while the request waited. Nothing was decided, and
-    // saying "accepted" would tell staff that something was.
+    // saying "accepted" would tell staff that something was. The request is
+    // closed here, so it leaves the queue instead of being offered again.
     if (delivery === "closed") {
+      const now = deps.clock();
+      const expired = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
+        trx
+          .updateTable("approvals")
+          .set({ status: "expired", decidedAt: now, decidedBy: "system:ticket-ended" })
+          .where("id", "=", approval.id)
+          .where("status", "=", "pending")
+          .returning("id")
+          .executeTakeFirst(),
+      );
+      if (expired) {
+        await appendAudit(deps.db, {
+          tenantId: staff.tenantId,
+          at: now,
+          actor: staff.subject,
+          event: "approval_expired",
+          detail: { approvalId: approval.id, ticketId: approval.ticketId },
+        });
+      }
       throw new HttpError(
         409,
         "no_longer_waiting",

@@ -101,6 +101,9 @@ export type ApprovalRow = {
 
 export type SpendRow = { key: string; micros: number };
 
+/** What a model call under way has set aside in one budget. */
+export type SpendReservationRow = { id: string; key: string; micros: number; expiresAt: Date };
+
 /** One refund the agent made, as billing reported it. */
 export type AgentRefundRow = {
   refundId: string;
@@ -237,6 +240,7 @@ export type AppDatabase = {
   agentRuns: AgentRunRow;
   approvals: ApprovalRow;
   spend: SpendRow;
+  spendReservations: SpendReservationRow;
   agentRefunds: AgentRefundRow;
   deletionRequests: DeletionRequestRow;
   agentControls: AgentControlRow;

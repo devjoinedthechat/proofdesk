@@ -278,6 +278,23 @@ describe("createGateway", () => {
     expect(await ledger.spent("tenant:tenant-a")).toBe(0);
   });
 
+  it("gives a budget back what a call set aside and never settled", async () => {
+    // A worker that dies in the middle of a call settles nothing. Its
+    // reservation counts for a while, and then no longer.
+    let clock = 0;
+    const ledger = createMemoryLedger(() => clock);
+    const hold = { key: "tenant:tenant-a", limitMicros: 100 };
+    await ledger.reserve([hold], 100, 60_000);
+    expect(await ledger.reserve([hold], 100, 60_000)).toEqual({
+      full: { key: hold.key, spentMicros: 100 },
+    });
+
+    clock = 60_000;
+
+    expect(await ledger.spent(hold.key)).toBe(0);
+    expect(await ledger.reserve([hold], 100, 60_000)).toHaveProperty("reservation");
+  });
+
   it("refuses a model that has no price", async () => {
     const { gateway, primaryProvider } = setup([answer("unused")]);
     await expect(

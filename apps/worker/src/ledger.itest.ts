@@ -30,6 +30,8 @@ afterAll(async () => {
   await env?.dispose();
 });
 
+const TTL = 60_000;
+
 describe("the spend ledger", () => {
   it("lets in only as many simultaneous reservations as the budget has room for", async () => {
     const ledger = createDbLedger(db);
@@ -39,12 +41,14 @@ describe("the spend ledger", () => {
     // own ticket and all for one company. The company has room for three.
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, n) =>
-        ledger.reserve([{ key: `ticket:crowded:${n}`, limitMicros: 1000 }, tenant], 100),
+        ledger.reserve([{ key: `ticket:crowded:${n}`, limitMicros: 1000 }, tenant], 100, TTL),
       ),
     );
 
-    expect(results.filter((result) => result === null)).toHaveLength(3);
-    expect(results.filter((result) => result?.key === tenant.key)).toHaveLength(17);
+    expect(results.filter((result) => "reservation" in result)).toHaveLength(3);
+    expect(
+      results.filter((result) => "full" in result && result.full.key === tenant.key),
+    ).toHaveLength(17);
     expect(await ledger.spent(tenant.key)).toBe(300);
   }, 60_000);
 
@@ -58,17 +62,55 @@ describe("the spend ledger", () => {
         { key: "tenant:full", limitMicros: 1000 },
       ],
       10,
+      TTL,
     );
 
-    expect(refused).toEqual({ key: "ticket:full:1", spentMicros: 50 });
+    expect(refused).toEqual({ full: { key: "ticket:full:1", spentMicros: 50 } });
     expect(await ledger.spent("tenant:full")).toBe(0);
   }, 60_000);
 
   it("replaces a reservation with what the call cost", async () => {
     const ledger = createDbLedger(db);
     const hold = { key: "tenant:settled", limitMicros: 1000 };
-    await ledger.reserve([hold], 400);
-    await ledger.add(hold.key, 120 - 400);
+    const made = await ledger.reserve([hold], 400, TTL);
+    if (!("reservation" in made)) throw new Error("The reservation was refused");
+    expect(await ledger.spent(hold.key)).toBe(400);
+
+    await ledger.settle(made.reservation, 120);
     expect(await ledger.spent(hold.key)).toBe(120);
+  }, 60_000);
+
+  it("gives a budget back what a lost worker had set aside, once the reservation lapses", async () => {
+    const ledger = createDbLedger(db);
+    const hold = { key: "tenant:lost", limitMicros: 100 };
+    // A worker sets the whole budget aside and is never heard from again.
+    const lost = await ledger.reserve([hold], 100, 200);
+    expect("reservation" in lost).toBe(true);
+    expect(await ledger.reserve([hold], 100, TTL)).toEqual({
+      full: { key: hold.key, spentMicros: 100 },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(await ledger.spent(hold.key)).toBe(0);
+    expect("reservation" in (await ledger.reserve([hold], 100, TTL))).toBe(true);
+    // The lapsed row is gone, not merely ignored.
+    const left = await env.dbs.app
+      .selectFrom("spendReservations")
+      .select("id")
+      .where("key", "=", hold.key)
+      .execute();
+    expect(left).toHaveLength(1);
+  }, 60_000);
+
+  it("still records the cost of a call that outlived its reservation", async () => {
+    const ledger = createDbLedger(db);
+    const hold = { key: "tenant:slow", limitMicros: 1000 };
+    const made = await ledger.reserve([hold], 400, 1);
+    if (!("reservation" in made)) throw new Error("The reservation was refused");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await ledger.settle(made.reservation, 250);
+    expect(await ledger.spent(hold.key)).toBe(250);
   }, 60_000);
 });

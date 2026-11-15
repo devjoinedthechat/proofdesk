@@ -455,6 +455,23 @@ describe("an approval decided after its ticket has ended", () => {
     expect(decided.status).toBe(409);
     expect(decided.body).toMatchObject({ error: { code: "no_longer_waiting" } });
     expect(await refunds()).toBe(1);
+
+    // The request is closed, so staff are not offered it a second time.
+    const queue = await as(staff.approver.email, "GET", "/staff/approvals");
+    expect(queue.body).toEqual({ approvals: [] });
+    const row = await env.dbs.app
+      .selectFrom("approvals")
+      .select(["status", "decidedBy"])
+      .where("id", "=", `${closed.id}:99`)
+      .executeTakeFirstOrThrow();
+    expect(row).toEqual({ status: "expired", decidedBy: "system:ticket-ended" });
+    const again = await as(
+      staff.approver.email,
+      "POST",
+      `/staff/approvals/${encodeURIComponent(`${closed.id}:99`)}/decision`,
+      { decision: "approved" },
+    );
+    expect(again.body).toMatchObject({ error: { code: "already_decided" } });
     await env.dbs.app.deleteFrom("approvals").where("id", "=", `${closed.id}:99`).execute();
   }, 60_000);
 });

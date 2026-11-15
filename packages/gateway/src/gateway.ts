@@ -20,40 +20,71 @@ export class BudgetExceededError extends Error {
 /** One budget a call counts against: where its spend is kept, and how much there may be. */
 export type BudgetHold = { key: string; limitMicros: number };
 
+/** An amount set aside in one or more budgets for a call that is under way. */
+export type Reservation = { id: string; keys: string[] };
+
 /** Where spend is recorded. In production this is a table; in tests, memory. */
 export interface SpendLedger {
+  /** What a budget has used: what calls cost, plus what calls under way have set aside. */
   spent(key: string): Promise<number>;
-  /** Adds to a total. The amount may be negative, to give back part of a reservation. */
+  /** Adds what a call cost to a total. */
   add(key: string, micros: number): Promise<void>;
   /**
    * Sets `micros` aside in every budget, if every one of them still has
    * room, and in one step: no other reservation can come between the look
-   * and the write. Returns nothing when it did, and otherwise the budget
-   * that is used up, with nothing set aside anywhere.
+   * and the write. Returns the reservation when it did, and otherwise the
+   * budget that is used up, with nothing set aside anywhere.
+   *
+   * A reservation counts for `ttlMs` and then lapses by itself, so a caller
+   * that dies before it settles does not hold its budget down for good.
    */
   reserve(
     holds: BudgetHold[],
     micros: number,
-  ): Promise<{ key: string; spentMicros: number } | null>;
+    ttlMs: number,
+  ): Promise<{ reservation: Reservation } | { full: { key: string; spentMicros: number } }>;
+  /**
+   * Replaces a reservation with what the call cost, in one step. The cost is
+   * recorded whether or not the reservation has lapsed in the meantime.
+   */
+  settle(reservation: Reservation, micros: number): Promise<void>;
 }
 
-export function createMemoryLedger(): SpendLedger {
+export function createMemoryLedger(now: () => number = Date.now): SpendLedger {
   const totals = new Map<string, number>();
+  const reservations = new Map<string, { keys: string[]; micros: number; expiresAt: number }>();
+  let issued = 0;
+  const used = (key: string) => {
+    let sum = totals.get(key) ?? 0;
+    for (const held of reservations.values()) {
+      if (held.expiresAt > now() && held.keys.includes(key)) sum += held.micros;
+    }
+    return sum;
+  };
   return {
     async spent(key) {
-      return totals.get(key) ?? 0;
+      return used(key);
     },
     async add(key, micros) {
       totals.set(key, (totals.get(key) ?? 0) + micros);
     },
-    async reserve(holds, micros) {
+    async reserve(holds, micros, ttlMs) {
       // No await between the look and the write, so nothing can interleave.
       for (const { key, limitMicros } of holds) {
-        const spentMicros = totals.get(key) ?? 0;
-        if (spentMicros >= limitMicros) return { key, spentMicros };
+        const spentMicros = used(key);
+        if (spentMicros >= limitMicros) return { full: { key, spentMicros } };
       }
-      for (const { key } of holds) totals.set(key, (totals.get(key) ?? 0) + micros);
-      return null;
+      const reservation = { id: `r${++issued}`, keys: holds.map((hold) => hold.key) };
+      reservations.set(reservation.id, {
+        keys: reservation.keys,
+        micros,
+        expiresAt: now() + ttlMs,
+      });
+      return { reservation };
+    },
+    async settle(reservation, micros) {
+      reservations.delete(reservation.id);
+      for (const key of reservation.keys) totals.set(key, (totals.get(key) ?? 0) + micros);
     },
   };
 }
@@ -93,6 +124,8 @@ export type GatewayOptions = {
   /** Attempts per route, including the first. */
   maxAttempts?: number;
   baseDelayMs?: number;
+  /** How long a call's reservation counts before it lapses. Longer than any one call may take. */
+  reservationTtlMs?: number;
   onCall?: (record: CallRecord) => void;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
@@ -101,6 +134,13 @@ export type GatewayOptions = {
 
 /** The longest a provider's "retry after" is obeyed. Beyond it, the backup route is the better bet. */
 const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * How long a reservation counts when nobody settles it. A provider gives up
+ * on a call well before this, so a reservation still there afterwards belongs
+ * to a worker that died, and the budget gets it back.
+ */
+const RESERVATION_TTL_MS = 5 * 60_000;
 
 const defaultSleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -126,6 +166,7 @@ export function createGateway(options: GatewayOptions): ModelProvider {
   const sleep = options.sleep ?? defaultSleep;
   const random = options.random ?? Math.random;
   const now = options.now ?? Date.now;
+  const reservationTtlMs = options.reservationTtlMs ?? RESERVATION_TTL_MS;
 
   const ticketKey = (context: CallContext) => `ticket:${context.tenantId}:${context.ticketId}`;
   const tenantKey = (context: CallContext) => `tenant:${context.tenantId}`;
@@ -138,20 +179,15 @@ export function createGateway(options: GatewayOptions): ModelProvider {
    * most the one call that takes it past its limit, as it is when calls
    * come one after another.
    */
-  async function reserve(context: CallContext, micros: number): Promise<void> {
+  async function reserve(context: CallContext, micros: number): Promise<Reservation> {
     const ticket = { key: ticketKey(context), limitMicros: options.limits.perTicketMicros };
     const tenant = { key: tenantKey(context), limitMicros: options.limits.perTenantMicros };
-    const full = await options.ledger.reserve([ticket, tenant], micros);
-    if (!full) return;
+    const result = await options.ledger.reserve([ticket, tenant], micros, reservationTtlMs);
+    if ("reservation" in result) return result.reservation;
+    const { full } = result;
     const [scope, hold] =
       full.key === ticket.key ? (["ticket", ticket] as const) : (["tenant", tenant] as const);
     throw new BudgetExceededError(scope, full.spentMicros, hold.limitMicros);
-  }
-
-  /** Replaces a reservation with what the call really cost, or with nothing. */
-  async function settle(context: CallContext, reserved: number, cost: number): Promise<void> {
-    await options.ledger.add(ticketKey(context), cost - reserved);
-    await options.ledger.add(tenantKey(context), cost - reserved);
   }
 
   return {
@@ -175,8 +211,7 @@ export function createGateway(options: GatewayOptions): ModelProvider {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           context.signal?.throwIfAborted();
-          const reserved = estimateMicros(price, { ...request, model });
-          await reserve(context, reserved);
+          const reservation = await reserve(context, estimateMicros(price, { ...request, model }));
 
           const started = now();
           const record: CallRecord = {
@@ -193,7 +228,7 @@ export function createGateway(options: GatewayOptions): ModelProvider {
           } catch (error) {
             lastError = error;
             // A call that failed cost nothing, so its reservation is given back.
-            await settle(context, reserved, 0);
+            await options.ledger.settle(reservation, 0);
             options.onCall?.({
               ...record,
               latencyMs: now() - started,
@@ -214,7 +249,7 @@ export function createGateway(options: GatewayOptions): ModelProvider {
             continue;
           }
           const cost = costMicros(price, response.usage);
-          await settle(context, reserved, cost);
+          await options.ledger.settle(reservation, cost);
           options.onCall?.({
             ...record,
             model: response.model,
