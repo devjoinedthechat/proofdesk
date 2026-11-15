@@ -9,7 +9,12 @@ import {
   testPostgresUrl,
   verifyAudit,
 } from "@proofdesk/db";
-import { createDispatch, type Dispatch, ticketWorkflowId } from "@proofdesk/dispatch";
+import {
+  createApprovalDelivery,
+  createDispatch,
+  type Dispatch,
+  ticketWorkflowId,
+} from "@proofdesk/dispatch";
 import { call, invoicesSeen, listInvoices } from "@proofdesk/evals";
 import type { ModelProvider, ModelRequest } from "@proofdesk/gateway";
 import {
@@ -272,6 +277,7 @@ beforeAll(async () => {
     limits: { ticketsPerHour: 6, openTickets: 5 },
     // Every ticket the agent resolved by itself is put up for a check here.
     reviewSamplePercent: 100,
+    decideApproval: createApprovalDelivery(client, { idSuffix: suffix }),
     dispatch: async (job) => {
       if (engineDown) throw new Error("connect ECONNREFUSED: the workflow engine is unreachable");
       return dispatch(job);
@@ -407,6 +413,49 @@ describe("a customer answering the agent's question", () => {
     const late = await as(customer.email, "POST", `/tickets/${id}/messages`, { body: "thanks" });
     expect(late.status).toBe(409);
     expect(await refunds()).toBe(1);
+  }, 60_000);
+});
+
+describe("an approval decided after its ticket has ended", () => {
+  it("is refused as no longer waiting, not accepted and not an error", async () => {
+    // The ticket above is closed and its workflow with it. A request for
+    // approval that was left behind is still in the queue.
+    const [closed] = await env.dbs.app
+      .selectFrom("tickets")
+      .select(["id", "customerId"])
+      .where("status", "=", "resolved")
+      .limit(1)
+      .execute();
+    if (!closed) throw new Error("No ticket has been resolved yet");
+    await env.dbs.app
+      .insertInto("approvals")
+      .values({
+        id: `${closed.id}:99`,
+        ticketId: closed.id,
+        tenantId: tenant.id,
+        customerId: closed.customerId,
+        step: 99,
+        tool: "create_refund",
+        summary: JSON.stringify({ tool: "create_refund", amountCents: 1 }),
+        reason: "over the limit",
+        status: "pending",
+        requestedAt: env.now,
+        decidedAt: null,
+        decidedBy: null,
+      })
+      .execute();
+
+    const decided = await as(
+      staff.approver.email,
+      "POST",
+      `/staff/approvals/${encodeURIComponent(`${closed.id}:99`)}/decision`,
+      { decision: "approved" },
+    );
+
+    expect(decided.status).toBe(409);
+    expect(decided.body).toMatchObject({ error: { code: "no_longer_waiting" } });
+    expect(await refunds()).toBe(1);
+    await env.dbs.app.deleteFrom("approvals").where("id", "=", `${closed.id}:99`).execute();
   }, 60_000);
 });
 

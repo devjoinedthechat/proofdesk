@@ -7,7 +7,7 @@ import {
   type TicketRow,
   withRowScope,
 } from "@proofdesk/db";
-import type { Dispatch, OutboxJob } from "@proofdesk/dispatch";
+import type { ApprovalDelivery, Dispatch, OutboxJob } from "@proofdesk/dispatch";
 import {
   bearerToken,
   CLIENTS,
@@ -46,12 +46,7 @@ export type PortalDeps = {
   /** The real time, for judging how old a sign-in is. Defaults to the system clock. */
   wallClock?: () => Date;
   /** Delivers a staff decision to the ticket's workflow. */
-  decideApproval?: (decision: {
-    ticketId: string;
-    approvalId: string;
-    decision: "approved" | "rejected";
-    decidedBy: string;
-  }) => Promise<void>;
+  decideApproval?: ApprovalDelivery;
 };
 
 /**
@@ -607,12 +602,21 @@ export function createPortalApp(deps: PortalDeps) {
       throw new HttpError(409, "already_decided", `This approval is already ${approval.status}`);
     }
     if (!deps.decideApproval) throw new Error("No approval delivery is configured");
-    await deps.decideApproval({
+    const delivery = await deps.decideApproval({
       ticketId: approval.ticketId,
       approvalId: approval.id,
       decision,
       decidedBy: staff.subject,
     });
+    // The ticket ended while the request waited. Nothing was decided, and
+    // saying "accepted" would tell staff that something was.
+    if (delivery === "closed") {
+      throw new HttpError(
+        409,
+        "no_longer_waiting",
+        "This ticket is no longer waiting for a decision",
+      );
+    }
     return c.json({ accepted: true }, 202);
   });
 

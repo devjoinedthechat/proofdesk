@@ -7,7 +7,7 @@ import {
   createMemoryLedger,
 } from "./gateway.ts";
 import { MockProvider, type MockStep, textResponse } from "./mock.ts";
-import { costMicros } from "./pricing.ts";
+import { costMicros, estimateMicros } from "./pricing.ts";
 import type { CallContext, ModelRequest } from "./types.ts";
 
 const context: CallContext = { tenantId: "tenant-a", ticketId: "ticket-1" };
@@ -232,6 +232,50 @@ describe("createGateway", () => {
     });
     await ledger.add("ticket:tenant-a:ticket-1", 1);
     await expect(gateway.complete(request, context)).rejects.toBeInstanceOf(BudgetExceededError);
+  });
+
+  it("counts calls under way, so calls made at the same moment cannot overrun together", async () => {
+    // Five tickets of one company call the model at once. The company's
+    // budget has room for two calls under way. Looking first and counting
+    // afterwards, all five would see an untouched budget and all five
+    // would be made.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow: MockStep = async () => {
+      await held;
+      return answer("done");
+    };
+    const reserved = estimateMicros(prices["main-model"], request);
+    const { gateway, primaryProvider, ledger } = setup([slow, slow, slow, slow, slow], undefined, {
+      perTicketMicros: 1_000_000,
+      perTenantMicros: reserved * 2,
+    });
+
+    const calls = [1, 2, 3, 4, 5].map((n) =>
+      gateway
+        .complete(request, { ...context, ticketId: `ticket-${n}` })
+        .then(() => "made" as const)
+        .catch((error: unknown) => (error instanceof BudgetExceededError ? error.scope : "failed")),
+    );
+    // Let every call reach the budget before any of them finishes.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    release();
+
+    expect(await Promise.all(calls)).toEqual(["made", "made", "tenant", "tenant", "tenant"]);
+    expect(primaryProvider.calls).toHaveLength(2);
+    // What is left on the books is what the two calls cost, not what was set aside.
+    expect(await ledger.spent("tenant:tenant-a")).toBe(6_000);
+  });
+
+  it("gives a failed call's reservation back", async () => {
+    const { gateway, ledger } = setup([down("invalid_request")]);
+    await expect(gateway.complete(request, context)).rejects.toMatchObject({
+      kind: "invalid_request",
+    });
+    expect(await ledger.spent("ticket:tenant-a:ticket-1")).toBe(0);
+    expect(await ledger.spent("tenant:tenant-a")).toBe(0);
   });
 
   it("refuses a model that has no price", async () => {

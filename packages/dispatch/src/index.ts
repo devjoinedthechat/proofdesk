@@ -113,3 +113,33 @@ export function runningWorkflows(client: Client) {
     return workflowIds.filter((_, index) => states[index]);
   };
 }
+
+/**
+ * `delivered`: the ticket's workflow has the decision.
+ * `closed`: no workflow is waiting for it any more. The ticket was finished,
+ * stopped or deleted while the approval sat in the queue.
+ */
+export type ApprovalDelivery = (decision: {
+  ticketId: string;
+  approvalId: string;
+  decision: "approved" | "rejected";
+  decidedBy: string;
+}) => Promise<"delivered" | "closed">;
+
+/** Hands a member of staff's decision to the workflow that asked for it. */
+export function createApprovalDelivery(
+  client: Client,
+  options: { idSuffix?: string } = {},
+): ApprovalDelivery {
+  return async ({ ticketId, ...decision }) => {
+    try {
+      await client.workflow
+        .getHandle(ticketWorkflowId(ticketId, options.idSuffix))
+        .signal("approvalDecided", decision);
+      return "delivered";
+    } catch (error) {
+      if (error instanceof WorkflowNotFoundError) return "closed";
+      throw error;
+    }
+  };
+}

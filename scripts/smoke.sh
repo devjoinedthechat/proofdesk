@@ -81,6 +81,24 @@ for service in billing billing-mcp documents-mcp entitlements entitlements-mcp p
 done
 expect services "$state" "^provision exited 0"
 
+echo "A service told to stop finishes and exits cleanly"
+compose=(docker compose -f infra/compose/compose.yaml --profile app)
+started=$(date +%s)
+"${compose[@]}" stop --timeout 30 billing portal >/dev/null 2>&1
+took=$(( $(date +%s) - started ))
+state="$("${compose[@]}" ps --all --format '{{.Service}} {{.State}} {{.ExitCode}}')"
+# Exit code 0 means the service closed by itself. Killed for taking too
+# long, it would report 137.
+expect shutdown "$state" "^billing exited 0"
+expect shutdown "$state" "^portal exited 0"
+expect shutdown "$("${compose[@]}" logs billing portal 2>&1)" "SIGTERM received, shutting down"
+if [ "$took" -ge 20 ]; then
+  echo "  FAIL  shutdown: took ${took}s"
+  failures=$((failures + 1))
+else
+  echo "  ok    shutdown: took ${took}s"
+fi
+
 scripts/local.sh down >/dev/null 2>&1
 if [ "$failures" -gt 0 ]; then
   echo "$failures check(s) failed."

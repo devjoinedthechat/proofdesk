@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { type AppDatabase, connect } from "@proofdesk/db";
-import { createDispatch, ticketWorkflowId } from "@proofdesk/dispatch";
+import { createApprovalDelivery, createDispatch } from "@proofdesk/dispatch";
 import {
   CLIENTS,
   createGrantSigner,
@@ -46,11 +46,7 @@ main(async () => {
       taskQueue,
       canaryTaskQueue: process.env.TEMPORAL_CANARY_TASK_QUEUE,
     }),
-    decideApproval: async ({ ticketId, ...decision }) => {
-      await temporal.workflow
-        .getHandle(ticketWorkflowId(ticketId))
-        .signal("approvalDecided", decision);
-    },
+    decideApproval: createApprovalDelivery(temporal),
   });
   mountUi(app, { issuer, clientId: CLIENTS.portalWeb });
   return serve(app, { port: Number(env("PORT")) });

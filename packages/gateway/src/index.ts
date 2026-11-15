@@ -3,6 +3,7 @@ export { ProviderError, type ProviderErrorKind } from "./errors.ts";
 export { createFaultInjector, modelOutage } from "./faults.ts";
 export {
   BudgetExceededError,
+  type BudgetHold,
   type CallRecord,
   createGateway,
   createMemoryLedger,
@@ -17,7 +18,13 @@ export {
   textResponse,
   toolUseResponse,
 } from "./mock.ts";
-export { ANTHROPIC_PRICES, costMicros, type ModelPrice, type PriceTable } from "./pricing.ts";
+export {
+  ANTHROPIC_PRICES,
+  costMicros,
+  estimateMicros,
+  type ModelPrice,
+  type PriceTable,
+} from "./pricing.ts";
 export {
   createRecordingProvider,
   createReplayProvider,

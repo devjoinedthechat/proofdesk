@@ -1,4 +1,4 @@
-import type { Usage } from "./types.ts";
+import type { ModelRequest, Usage } from "./types.ts";
 
 /** Prices in US dollars per million tokens. */
 export type ModelPrice = {
@@ -34,4 +34,14 @@ export function costMicros(price: ModelPrice, usage: Usage): number {
       usage.cacheReadTokens * price.cacheRead +
       usage.cacheWriteTokens * price.cacheWrite,
   );
+}
+
+/**
+ * The most a call could plausibly cost, before it is made: its whole input
+ * at the uncached price, and every output token it is allowed. Text is
+ * counted at three characters a token, which errs on the high side.
+ */
+export function estimateMicros(price: ModelPrice, request: ModelRequest): number {
+  const characters = JSON.stringify([request.system, request.messages, request.tools]).length;
+  return Math.ceil((characters / 3) * price.input + request.maxTokens * price.output);
 }

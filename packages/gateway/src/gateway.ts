@@ -1,5 +1,5 @@
 import { ProviderError } from "./errors.ts";
-import { costMicros, type PriceTable } from "./pricing.ts";
+import { costMicros, estimateMicros, type PriceTable } from "./pricing.ts";
 import type { CallContext, ModelProvider, ModelRequest, ModelResponse, Usage } from "./types.ts";
 
 /** Thrown before a call is made, when the ticket or tenant has no budget left. */
@@ -17,10 +17,24 @@ export class BudgetExceededError extends Error {
   }
 }
 
+/** One budget a call counts against: where its spend is kept, and how much there may be. */
+export type BudgetHold = { key: string; limitMicros: number };
+
 /** Where spend is recorded. In production this is a table; in tests, memory. */
 export interface SpendLedger {
   spent(key: string): Promise<number>;
+  /** Adds to a total. The amount may be negative, to give back part of a reservation. */
   add(key: string, micros: number): Promise<void>;
+  /**
+   * Sets `micros` aside in every budget, if every one of them still has
+   * room, and in one step: no other reservation can come between the look
+   * and the write. Returns nothing when it did, and otherwise the budget
+   * that is used up, with nothing set aside anywhere.
+   */
+  reserve(
+    holds: BudgetHold[],
+    micros: number,
+  ): Promise<{ key: string; spentMicros: number } | null>;
 }
 
 export function createMemoryLedger(): SpendLedger {
@@ -31,6 +45,15 @@ export function createMemoryLedger(): SpendLedger {
     },
     async add(key, micros) {
       totals.set(key, (totals.get(key) ?? 0) + micros);
+    },
+    async reserve(holds, micros) {
+      // No await between the look and the write, so nothing can interleave.
+      for (const { key, limitMicros } of holds) {
+        const spentMicros = totals.get(key) ?? 0;
+        if (spentMicros >= limitMicros) return { key, spentMicros };
+      }
+      for (const { key } of holds) totals.set(key, (totals.get(key) ?? 0) + micros);
+      return null;
     },
   };
 }
@@ -107,15 +130,28 @@ export function createGateway(options: GatewayOptions): ModelProvider {
   const ticketKey = (context: CallContext) => `ticket:${context.tenantId}:${context.ticketId}`;
   const tenantKey = (context: CallContext) => `tenant:${context.tenantId}`;
 
-  async function checkBudget(context: CallContext): Promise<void> {
-    const ticket = await options.ledger.spent(ticketKey(context));
-    if (ticket >= options.limits.perTicketMicros) {
-      throw new BudgetExceededError("ticket", ticket, options.limits.perTicketMicros);
-    }
-    const tenant = await options.ledger.spent(tenantKey(context));
-    if (tenant >= options.limits.perTenantMicros) {
-      throw new BudgetExceededError("tenant", tenant, options.limits.perTenantMicros);
-    }
+  /**
+   * Sets the call's estimated cost aside in the ticket's and the tenant's
+   * budget, or refuses the call. A call under way therefore already counts
+   * against the budget, and calls made at the same moment cannot each see
+   * room that only one of them can have. A budget is still overrun by at
+   * most the one call that takes it past its limit, as it is when calls
+   * come one after another.
+   */
+  async function reserve(context: CallContext, micros: number): Promise<void> {
+    const ticket = { key: ticketKey(context), limitMicros: options.limits.perTicketMicros };
+    const tenant = { key: tenantKey(context), limitMicros: options.limits.perTenantMicros };
+    const full = await options.ledger.reserve([ticket, tenant], micros);
+    if (!full) return;
+    const [scope, hold] =
+      full.key === ticket.key ? (["ticket", ticket] as const) : (["tenant", tenant] as const);
+    throw new BudgetExceededError(scope, full.spentMicros, hold.limitMicros);
+  }
+
+  /** Replaces a reservation with what the call really cost, or with nothing. */
+  async function settle(context: CallContext, reserved: number, cost: number): Promise<void> {
+    await options.ledger.add(ticketKey(context), cost - reserved);
+    await options.ledger.add(tenantKey(context), cost - reserved);
   }
 
   return {
@@ -139,7 +175,8 @@ export function createGateway(options: GatewayOptions): ModelProvider {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           context.signal?.throwIfAborted();
-          await checkBudget(context);
+          const reserved = estimateMicros(price, { ...request, model });
+          await reserve(context, reserved);
 
           const started = now();
           const record: CallRecord = {
@@ -150,21 +187,13 @@ export function createGateway(options: GatewayOptions): ModelProvider {
             latencyMs: 0,
             context,
           };
+          let response: ModelResponse;
           try {
-            const response = await route.provider.complete({ ...request, model }, context);
-            const cost = costMicros(price, response.usage);
-            await options.ledger.add(ticketKey(context), cost);
-            await options.ledger.add(tenantKey(context), cost);
-            options.onCall?.({
-              ...record,
-              model: response.model,
-              latencyMs: now() - started,
-              usage: response.usage,
-              costMicros: cost,
-            });
-            return response;
+            response = await route.provider.complete({ ...request, model }, context);
           } catch (error) {
             lastError = error;
+            // A call that failed cost nothing, so its reservation is given back.
+            await settle(context, reserved, 0);
             options.onCall?.({
               ...record,
               latencyMs: now() - started,
@@ -182,7 +211,18 @@ export function createGateway(options: GatewayOptions): ModelProvider {
               const asked = Math.min(error.retryAfterMs ?? 0, MAX_RETRY_AFTER_MS);
               await sleep(Math.max(jittered, asked), context.signal);
             }
+            continue;
           }
+          const cost = costMicros(price, response.usage);
+          await settle(context, reserved, cost);
+          options.onCall?.({
+            ...record,
+            model: response.model,
+            latencyMs: now() - started,
+            usage: response.usage,
+            costMicros: cost,
+          });
+          return response;
         }
       }
 
