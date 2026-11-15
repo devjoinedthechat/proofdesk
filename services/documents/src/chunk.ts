@@ -3,6 +3,25 @@ export type Chunk = { ordinal: number; heading: string; body: string };
 const MAX_CHARS = 700;
 
 /**
+ * The document's blocks: runs of lines with an empty line between them. Done
+ * line by line and not with a pattern, so the cost is the document's length
+ * whatever it contains.
+ */
+function blocks(markdown: string): string[] {
+  const found: string[] = [];
+  let lines: string[] = [];
+  for (const line of [...markdown.split("\n"), ""]) {
+    if (line.trim() !== "") {
+      lines.push(line);
+    } else if (lines.length > 0) {
+      found.push(lines.join("\n"));
+      lines = [];
+    }
+  }
+  return found;
+}
+
+/**
  * Splits a Markdown document into retrievable pieces. Every piece carries the
  * path of headings above it, so a paragraph that only makes sense under its
  * heading is still found and still understood when read alone.
@@ -19,9 +38,7 @@ export function chunkMarkdown(title: string, markdown: string): Chunk[] {
     buffer = [];
   };
 
-  // A blank line ends a block. The pattern cannot match a line break in its
-  // middle, so a long run of empty lines costs no more than its length.
-  for (const block of markdown.split(/\n[^\S\n]*\n/)) {
+  for (const block of blocks(markdown)) {
     const text = block.trim();
     if (!text) continue;
     const match = /^(#{1,4})\s+(.*)$/.exec(text);
