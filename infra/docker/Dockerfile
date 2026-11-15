@@ -3,7 +3,7 @@
 #
 # The base is pinned to a digest: the tag names a version, and the digest
 # names the exact bytes that were tested.
-FROM node:22.18.0-bookworm-slim@sha256:752ea8a2f758c34002a0461bd9f1cee4f9a3c36d48494586f60ffce1fc708e0e
+FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
 
 RUN corepack enable && corepack prepare pnpm@11.28.11 --activate \
   && mkdir /state /app && chown node:node /state /app
