@@ -21,11 +21,19 @@ export class ProviderError extends Error {
   override readonly name = "ProviderError";
   readonly kind: ProviderErrorKind;
   readonly provider: string;
+  /** How long the provider asked callers to wait before trying again, when it said. */
+  readonly retryAfterMs?: number;
 
-  constructor(provider: string, kind: ProviderErrorKind, message: string, options?: ErrorOptions) {
+  constructor(
+    provider: string,
+    kind: ProviderErrorKind,
+    message: string,
+    options?: ErrorOptions & { retryAfterMs?: number },
+  ) {
     super(message, options);
     this.provider = provider;
     this.kind = kind;
+    if (options?.retryAfterMs !== undefined) this.retryAfterMs = options.retryAfterMs;
   }
 
   /** True when the same request may succeed later or on another provider. */

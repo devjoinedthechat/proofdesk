@@ -265,6 +265,19 @@ describe("createAnthropicProvider", () => {
     expect(error).toMatchObject({ kind, retryable, provider: "anthropic" });
   });
 
+  it("carries along how long the API asked callers to wait", async () => {
+    const { provider } = fakeApi(
+      () =>
+        new Response(
+          JSON.stringify({ type: "error", error: { type: "rate_limit_error", message: "slow" } }),
+          { status: 429, headers: { "content-type": "application/json", "retry-after": "7" } },
+        ),
+    );
+    const error = await provider.complete(request, context).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ kind: "rate_limited", retryAfterMs: 7000 });
+  });
+
   it("maps a network failure to unavailable", async () => {
     const client = new Anthropic({
       apiKey: "test-key",

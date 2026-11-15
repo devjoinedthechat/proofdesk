@@ -20,7 +20,7 @@ export type Authenticate = (request: Request) => Principal | null | Promise<Prin
 
 export type ServiceEnv = { Variables: { principal: Principal } };
 
-type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429;
+type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 503;
 
 /** An error with a stable machine-readable code, returned as `{ error: { code, message } }`. */
 export class HttpError extends Error {
@@ -35,6 +35,8 @@ export class HttpError extends Error {
   }
 }
 
+export const HEALTH_PATH = "/healthz";
+
 /** A Hono app whose failures all have one JSON shape. Unexpected errors return 500 without detail. */
 export function createJsonApp<Env extends { Variables: object } = { Variables: object }>() {
   const app = new Hono<Env>();
@@ -48,6 +50,11 @@ export function createJsonApp<Env extends { Variables: object } = { Variables: o
   });
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: "Not found" } }, 404));
+
+  // Says the process is up and serving, and nothing else. It is registered
+  // before any authentication, so whatever starts and stops the service can
+  // ask without a credential.
+  app.get(HEALTH_PATH, (c) => c.json({ status: "ok" }));
 
   return app;
 }
@@ -122,6 +129,8 @@ export type ClientOptions = {
   fetch?: (request: Request) => Response | Promise<Response>;
   /** Called on every request, so a caller can attach a fresh credential each time. */
   headers?: () => Record<string, string> | Promise<Record<string, string>>;
+  /** How long a request may take before it is given up. Defaults to 30 seconds. */
+  timeoutMs?: number;
 };
 
 /** Sends a JSON request and validates the response body against `schema`. */
@@ -136,14 +145,25 @@ export async function callService<Schema extends z.ZodType>(
   },
 ): Promise<z.infer<Schema>> {
   const headers = new Headers({ ...(await options.headers?.()), ...request.headers });
-  const init: RequestInit = { method: request.method, headers };
+  // A service that never answers must not hold its caller for ever.
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? 30_000);
+  const init: RequestInit = { method: request.method, headers, signal: timeout };
   if (request.body !== undefined) {
     headers.set("content-type", "application/json");
     init.body = JSON.stringify(request.body);
   }
 
   const send = options.fetch ?? fetch;
-  const response = await send(new Request(new URL(request.path, options.baseUrl), init));
+  // The signal on the request cancels the call where it can. The caller is
+  // released by the race either way: a request's own signal only follows
+  // the one it was given for as long as the runtime keeps the link alive,
+  // which under memory pressure it does not always do.
+  const response = await Promise.race([
+    send(new Request(new URL(request.path, options.baseUrl), init)),
+    new Promise<never>((_resolve, reject) => {
+      timeout.addEventListener("abort", () => reject(timeout.reason), { once: true });
+    }),
+  ]);
   const payload: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {

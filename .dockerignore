@@ -12,3 +12,12 @@ recordings
 coverage
 *.pem
 *.key
+
+# Nothing a running service needs: tests, documentation, pictures, CI.
+**/*.test.ts
+**/*.itest.ts
+test
+docs
+assets
+.github
+*.md

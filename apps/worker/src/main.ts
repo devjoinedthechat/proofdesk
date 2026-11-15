@@ -184,12 +184,13 @@ async function start() {
     namespace: env("TEMPORAL_NAMESPACE"),
   });
 
-  // Deletion needs the entitlements server and a Keycloak account that may
-  // delete users. A worker without them handles tickets and no deletions.
+  // Deletion needs the entitlements server and the client that may delete
+  // sign-in accounts. A worker without them handles tickets and no deletions.
   const entitlementsUrl = process.env.ENTITLEMENTS_MCP_URL;
   const keycloakAdminUrl = process.env.KEYCLOAK_ADMIN_URL;
+  const deletionSecret = process.env.ACCOUNT_DELETION_CLIENT_SECRET;
   const deletion =
-    entitlementsUrl && keycloakAdminUrl
+    entitlementsUrl && keycloakAdminUrl && deletionSecret
       ? createDeletionActivities({
           db,
           clock: () => new Date(),
@@ -210,10 +211,13 @@ async function start() {
           agents: { running: runningWorkflows(client) },
           identity: {
             async deleteAccount(customerId) {
+              // Signed in as a client that may manage this realm's users and
+              // nothing else. The worker holds no administrator's password.
               const admin = await connectKeycloakAdmin({
                 url: keycloakAdminUrl,
-                username: env("KEYCLOAK_ADMIN_USER"),
-                password: env("KEYCLOAK_ADMIN_PASSWORD"),
+                realm: env("KEYCLOAK_REALM"),
+                clientId: CLIENTS.accountDeletion,
+                clientSecret: deletionSecret,
               });
               return deleteCustomerAccount(admin, customerId, env("KEYCLOAK_REALM"));
             },

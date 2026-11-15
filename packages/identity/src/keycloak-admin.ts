@@ -1,23 +1,45 @@
 import { CLIENTS, GRANT_IDP, REALM, SCOPES } from "./names.ts";
 
+/** How long one admin request gets. Creating a realm is the slowest of them. */
+const ADMIN_TIMEOUT_MS = 60_000;
+
 export type KeycloakAdmin = Awaited<ReturnType<typeof connectKeycloakAdmin>>;
 
+/**
+ * How to sign in to the admin API: as the server's administrator, who can do
+ * anything, or as one realm's client, which can do what its roles allow.
+ */
+export type KeycloakAdminCredentials =
+  | { username: string; password: string }
+  | { realm: string; clientId: string; clientSecret: string };
+
 /** A minimal client for Keycloak's admin REST API. */
-export async function connectKeycloakAdmin(options: {
-  url: string;
-  username: string;
-  password: string;
-}) {
+export async function connectKeycloakAdmin(options: { url: string } & KeycloakAdminCredentials) {
   const base = options.url.replace(/\/$/, "");
+  const [realm, credentials] =
+    "clientId" in options
+      ? [
+          options.realm,
+          {
+            grant_type: "client_credentials",
+            client_id: options.clientId,
+            client_secret: options.clientSecret,
+          },
+        ]
+      : [
+          "master",
+          {
+            client_id: "admin-cli",
+            grant_type: "password",
+            username: options.username,
+            password: options.password,
+          },
+        ];
   async function signIn(): Promise<string> {
-    const login = await fetch(`${base}/realms/master/protocol/openid-connect/token`, {
+    const login = await fetch(`${base}/realms/${realm}/protocol/openid-connect/token`, {
       method: "POST",
-      body: new URLSearchParams({
-        client_id: "admin-cli",
-        grant_type: "password",
-        username: options.username,
-        password: options.password,
-      }),
+      signal: AbortSignal.timeout(ADMIN_TIMEOUT_MS),
+      body: new URLSearchParams(credentials),
     });
     const { access_token: accessToken } = (await login.json()) as { access_token?: string };
     if (!accessToken) throw new Error(`Keycloak admin sign-in failed with status ${login.status}`);
@@ -29,6 +51,7 @@ export async function connectKeycloakAdmin(options: {
     const send = () =>
       fetch(`${base}/admin${path}`, {
         method,
+        signal: AbortSignal.timeout(ADMIN_TIMEOUT_MS),
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
@@ -59,7 +82,13 @@ export type RealmOptions = {
   /** The signer's public key, base64 SPKI. */
   grantPublicKey: string;
   grantKeyId: string;
-  secrets: { worker: string; billingMcp: string; entitlementsMcp: string };
+  secrets: {
+    worker: string;
+    billingMcp: string;
+    entitlementsMcp: string;
+    /** Creates the client that may delete sign-in accounts. Left out, there is none. */
+    accountDeletion?: string;
+  };
   /** Adds a password sign-in client. For local development and tests only. */
   devLogin?: boolean;
   /** Allows plain HTTP from any address. For local development and tests only. */
@@ -255,6 +284,49 @@ export async function provisionRealm(admin: KeycloakAdmin, options: RealmOptions
     defaultClientScopes: [...IDENTITY_SCOPES, ENTITLEMENTS_API_AUDIENCE],
     attributes: { "standard.token.exchange.enabled": "true", "access.token.lifespan": "60" },
   });
+
+  if (options.secrets.accountDeletion) {
+    // The one client that may change the realm's users, so that a worker
+    // carrying out a deletion request does not need an administrator's
+    // password. It has no user behind it and no scope of this system's:
+    // its token is good for Keycloak's own user administration only.
+    const created = await client({
+      clientId: CLIENTS.accountDeletion,
+      secret: options.secrets.accountDeletion,
+      serviceAccountsEnabled: true,
+      // `basic` names the account in the token, `roles` says what it may
+      // do, and `kc-admin-api` addresses the token to the admin API, which
+      // accepts no token that is not.
+      defaultClientScopes: ["basic", "roles", "kc-admin-api"],
+      attributes: { "access.token.lifespan": "60" },
+    });
+    const clientUuid = created.location?.split("/").pop();
+    const account = (
+      await admin.call("GET", `${path}/clients/${clientUuid}/service-account-user`)
+    ).json<{
+      id: string;
+    }>();
+    const [management] = (
+      await admin.call("GET", `${path}/clients?clientId=realm-management`)
+    ).json<{ id: string }[]>();
+    if (!management) throw new Error("The realm has no realm-management client");
+    const role = (
+      await admin.call("GET", `${path}/clients/${management.id}/roles/manage-users`)
+    ).json<{ id: string; name: string }>();
+    const granted = [{ id: role.id, name: role.name }];
+    // The account holds the role, and the client's tokens may carry that
+    // one role. Like every client here, it does not get "full scope".
+    await admin.call(
+      "POST",
+      `${path}/users/${account.id}/role-mappings/clients/${management.id}`,
+      granted,
+    );
+    await admin.call(
+      "POST",
+      `${path}/clients/${clientUuid}/scope-mappings/clients/${management.id}`,
+      granted,
+    );
+  }
 
   if (options.devLogin) {
     await client({

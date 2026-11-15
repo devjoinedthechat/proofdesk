@@ -88,6 +88,15 @@ const issuer = realmIssuer(testKeycloakUrl(), realm);
 const taskQueue = `del-${randomBytes(4).toString("hex")}`;
 const suffix = `-${taskQueue}`;
 
+const DELETION_SECRET = "account-deletion-secret";
+const accountDeletion = () =>
+  connectKeycloakAdmin({
+    url: testKeycloakUrl(),
+    realm,
+    clientId: CLIENTS.accountDeletion,
+    clientSecret: DELETION_SECRET,
+  });
+
 const PHOENIX_KEY = "test-only-phoenix-admin-secret-0123456789";
 let phoenix: StartedTestContainer;
 let phoenixUrl = "";
@@ -237,6 +246,7 @@ beforeAll(async () => {
       worker: "worker-secret",
       billingMcp: "mcp-secret",
       entitlementsMcp: "entitlements-mcp-secret",
+      accountDeletion: DELETION_SECRET,
     },
     devLogin: true,
     insecureHttp: true,
@@ -405,7 +415,12 @@ beforeAll(async () => {
         ),
       { billingErase: SCOPES.billingErase, entitlementsErase: SCOPES.entitlementsErase },
     ),
-    identity: { deleteAccount: (customerId) => deleteCustomerAccount(admin, customerId, realm) },
+    // As in production: not the administrator, but the one client that may
+    // manage this realm's users.
+    identity: {
+      deleteAccount: async (customerId) =>
+        deleteCustomerAccount(await accountDeletion(), customerId, realm),
+    },
     agents: { running: runningWorkflows(client) },
   });
   worker = await createTicketWorker({
@@ -518,6 +533,19 @@ describe("before the request", () => {
       minutesLater = 0;
     }
     expect(await count(app(), "deletion_requests", sql`true`)).toBe(0);
+  });
+
+  it("gives the worker's Keycloak account the realm's users and nothing else", async () => {
+    const limited = await accountDeletion();
+    const users = (await limited.call("GET", `/realms/${realm}/users?max=1`)).json<unknown[]>();
+    expect(users).toHaveLength(1);
+    // Not the realm's clients and their secrets, not the realm itself, and
+    // not any other realm.
+    await expect(limited.call("GET", `/realms/${realm}/clients`)).rejects.toThrow(/403/);
+    await expect(limited.call("PUT", `/realms/${realm}`, { enabled: false })).rejects.toThrow(
+      /403/,
+    );
+    await expect(limited.call("GET", "/realms/master/users")).rejects.toThrow(/40[13]/);
   });
 
   it("gives the worker no way to delete a customer who has not asked", async () => {

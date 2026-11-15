@@ -76,6 +76,9 @@ export type GatewayOptions = {
   now?: () => number;
 };
 
+/** The longest a provider's "retry after" is obeyed. Beyond it, the backup route is the better bet. */
+const MAX_RETRY_AFTER_MS = 30_000;
+
 const defaultSleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -173,7 +176,11 @@ export function createGateway(options: GatewayOptions): ModelProvider {
             if (!(error instanceof ProviderError) || !error.retryable) throw error;
             if (attempt < maxAttempts) {
               const backoff = baseDelayMs * 2 ** (attempt - 1);
-              await sleep(backoff / 2 + random() * (backoff / 2), context.signal);
+              const jittered = backoff / 2 + random() * (backoff / 2);
+              // A provider that says when to come back is taken at its word,
+              // up to a limit: sooner would only fail again.
+              const asked = Math.min(error.retryAfterMs ?? 0, MAX_RETRY_AFTER_MS);
+              await sleep(Math.max(jittered, asked), context.signal);
             }
           }
         }

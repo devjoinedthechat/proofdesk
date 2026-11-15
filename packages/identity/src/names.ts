@@ -21,6 +21,11 @@ export const CLIENTS = {
   entitlementsApi: "entitlements-api",
   /** The help-centre search MCP server, as a token audience. */
   documentsMcp: "documents-mcp",
+  /**
+   * The worker's means of removing a sign-in account on a deletion request.
+   * It may manage the realm's users and nothing else in Keycloak.
+   */
+  accountDeletion: "account-deletion",
 } as const;
 
 /** The identity provider through which Keycloak trusts signed ticket grants. */

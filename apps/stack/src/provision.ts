@@ -256,6 +256,7 @@ async function identity(seeded: Awaited<ReturnType<typeof seed>>) {
       worker: env("WORKER_CLIENT_SECRET"),
       billingMcp: env("BILLING_MCP_CLIENT_SECRET"),
       entitlementsMcp: env("ENTITLEMENTS_MCP_CLIENT_SECRET"),
+      accountDeletion: env("ACCOUNT_DELETION_CLIENT_SECRET"),
     },
     // This is a local stack: password sign-in and plain HTTP are for it only.
     devLogin: true,

@@ -79,18 +79,23 @@ services:
       pull_policy: never
       profiles: ["app"]
       restart: "no"
+      # A small init process as PID 1, so that a stop signal reaches Node
+      # and the service can finish what it is doing.
+      init: true
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
     pull_policy: build
     command: ["node", "apps/stack/src/provision.ts"]
     environment:
-      <<: &secrets
-        DB_ROLE_PASSWORD: ${DB_ROLE_PASSWORD:-local-role-password}
-        WORKER_CLIENT_SECRET: ${WORKER_CLIENT_SECRET:-local-worker-secret}
-        BILLING_MCP_CLIENT_SECRET: ${BILLING_MCP_CLIENT_SECRET:-local-billing-mcp-secret}
-        ENTITLEMENTS_MCP_CLIENT_SECRET: ${ENTITLEMENTS_MCP_CLIENT_SECRET:-local-entitlements-mcp-secret}
-        DEMO_PASSWORD: ${DEMO_PASSWORD:-local-demo-password}
+      # Provisioning sets every secret up, so it is given them all. Each
+      # service below gets its own and no other's.
+      DB_ROLE_PASSWORD: ${DB_ROLE_PASSWORD:-local-role-password}
+      WORKER_CLIENT_SECRET: &worker-secret ${WORKER_CLIENT_SECRET:-local-worker-secret}
+      BILLING_MCP_CLIENT_SECRET: &billing-mcp-secret ${BILLING_MCP_CLIENT_SECRET:-local-billing-mcp-secret}
+      ENTITLEMENTS_MCP_CLIENT_SECRET: &entitlements-mcp-secret ${ENTITLEMENTS_MCP_CLIENT_SECRET:-local-entitlements-mcp-secret}
+      ACCOUNT_DELETION_CLIENT_SECRET: &deletion-secret ${ACCOUNT_DELETION_CLIENT_SECRET:-local-account-deletion-secret}
+      DEMO_PASSWORD: &demo-password ${DEMO_PASSWORD:-local-demo-password}
       POSTGRES_ADMIN_URL: postgresql://proofdesk:proofdesk@postgres:5432/proofdesk
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_ADMIN_USER: admin
@@ -117,6 +122,16 @@ services:
     depends_on: &provisioned
       provision:
         condition: service_completed_successfully
+    healthcheck: &http-health # Node is the only tool the image is sure to have.
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch("http://127.0.0.1:3000/healthz").then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))
+      interval: 3s
+      timeout: 3s
+      retries: 40
 
   entitlements:
     <<: *app
@@ -128,32 +143,35 @@ services:
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_DATABASE_URL: postgresql://entitlements_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_entitlements
     depends_on: *provisioned
+    healthcheck: *http-health
 
   billing-mcp:
     <<: *app
     restart: unless-stopped
     command: ["node", "mcp/billing/src/main.ts"]
     environment:
-      <<: *secrets
+      BILLING_MCP_CLIENT_SECRET: *billing-mcp-secret
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       BILLING_URL: http://billing:3000
       PUBLIC_URL: http://billing-mcp:3000
     depends_on: *provisioned
+    healthcheck: *http-health
 
   entitlements-mcp:
     <<: *app
     restart: unless-stopped
     command: ["node", "mcp/entitlements/src/main.ts"]
     environment:
-      <<: *secrets
+      ENTITLEMENTS_MCP_CLIENT_SECRET: *entitlements-mcp-secret
       PORT: "3000"
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_URL: http://entitlements:3000
       PUBLIC_URL: http://entitlements-mcp:3000
     depends_on: *provisioned
+    healthcheck: *http-health
 
   documents-mcp:
     <<: *app
@@ -166,6 +184,7 @@ services:
       DOCUMENTS_DATABASE_URL: postgresql://documents_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_documents
       PUBLIC_URL: http://documents-mcp:3000
     depends_on: *provisioned
+    healthcheck: *http-health
 
   portal:
     <<: *app
@@ -191,13 +210,14 @@ services:
         condition: service_completed_successfully
       temporal:
         condition: service_healthy
+    healthcheck: *http-health
 
   worker:
     <<: *app
     restart: unless-stopped
     command: ["node", "apps/worker/src/main.ts"]
     environment:
-      <<: *secrets
+      WORKER_CLIENT_SECRET: *worker-secret
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       WORKER_DATABASE_URL: postgresql://worker_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_app
@@ -205,11 +225,11 @@ services:
       BILLING_MCP_URL: http://billing-mcp:3000/mcp
       ENTITLEMENTS_MCP_URL: http://entitlements-mcp:3000/mcp
       DOCUMENTS_MCP_URL: http://documents-mcp:3000/mcp
-      # For deleting a customer's sign-in account on a deletion request.
+      # For deleting a customer's sign-in account on a deletion request: a
+      # client that may manage the realm's users, not the administrator.
       KEYCLOAK_ADMIN_URL: http://keycloak:8080
-      KEYCLOAK_ADMIN_USER: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
       KEYCLOAK_REALM: proofdesk
+      ACCOUNT_DELETION_CLIENT_SECRET: *deletion-secret
       TEMPORAL_ADDRESS: *temporal
       TEMPORAL_NAMESPACE: *namespace
       TEMPORAL_TASK_QUEUE: *queue
@@ -229,7 +249,7 @@ services:
       temporal:
         condition: service_healthy
       portal:
-        condition: service_started
+        condition: service_healthy
       telemetry:
         condition: service_healthy
       phoenix:
@@ -283,7 +303,7 @@ services:
     profiles: ["demo"]
     entrypoint: ["node", "apps/stack/src/demo.ts"]
     environment:
-      <<: *secrets
+      DEMO_PASSWORD: *demo-password
       PORTAL_URL: http://portal:3000
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel

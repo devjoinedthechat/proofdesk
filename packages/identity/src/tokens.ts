@@ -11,6 +11,9 @@ export class TokenError extends Error {
   }
 }
 
+/** How long the token endpoint gets to answer. */
+const TOKEN_TIMEOUT_MS = 10_000;
+
 export type IssuedToken = { accessToken: string; expiresAt: number };
 
 export type TokenClient = ReturnType<typeof createTokenClient>;
@@ -28,6 +31,7 @@ export function createTokenClient(options: {
   async function request(parameters: Record<string, string>): Promise<IssuedToken> {
     const response = await fetch(endpoint, {
       method: "POST",
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
       body: new URLSearchParams({
         client_id: options.clientId,
         client_secret: options.clientSecret,

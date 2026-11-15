@@ -24,6 +24,7 @@ const STOP_REASONS: Partial<Record<string, StopReason>> = {
  * fallback, so the parameter is left off there.
  */
 const SERVER_FALLBACK = /^claude-(sonnet-5-5|opus-5|fable-5-1)/;
+const CALL_TIMEOUT_MS = 180_000;
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 /**
@@ -113,6 +114,12 @@ function toMessages(messages: Message[], provider: string): Anthropic.Beta.BetaM
   });
 }
 
+/** The provider's "retry-after" header, which is a number of seconds. */
+function retryAfter(headers: Headers | undefined): { retryAfterMs?: number } {
+  const seconds = Number(headers?.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0 ? { retryAfterMs: seconds * 1000 } : {};
+}
+
 function toProviderError(provider: string, error: unknown): unknown {
   // A call the caller aborted is not the provider's failure. It goes up as
   // it is, so nothing retries it or moves it to a backup.
@@ -128,19 +135,25 @@ function toProviderError(provider: string, error: unknown): unknown {
   else if (error.status === 408) kind = "timeout";
   else if (error instanceof Anthropic.InternalServerError) kind = "unavailable";
   else kind = "invalid_request";
-  return new ProviderError(provider, kind, error.message, { cause: error });
+  return new ProviderError(provider, kind, error.message, {
+    cause: error,
+    ...retryAfter(error.headers),
+  });
 }
 
 /**
  * The Anthropic Messages API as a provider. Retries are switched off in the
  * SDK client because the gateway owns them: one place decides how often a
  * call is repeated and what it may cost.
+ *
+ * One call gets three minutes. The SDK's own default is ten, which is the
+ * whole time the workflow allows a model turn, retries included.
  */
 export function createAnthropicProvider(
   options: { client?: Anthropic; name?: string } = {},
 ): ModelProvider {
   const name = options.name ?? "anthropic";
-  const client = options.client ?? new Anthropic({ maxRetries: 0 });
+  const client = options.client ?? new Anthropic({ maxRetries: 0, timeout: CALL_TIMEOUT_MS });
 
   return {
     name,

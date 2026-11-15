@@ -91,6 +91,16 @@ describe("createGateway", () => {
     ]);
   });
 
+  it("waits as long as the provider asked, within reason", async () => {
+    const limited = (retryAfterMs: number) =>
+      new ProviderError("mock", "rate_limited", "slow down", { retryAfterMs });
+    const { gateway, sleeps } = setup([limited(4000), limited(600_000), answer("ok")]);
+
+    await gateway.complete(request, context);
+
+    expect(sleeps).toEqual([4000, 30_000]);
+  });
+
   it("retries a transient failure with growing delays", async () => {
     const { gateway, sleeps, records } = setup([
       down(),
