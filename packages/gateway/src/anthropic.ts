@@ -114,6 +114,9 @@ function toMessages(messages: Message[], provider: string): Anthropic.Beta.BetaM
 }
 
 function toProviderError(provider: string, error: unknown): unknown {
+  // A call the caller aborted is not the provider's failure. It goes up as
+  // it is, so nothing retries it or moves it to a backup.
+  if (error instanceof Anthropic.APIUserAbortError) return error;
   if (!(error instanceof Anthropic.APIError)) return error;
   let kind: ProviderErrorKind;
   if (error instanceof Anthropic.APIConnectionTimeoutError) kind = "timeout";

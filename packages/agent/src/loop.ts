@@ -202,6 +202,10 @@ export async function inspectNext(
  * Settles the next pending call. `approval` is a person's answer when the
  * policy asked for one. A tool runs only when policy allowed it, or policy
  * asked for approval and a person gave it.
+ *
+ * A person's "no" is final. The verdict passed here may be newer than the one
+ * the person was asked about, and may have turned into "allow" while they
+ * decided. The call still does not run.
  */
 export async function settleNext(
   state: AgentState,
@@ -219,16 +223,17 @@ export async function settleNext(
       state.toolCalls.push({ tool: next.tool, input: next.input, verdict: label, outcome: result });
       return result;
     };
-    if (verdict.decision === "deny") {
+    const rejected = () =>
+      record("rejected", failure("approval_rejected: staff reviewed this action and declined it."));
+    if (approval === "rejected") {
+      outcome = rejected();
+    } else if (verdict.decision === "deny") {
       outcome = record("deny", failure(`Not allowed by policy: ${verdict.reason}`));
     } else if (verdict.decision === "needs_approval" && approval !== "approved") {
-      outcome = record(
-        "rejected",
-        failure("approval_rejected: staff reviewed this action and declined it."),
-      );
+      outcome = rejected();
     } else {
       outcome = record(
-        verdict.decision === "needs_approval" ? "approved" : "allow",
+        approval === "approved" ? "approved" : "allow",
         await run(next.tool, next.input),
       );
     }

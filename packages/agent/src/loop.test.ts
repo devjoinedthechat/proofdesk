@@ -9,7 +9,14 @@ import {
 } from "@proofdesk/gateway";
 import { describe, expect, it } from "vitest";
 import { checkResolution, ungroundedAmounts } from "./guards.ts";
-import { type AgentRun, type AgentState, resumeWith, runAgent } from "./loop.ts";
+import {
+  type AgentRun,
+  type AgentState,
+  initialState,
+  resumeWith,
+  runAgent,
+  settleNext,
+} from "./loop.ts";
 import type { AgentTool, ToolCallRecord, Verdict } from "./tools.ts";
 import { withSystemIdempotency } from "./tools.ts";
 
@@ -149,6 +156,27 @@ describe("runAgent", () => {
     expect(yes.toolCalls).toMatchObject([{ verdict: "approved" }]);
     expect(rejected.calls).toEqual([]);
     expect(no.toolCalls).toMatchObject([{ verdict: "rejected", outcome: { isError: true } }]);
+  });
+
+  it("does not run a call a person rejected, even when policy would now allow it", async () => {
+    // The durable workflow asks policy again after the wait for a person.
+    // The rules may have been relaxed in the meantime. The answer stands.
+    const state = initialState("ticket");
+    state.pending = [{ type: "tool_use", id: "call_1", name: "create_refund", input: {} }];
+    let ran = 0;
+
+    await settleNext(
+      state,
+      { kind: "tool", tool: "create_refund", input: {}, verdict: { decision: "allow" } },
+      async () => {
+        ran += 1;
+        return { content: "{}", isError: false };
+      },
+      "rejected",
+    );
+
+    expect(ran).toBe(0);
+    expect(state.toolCalls).toMatchObject([{ verdict: "rejected", outcome: { isError: true } }]);
   });
 
   it("gives the policy the calls made so far", async () => {

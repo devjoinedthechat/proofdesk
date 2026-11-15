@@ -94,6 +94,22 @@ export type ActivityDeps = {
   telemetry?: Telemetry;
   /** Where full conversations go, for a person to read. Nothing is sent without it. */
   inspection?: Inspection;
+  /**
+   * Aborts when the engine has cancelled the step that is running, so a
+   * model call under way stops instead of being paid for and thrown away.
+   */
+  cancelled?: () => AbortSignal | undefined;
+};
+
+/**
+ * What a step wants on record. Nothing is written until the step itself is
+ * saved, and then in the same transaction, so a step that runs twice, or
+ * loses to another attempt, is on record once.
+ */
+type StepLog = {
+  audit(event: string, detail: Record<string, unknown>): void;
+  /** Runs after the step is saved. For records kept outside the database. */
+  after(effect: () => void): void;
 };
 
 const TICKET_STATUS: Record<string, TicketStatus> = {
@@ -132,8 +148,14 @@ const DAY_MS = 86_400_000;
 
 export function createActivities(deps: ActivityDeps) {
   const scope = (ref: TicketRef) => ({ tenantId: ref.tenantId, customerId: ref.customerId });
-  const audit = async (ref: TicketRef, event: string, detail: Record<string, unknown>) => {
-    await appendAudit(deps.db, {
+  /** Writes an audit entry on `db`, which may be a transaction that is still open. */
+  const auditOn = (
+    db: Kysely<AppDatabase>,
+    ref: TicketRef,
+    event: string,
+    detail: Record<string, unknown>,
+  ) =>
+    appendAudit(db, {
       tenantId: ref.tenantId,
       ticketId: ref.ticketId,
       at: deps.clock(),
@@ -141,7 +163,12 @@ export function createActivities(deps: ActivityDeps) {
       event,
       detail,
     });
+  const emit = (ref: TicketRef, event: string, detail: Record<string, unknown>) => {
     if (deps.telemetry) recordEvent(deps.telemetry, { ...ref, event, detail });
+  };
+  const audit = async (ref: TicketRef, event: string, detail: Record<string, unknown>) => {
+    await auditOn(deps.db, ref, event, detail);
+    emit(ref, event, detail);
   };
 
   async function load(ref: TicketRef) {
@@ -171,7 +198,11 @@ export function createActivities(deps: ActivityDeps) {
   async function advance<Output>(
     ref: TicketRef,
     step: number,
-    apply: (state: AgentState, tools: McpToolDescriptor[]) => Promise<Output | { hold: Output }>,
+    apply: (
+      state: AgentState,
+      tools: McpToolDescriptor[],
+      log: StepLog,
+    ) => Promise<Output | { hold: Output }>,
   ): Promise<Output> {
     const run = await load(ref);
     // Already applied: skip the work. The conditional update below is what
@@ -179,12 +210,17 @@ export function createActivities(deps: ActivityDeps) {
     if (run.step > step) return run.lastOutput as Output;
     if (run.step < step) throw new Error(`Step ${step} arrived before step ${run.step} finished`);
 
-    const result = await apply(run.state, run.tools);
+    const entries: { event: string; detail: Record<string, unknown> }[] = [];
+    const effects: (() => void)[] = [];
+    const result = await apply(run.state, run.tools, {
+      audit: (event, detail) => void entries.push({ event, detail }),
+      after: (effect) => void effects.push(effect),
+    });
     // A step that must wait for a person changes nothing and is not counted.
     if (result !== null && typeof result === "object" && "hold" in result) return result.hold;
 
-    const saved = await withRowScope(deps.db, scope(ref), (trx) =>
-      trx
+    const saved = await withRowScope(deps.db, scope(ref), async (trx) => {
+      const row = await trx
         .updateTable("agentRuns")
         .set({
           state: JSON.stringify(run.state),
@@ -195,10 +231,17 @@ export function createActivities(deps: ActivityDeps) {
         .where("ticketId", "=", ref.ticketId)
         .where("step", "=", step)
         .returning("step")
-        .executeTakeFirst(),
-    );
-    // Another attempt of this same step saved first. Its output is the one that counts.
-    return saved ? result : ((await load(ref)).lastOutput as Output);
+        .executeTakeFirst();
+      if (!row) return false;
+      for (const entry of entries) await auditOn(trx, ref, entry.event, entry.detail);
+      return true;
+    });
+    // Another attempt of this same step saved first. Its output is the one
+    // that counts, and so is its record.
+    if (!saved) return (await load(ref)).lastOutput as Output;
+    for (const entry of entries) emit(ref, entry.event, entry.detail);
+    for (const effect of effects) effect();
+    return result;
   }
 
   /** What the agent has refunded for the ticket's tenant since a moment, across all customers. */
@@ -276,8 +319,16 @@ export function createActivities(deps: ActivityDeps) {
           history: memories.map(describeMemory),
         }),
       );
-      const created = await withRowScope(deps.db, scope(ref), (trx) =>
-        trx
+      const { tenant } = await tenantFacts(ref);
+      const started = {
+        category: ticket.category,
+        tools: tools.map((tool) => tool.definition.name),
+        ...deps.versions,
+        // The instructions differ per company. This says which text it was.
+        promptHash: promptHash(tenant),
+      };
+      const created = await withRowScope(deps.db, scope(ref), async (trx) => {
+        const row = await trx
           .insertInto("agentRuns")
           .values({
             // Named one by one: a reference that arrives with extra fields must
@@ -295,17 +346,13 @@ export function createActivities(deps: ActivityDeps) {
           })
           .onConflict((conflict) => conflict.column("ticketId").doNothing())
           .returning("ticketId")
-          .executeTakeFirst(),
-      );
+          .executeTakeFirst();
+        // The run and the record of its start are written together.
+        if (row) await auditOn(trx, ref, "run_started", started);
+        return row;
+      });
       if (created) {
-        const { tenant } = await tenantFacts(ref);
-        await audit(ref, "run_started", {
-          category: ticket.category,
-          tools: tools.map((tool) => tool.definition.name),
-          ...deps.versions,
-          // The instructions differ per company. This says which text it was.
-          promptHash: promptHash(tenant),
-        });
+        emit(ref, "run_started", started);
         if (deps.screen) {
           // A screen that fails must not hold up the ticket.
           const screening = await deps.screen(ref, ticket).catch(() => null);
@@ -319,20 +366,25 @@ export function createActivities(deps: ActivityDeps) {
       const { ref } = input;
       const { tenant } = await tenantFacts(ref);
       const paused = await controls(ref);
-      return advance(ref, input.step, async (state, tools) => {
+      return advance(ref, input.step, async (state, tools, log) => {
         // A paused agent does not think either: no model call is made, and
         // the ticket goes to staff as it stands.
         if (paused.agent && !state.stopped) {
           state.stopped = "paused";
           state.pending = [];
-          await audit(ref, "run_stopped", { cause: "paused", turns: state.turns });
+          log.audit("run_stopped", { cause: "paused", turns: state.turns });
           return { pending: 0, stopped: true };
         }
+        const signal = deps.cancelled?.();
         const { model } = deps.versions;
         const answeredBy = await modelStep(state, {
           model,
           gateway: deps.gateway,
-          context: { tenantId: ref.tenantId, ticketId: ref.ticketId },
+          context: {
+            tenantId: ref.tenantId,
+            ticketId: ref.ticketId,
+            ...(signal ? { signal } : {}),
+          },
           system: promptFor(tenant),
           tools: toolsShown(tools),
           ...(deps.effort ? { effort: deps.effort } : {}),
@@ -340,7 +392,7 @@ export function createActivities(deps: ActivityDeps) {
         // A turn answered by a model other than the configured one, after a
         // failover, is on the record: it is part of who decided what.
         if (answeredBy && answeredBy !== model && !answeredBy.startsWith(`${model}-`)) {
-          await audit(ref, "answered_by_other_model", { configured: model, answeredBy });
+          log.audit("answered_by_other_model", { configured: model, answeredBy });
         }
         return { pending: state.pending.length, stopped: state.stopped !== undefined };
       });
@@ -358,6 +410,14 @@ export function createActivities(deps: ActivityDeps) {
     }): Promise<{ step: number; resumed: boolean }> {
       const { ref, messageId } = input;
       const run = await load(ref);
+      if (run.state.followUps?.includes(messageId)) {
+        // Taken in before. If it opened the round that is still going, this
+        // is the same step running again after its report was lost, and the
+        // answer is the same as the first time: there is a turn to take. If
+        // that round is over, the message is old and nothing is left to do.
+        const open = run.state.followUps.at(-1) === messageId && run.state.stopped === undefined;
+        return { step: run.step, resumed: open };
+      }
       const message = await withRowScope(deps.db, scope(ref), (trx) =>
         trx
           .selectFrom("ticketMessages")
@@ -369,27 +429,31 @@ export function createActivities(deps: ActivityDeps) {
       if (message?.author !== "customer") {
         throw new Error(`No customer message ${messageId} on ticket ${ref.ticketId}`);
       }
-      const resumed = resumeWith(run.state, {
+      resumeWith(run.state, {
         id: messageId,
         text: followUpMessage({ now: deps.clock(), body: message.body }),
       });
-      if (!resumed) return { step: run.step, resumed: false };
+      const resumed = { round: run.state.followUps?.length ?? 1 };
 
+      // The conversation, the ticket and the record change together or not at all.
       await withRowScope(deps.db, scope(ref), async (trx) => {
-        await trx
+        const saved = await trx
           .updateTable("agentRuns")
           .set({ state: JSON.stringify(run.state), updatedAt: deps.clock() })
           .where("ticketId", "=", ref.ticketId)
           .where("step", "=", run.step)
-          .execute();
+          .returning("step")
+          .executeTakeFirst();
+        if (!saved) throw new Error(`The run for ticket ${ref.ticketId} moved on while resuming`);
         // The ticket is open again: its earlier outcome was a question.
         await trx
           .updateTable("tickets")
           .set({ status: "open", outcome: null, reasonCode: null, resolvedAt: null })
           .where("id", "=", ref.ticketId)
           .execute();
+        await auditOn(trx, ref, "run_resumed", resumed);
       });
-      await audit(ref, "run_resumed", { round: run.state.followUps?.length ?? 1 });
+      emit(ref, "run_resumed", resumed);
       return { step: run.step, resumed: true };
     },
 
@@ -400,9 +464,9 @@ export function createActivities(deps: ActivityDeps) {
      */
     async stopRun(input: { ref: TicketRef; step: number }): Promise<void> {
       const { ref } = input;
-      await advance(ref, input.step, async (state) => {
+      await advance(ref, input.step, async (state, _tools, log) => {
         state.stopped = "model_unavailable";
-        await audit(ref, "run_stopped", { cause: "model_unavailable", turns: state.turns });
+        log.audit("run_stopped", { cause: "model_unavailable", turns: state.turns });
         return null;
       });
     },
@@ -438,7 +502,7 @@ export function createActivities(deps: ActivityDeps) {
       };
       const approvalId = `${ref.ticketId}:${step}`;
 
-      return advance<CallOutput>(ref, step, async (state, tools) => {
+      return advance<CallOutput>(ref, step, async (state, tools, log) => {
         const byName = new Map(tools.map((tool) => [tool.definition.name, tool]));
         const canChangePlan = planChangeAvailable([...byName.keys()]);
         let next: NextCall = await inspectNext(
@@ -448,7 +512,10 @@ export function createActivities(deps: ActivityDeps) {
           policyAuthorizer(deps.policy, inputs),
         );
 
-        if (next.kind === "tool" && next.verdict.decision === "needs_approval") {
+        // A person was asked about this call if policy wants one now, or if
+        // their answer is already here. In the second case policy may have
+        // changed its mind since, and the answer is still recorded and kept.
+        if (next.kind === "tool" && (next.verdict.decision === "needs_approval" || approval)) {
           const summary = { tool: next.tool, ...next.input };
           if (!approval) {
             const requested = await withRowScope(deps.db, scope(ref), async (trx) => {
@@ -457,7 +524,7 @@ export function createActivities(deps: ActivityDeps) {
                 .set({ status: "waiting_approval" })
                 .where("id", "=", ref.ticketId)
                 .execute();
-              return trx
+              const row = await trx
                 .insertInto("approvals")
                 .values({
                   id: approvalId,
@@ -479,8 +546,10 @@ export function createActivities(deps: ActivityDeps) {
                 .onConflict((conflict) => conflict.column("id").doNothing())
                 .returning("id")
                 .executeTakeFirst();
+              if (row) await auditOn(trx, ref, "approval_requested", { approvalId, ...summary });
+              return row;
             });
-            if (requested) await audit(ref, "approval_requested", { approvalId, ...summary });
+            if (requested) emit(ref, "approval_requested", { approvalId, ...summary });
             return { hold: { status: "needs_approval", approvalId } };
           }
 
@@ -501,12 +570,13 @@ export function createActivities(deps: ActivityDeps) {
               .where("id", "=", ref.ticketId)
               .execute();
           });
-          await audit(ref, "approval_decided", { approvalId, ...approval });
+          log.audit("approval_decided", { approvalId, ...approval });
 
           // An approval lets policy be asked again, this time with the
           // approval as a fact. It cannot override a rule that forbids the
-          // call outright, such as the kill switch.
-          if (approval.decision === "approved") {
+          // call outright, such as the kill switch. A rejection needs no
+          // second look: the call does not run, whatever policy says now.
+          if (approval.decision === "approved" && next.verdict.decision === "needs_approval") {
             const refunded = refundsMade(state.toolCalls).reduce(
               (sum, refund) => sum + refund.amountCents,
               0,
@@ -545,21 +615,24 @@ export function createActivities(deps: ActivityDeps) {
 
         const record = state.toolCalls[before];
         if (record) {
-          deps.inspection?.toolCall({
-            tenantId: ref.tenantId,
-            ticketId: ref.ticketId,
-            name: record.tool,
-            input: record.input,
-            verdict: record.verdict,
-            output: record.outcome.content,
-            failed: record.outcome.isError,
-            startedAt,
-            endedAt: deps.clock(),
-          });
+          const endedAt = deps.clock();
+          log.after(() =>
+            deps.inspection?.toolCall({
+              tenantId: ref.tenantId,
+              ticketId: ref.ticketId,
+              name: record.tool,
+              input: record.input,
+              verdict: record.verdict,
+              output: record.outcome.content,
+              failed: record.outcome.isError,
+              startedAt,
+              endedAt,
+            }),
+          );
           // Counted towards the tenant's daily cap, once per refund: a
           // repeated step gets the same refund back from billing.
           for (const refund of refundsMade([record])) await recordRefund(ref, refund);
-          await audit(ref, "tool_call", {
+          log.audit("tool_call", {
             step,
             tool: record.tool,
             verdict: record.verdict,

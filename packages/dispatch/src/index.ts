@@ -1,4 +1,8 @@
-import { type Client, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
+import {
+  type Client,
+  WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
+} from "@temporalio/client";
 import { z } from "zod";
 
 // How a piece of promised work becomes a running workflow. The portal and
@@ -85,5 +89,27 @@ export function createDispatch(
       // previous run closing. For the others it is this same job.
       return job.kind === "follow_up" ? "busy" : "started";
     }
+  };
+}
+
+/**
+ * Tells which of the given workflows are still running. One that was asked
+ * to stop counts as running until the step it was in has finished.
+ */
+export function runningWorkflows(client: Client) {
+  return async (workflowIds: string[]): Promise<string[]> => {
+    const states = await Promise.all(
+      workflowIds.map(async (workflowId) => {
+        try {
+          const { status } = await client.workflow.getHandle(workflowId).describe();
+          return status.name === "RUNNING";
+        } catch (error) {
+          // Never started: nothing ever ran under that id.
+          if (error instanceof WorkflowNotFoundError) return false;
+          throw error;
+        }
+      }),
+    );
+    return workflowIds.filter((_, index) => states[index]);
   };
 }

@@ -3,6 +3,7 @@
 // replays this function from its history after a crash.
 
 import {
+  ActivityCancellationType,
   ActivityFailure,
   ApplicationFailure,
   condition,
@@ -25,7 +26,14 @@ import type {
 import type { DeletionActivities, DeletionRef, DeletionReport } from "./deletion.ts";
 import type { WatchdogActivities } from "./watchdog.ts";
 
+// When a ticket's workflow is cancelled, it does not close until the step
+// that is running has stopped. A deletion cancels the customer's tickets and
+// then erases; a workflow that closed at once would leave a tool call still
+// writing while the erasing went on.
+const cancellationType = ActivityCancellationType.WAIT_CANCELLATION_COMPLETED;
+
 const { startRun, executeNext, finishRun, stopRun, resumeRun } = proxyActivities<Activities>({
+  cancellationType,
   startToCloseTimeout: "2 minutes",
   // Activities report in every few seconds. A worker that goes silent is
   // presumed lost and its activity is given to another, long before the
@@ -38,6 +46,7 @@ const { startRun, executeNext, finishRun, stopRun, resumeRun } = proxyActivities
 // its attempts are capped. The gateway inside already retries transient
 // provider failures.
 const { modelTurn } = proxyActivities<Activities>({
+  cancellationType,
   startToCloseTimeout: "10 minutes",
   heartbeatTimeout: "30 seconds",
   retry: { initialInterval: "5 seconds", backoffCoefficient: 2, maximumAttempts: 4 },
@@ -148,6 +157,7 @@ export async function ticketWorkflow(
 
 const {
   beginDeletion,
+  agentsStopped,
   eraseConversations,
   eraseElsewhere,
   eraseRecords,
@@ -166,7 +176,7 @@ const ticketWorkflowId = (ticketId: string, suffix = "") => `ticket-${ticketId}$
  * Deletes one customer's data at their request. There is no model in this
  * workflow and no decision: the steps and their order are fixed.
  *
- * 1. Stop any agent still working for the customer.
+ * 1. Stop any agent still working for the customer, and wait until it has.
  * 2. Remove their conversations from the inspection store.
  * 3. Close the billing account and remove access, on the request's own grant.
  * 4. Erase this system's records, which also removes that grant.
@@ -180,15 +190,19 @@ export async function deletionWorkflow(
   options: { ticketWorkflowSuffix?: string } = {},
 ): Promise<DeletionReport> {
   const { openTicketIds, ticketIds } = await beginDeletion(ref);
-  for (const ticketId of openTicketIds) {
+  const agents = openTicketIds.map((ticketId) =>
+    ticketWorkflowId(ticketId, options.ticketWorkflowSuffix),
+  );
+  for (const workflowId of agents) {
     try {
-      await getExternalWorkflowHandle(
-        ticketWorkflowId(ticketId, options.ticketWorkflowSuffix),
-      ).cancel();
+      await getExternalWorkflowHandle(workflowId).cancel();
     } catch {
       // Already finished, or never started. Either way no agent is running.
     }
   }
+  // Asking an agent to stop is not the same as it having stopped: a tool
+  // call under way finishes first. Nothing is erased until every one has.
+  if (patched("wait-for-agents")) await agentsStopped({ workflowIds: agents });
   // After the agents have stopped, so that no conversation is still being
   // written. A request that was already running when this step was added
   // carries on without it, as it was started.

@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { callMcpTool, listMcpTools, PROMPT_VERSION, screenTicket } from "@proofdesk/agent";
 import { type AppDatabase, connect } from "@proofdesk/db";
-import { createDispatch } from "@proofdesk/dispatch";
+import { createDispatch, runningWorkflows } from "@proofdesk/dispatch";
 import {
   ANTHROPIC_PRICES,
   CLAUDE_FAILOVER,
@@ -23,6 +23,7 @@ import {
 import { createToolPolicy, invoiceRecords, policyVersion } from "@proofdesk/policy";
 import { env } from "@proofdesk/service";
 import { startInspection, startTelemetry } from "@proofdesk/telemetry";
+import { Context } from "@temporalio/activity";
 import { Client, Connection, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { createActivities, type TicketRef } from "./activities.ts";
@@ -137,6 +138,9 @@ async function start() {
     policy: createToolPolicy(),
     clock: () => new Date(),
     telemetry,
+    // Every activity runs inside the engine's context, which says when the
+    // step has been cancelled.
+    cancelled: () => Context.current().cancellationSignal,
     ...(screenModel
       ? {
           screen: (ref: TicketRef, ticket: { subject: string; body: string }) =>
@@ -175,6 +179,11 @@ async function start() {
     },
   });
 
+  const client = new Client({
+    connection: await Connection.connect({ address: env("TEMPORAL_ADDRESS") }),
+    namespace: env("TEMPORAL_NAMESPACE"),
+  });
+
   // Deletion needs the entitlements server and a Keycloak account that may
   // delete users. A worker without them handles tickets and no deletions.
   const entitlementsUrl = process.env.ENTITLEMENTS_MCP_URL;
@@ -198,6 +207,7 @@ async function start() {
               ),
             { billingErase: SCOPES.billingErase, entitlementsErase: SCOPES.entitlementsErase },
           ),
+          agents: { running: runningWorkflows(client) },
           identity: {
             async deleteAccount(customerId) {
               const admin = await connectKeycloakAdmin({
@@ -210,11 +220,6 @@ async function start() {
           },
         })
       : {};
-
-  const client = new Client({
-    connection: await Connection.connect({ address: env("TEMPORAL_ADDRESS") }),
-    namespace: env("TEMPORAL_NAMESPACE"),
-  });
 
   const worker = await createTicketWorker({
     connection: await NativeConnection.connect({ address: env("TEMPORAL_ADDRESS") }),

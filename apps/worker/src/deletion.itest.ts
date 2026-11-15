@@ -10,7 +10,7 @@ import {
   testPostgresUrl,
   verifyAudit,
 } from "@proofdesk/db";
-import { createDispatch, deletionWorkflowId } from "@proofdesk/dispatch";
+import { createDispatch, deletionWorkflowId, runningWorkflows } from "@proofdesk/dispatch";
 import { createEntitlementsApp } from "@proofdesk/entitlements";
 import { call, invoicesSeen, listInvoices } from "@proofdesk/evals";
 import { MockProvider, type MockStep } from "@proofdesk/gateway";
@@ -406,6 +406,7 @@ beforeAll(async () => {
       { billingErase: SCOPES.billingErase, entitlementsErase: SCOPES.entitlementsErase },
     ),
     identity: { deleteAccount: (customerId) => deleteCustomerAccount(admin, customerId, realm) },
+    agents: { running: runningWorkflows(client) },
   });
   worker = await createTicketWorker({
     connection: native,

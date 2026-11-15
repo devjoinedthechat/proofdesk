@@ -96,6 +96,8 @@ async function setup(target: Scenario, steps: MockStep[]) {
     /** Makes the undo of a billing change crash this many times. */
     crashRevert: 0,
     calls: [] as string[],
+    /** Keeps a refund call in flight until it resolves. */
+    hold: undefined as Promise<void> | undefined,
   };
   // Only the tools the ticket's category grants, as the token scopes arrange in production.
   const granted = new Set(GRANT_SCOPES[target.ticket.category]);
@@ -135,6 +137,7 @@ async function setup(target: Scenario, steps: MockStep[]) {
         const entry = serviceTools.find((candidate) => candidate.tool.name === name);
         if (!entry) throw new Error("unknown tool");
         state.calls.push(name);
+        if (name === "create_refund" && state.hold) await state.hold;
         if (name === "set_entitlement" && state.crashEntitlementWrite > 0) {
           state.crashEntitlementWrite -= 1;
           throw new Error("worker lost before access was updated");
@@ -492,6 +495,89 @@ describe("ticket workflow", () => {
     expect((await run.ticket()).status).toBe("refused");
   }, 90_000);
 
+  it("does not pay when staff reject, even if the rules were relaxed while they decided", async () => {
+    const target = scenario("refund-over-limit-rejected");
+    const run = await setup(
+      target,
+      overLimitScript(
+        resolveWith(
+          "refused",
+          "approval_rejected",
+          (number) => `Our team declined the refund for ${number}.`,
+        ),
+      ),
+    );
+    await run.startWorker();
+    const handle = await run.start();
+    const waiting = await waitFor(
+      () => handle.query(progress),
+      (value) => value.phase === "waiting_approval",
+      "the approval request",
+    );
+
+    // The company raises its limit while the request waits. Asked today,
+    // policy would let this refund through without a person. A person was
+    // asked, though, and their answer is the one that counts.
+    await run.env.dbs.app
+      .updateTable("tenants")
+      .set({ refundApprovalLimitCents: 100_000_00 })
+      .where("id", "=", run.ref.tenantId)
+      .execute();
+    await handle.signal(approvalDecided, {
+      approvalId: waiting.approvalId ?? "",
+      decision: "rejected",
+      decidedBy: "staff:ada",
+    });
+
+    expect(await handle.result()).toEqual({ outcome: "refused", reasonCode: "approval_rejected" });
+    expect(await run.refunds()).toEqual([]);
+    expect(
+      await run.env.dbs.app
+        .selectFrom("approvals")
+        .select(["status", "decidedBy"])
+        .executeTakeFirstOrThrow(),
+    ).toEqual({ status: "rejected", decidedBy: "staff:ada" });
+    expect((await run.ticket()).status).toBe("refused");
+    const last = (await run.audit()).filter((entry) => entry.event === "tool_call").at(-1);
+    expect(JSON.parse(last?.detail ?? "{}")).toMatchObject({
+      tool: "create_refund",
+      verdict: "rejected",
+    });
+  }, 90_000);
+
+  it("stays open, when cancelled, until the tool call in flight has finished", async () => {
+    // A deletion cancels the customer's tickets and then erases. If the
+    // workflow closed while a tool call was still running, the erasing
+    // would race the call's last writes.
+    const run = await setup(scenario("refund-duplicate-with-invoice"), duplicateScript());
+    let release: () => void = () => {};
+    run.state.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await run.startWorker();
+    const handle = await run.start();
+    await waitFor(
+      async () => run.state.calls,
+      (calls) => calls.includes("create_refund"),
+      "the refund call to start",
+    );
+
+    try {
+      await handle.cancel();
+      // Longer than a heartbeat, so the activity has heard of the cancellation.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      expect((await handle.describe()).status.name).toBe("RUNNING");
+    } finally {
+      release();
+    }
+    const closed = await waitFor(
+      () => handle.describe(),
+      (description) => description.status.name !== "RUNNING",
+      "the workflow to close",
+    );
+    expect(closed.status.name).toBe("CANCELLED");
+  }, 90_000);
+
   it("does not pay an approved refund if the agent was paused in the meantime", async () => {
     const target = scenario("refund-over-limit-approved");
     const run = await setup(
@@ -622,6 +708,86 @@ describe("activities applied twice", () => {
       .executeTakeFirstOrThrow();
     expect(saved.step).toBe(1);
     expect((saved.state as { messages: unknown[] }).messages).toHaveLength(2);
+  }, 60_000);
+
+  it("writes one audit entry for a tool call, however many attempts made it", async () => {
+    const target = scenario("refund-duplicate-with-invoice");
+    const run = await setup(target, duplicateScript());
+    const { activities, ref } = run;
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    await activities.modelTurn({ ref, step: 2 });
+
+    // Two attempts of the refund overlap. Billing pays once, on the shared
+    // key, and the record must say once too.
+    const [a, b] = await Promise.all([
+      activities.executeNext({ ref, step: 3 }),
+      activities.executeNext({ ref, step: 3 }),
+    ]);
+
+    expect(a).toEqual(b);
+    expect(await run.refunds()).toEqual(target.expected.refunds);
+    expect((await run.audit()).map((entry) => entry.event)).toEqual([
+      "run_started",
+      "tool_call",
+      "tool_call",
+    ]);
+  }, 60_000);
+
+  it("takes a customer's answer in again when the first attempt's report was lost", async () => {
+    const run = await setup(scenario("refund-duplicate-with-invoice"), [
+      call("resolve_ticket", {
+        outcome: "needs_clarification",
+        reasonCode: "other",
+        reply: "Which charge do you mean?",
+      }),
+      ...duplicateScript(),
+    ]);
+    const { activities, ref } = run;
+    await activities.startRun(ref);
+    await activities.modelTurn({ ref, step: 0 });
+    await activities.executeNext({ ref, step: 1 });
+    expect((await activities.finishRun(ref)).outcome).toBe("needs_clarification");
+    await run.env.dbs.app
+      .insertInto("ticketMessages")
+      .values({
+        id: "msg_answer",
+        ticketId: ref.ticketId,
+        tenantId: ref.tenantId,
+        customerId: ref.customerId,
+        author: "customer",
+        body: "The second one in March.",
+        createdAt: run.env.now,
+      })
+      .execute();
+
+    // The worker took the message in and died before the engine heard. The
+    // engine runs the step again, and must be told the same thing: there is
+    // a turn to take. Told otherwise, it would close the ticket unanswered.
+    const first = await activities.resumeRun({ ref, messageId: "msg_answer" });
+    const again = await activities.resumeRun({ ref, messageId: "msg_answer" });
+    expect(first).toEqual({ step: 2, resumed: true });
+    expect(again).toEqual(first);
+    expect((await run.audit()).filter((entry) => entry.event === "run_resumed")).toHaveLength(1);
+    const saved = await run.env.dbs.app
+      .selectFrom("agentRuns")
+      .select("state")
+      .executeTakeFirstOrThrow();
+    const texts = JSON.stringify((saved.state as { messages: unknown[] }).messages);
+    expect(texts.split("The second one in March.")).toHaveLength(2);
+
+    // Once that round is over, the same message is old news.
+    await activities.modelTurn({ ref, step: 2 });
+    await activities.executeNext({ ref, step: 3 });
+    await activities.modelTurn({ ref, step: 4 });
+    await activities.executeNext({ ref, step: 5 });
+    await activities.modelTurn({ ref, step: 6 });
+    await activities.executeNext({ ref, step: 7 });
+    expect((await activities.finishRun(ref)).outcome).toBe("refunded");
+    expect(await activities.resumeRun({ ref, messageId: "msg_answer" })).toMatchObject({
+      resumed: false,
+    });
   }, 60_000);
 
   it("refuses a step that arrives before the one before it", async () => {

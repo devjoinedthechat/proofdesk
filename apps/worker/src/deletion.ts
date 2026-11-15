@@ -34,6 +34,8 @@ export type DeletionDeps = {
   entitlements: { erase(ref: DeletionRef): Promise<DeletionReport["entitlements"]> };
   /** Removes the customer's sign-in account and returns how many were removed. */
   identity: { deleteAccount(customerId: string): Promise<number> };
+  /** Which of the given ticket workflows are still running, by workflow id. */
+  agents: { running(workflowIds: string[]): Promise<string[]> };
   telemetry?: Telemetry;
   /** The store of full conversations, if one is in use. A deletion must reach it. */
   inspection?: Inspection;
@@ -101,6 +103,8 @@ export function mcpErasers(
   };
 }
 
+/** How long one attempt waits for agents to stop. Well inside the activity's own timeout. */
+const AGENT_WAIT_MS = 60_000;
 const OPEN_STATUSES = ["open", "waiting_approval", "waiting_customer"] as const;
 const erasedCounts = z.record(z.string(), z.number().int().nonnegative());
 
@@ -155,6 +159,23 @@ export function createDeletionActivities(deps: DeletionDeps) {
       // Every ticket the customer ever had, read now: once the records are
       // erased nothing here will know which conversations were theirs.
       return { openTicketIds, ticketIds: found.all.map((ticket) => ticket.id) };
+    },
+
+    /**
+     * Returns once none of the customer's agents is running any more. One
+     * that is still in the middle of a step makes this fail, and the engine
+     * asks again until it has stopped.
+     */
+    async agentsStopped(input: { workflowIds: string[] }): Promise<void> {
+      const giveUpAt = Date.now() + AGENT_WAIT_MS;
+      for (;;) {
+        const running = await deps.agents.running(input.workflowIds);
+        if (running.length === 0) return;
+        if (Date.now() >= giveUpAt) {
+          throw new Error(`${running.length} agent(s) for this customer are still running`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     },
 
     /** Removes the customer's conversations from the inspection store. */
