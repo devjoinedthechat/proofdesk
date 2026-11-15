@@ -16,6 +16,6 @@
     "@proofdesk/entitlements": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "hono": "4.13.18",
-    "kysely": "0.29.8"
+    "kysely": "0.29.9"
   }
 }

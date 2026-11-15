@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@proofdesk/db": "workspace:*",
-    "kysely": "0.29.8"
+    "kysely": "0.29.9"
   }
 }

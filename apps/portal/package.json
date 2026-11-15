@@ -16,7 +16,7 @@
     "@proofdesk/service": "workspace:*",
     "@temporalio/client": "1.25.0",
     "hono": "4.13.18",
-    "kysely": "0.29.8",
+    "kysely": "0.29.9",
     "zod": "4.6.7"
   }
 }

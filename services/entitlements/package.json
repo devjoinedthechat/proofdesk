@@ -14,7 +14,7 @@
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "hono": "4.13.18",
-    "kysely": "0.29.8",
+    "kysely": "0.29.9",
     "zod": "4.6.7"
   }
 }
