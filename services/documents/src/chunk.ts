@@ -19,7 +19,9 @@ export function chunkMarkdown(title: string, markdown: string): Chunk[] {
     buffer = [];
   };
 
-  for (const block of markdown.split(/\n\s*\n/)) {
+  // A blank line ends a block. The pattern cannot match a line break in its
+  // middle, so a long run of empty lines costs no more than its length.
+  for (const block of markdown.split(/\n[^\S\n]*\n/)) {
     const text = block.trim();
     if (!text) continue;
     const match = /^(#{1,4})\s+(.*)$/.exec(text);

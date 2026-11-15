@@ -352,7 +352,7 @@ beforeAll(async () => {
   const server = (url: string, ticketId: string) => ({
     url,
     fetch: (request: Request) =>
-      (url.startsWith(BILLING_MCP) ? billingMcp : entitlementsMcp).fetch(request),
+      (new URL(url).origin === BILLING_MCP ? billingMcp : entitlementsMcp).fetch(request),
     tokenFor: async (scope: string) => {
       try {
         return (await toolTokens.forTool({ ticketId, scope })).accessToken;

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BILLING_MIGRATIONS_DIR, type BillingDatabase } from "@proofdesk/billing";
 import {
@@ -214,12 +214,16 @@ async function seed(urls: Record<keyof typeof DATABASES, string>) {
 
 async function grantKey(): Promise<{ key: GrantKey; created: boolean }> {
   const file = join(stateDir, "grant-key.json");
-  if (existsSync(file)) {
+  const key = await generateGrantKey();
+  try {
+    // Created only if it is not there, in one step. Looking first and
+    // writing second would let two runs each write a key of their own.
+    writeFileSync(file, JSON.stringify(key), { mode: 0o600, flag: "wx" });
+    return { key, created: true };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     return { key: JSON.parse(readFileSync(file, "utf8")) as GrantKey, created: false };
   }
-  const key = await generateGrantKey();
-  writeFileSync(file, JSON.stringify(key), { mode: 0o600 });
-  return { key, created: true };
 }
 
 async function identity(seeded: Awaited<ReturnType<typeof seed>>) {

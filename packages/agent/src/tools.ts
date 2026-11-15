@@ -40,6 +40,18 @@ export type ToolCallRecord = {
 type ObjectSchema = { properties?: Record<string, unknown>; required?: string[] };
 
 /**
+ * Drops the sentence that explains the idempotency key from a tool's
+ * description. A description comes from a server, so it is searched with
+ * plain string functions, whose cost does not depend on what it contains.
+ */
+function withoutKeySentence(description: string): string {
+  const start = description.indexOf("Repeating a call");
+  const end = start < 0 ? -1 : description.indexOf(".", start);
+  if (end < 0) return description;
+  return description.slice(0, start).trimEnd() + description.slice(end + 1);
+}
+
+/**
  * Removes the idempotency key from what the model is shown. The model cannot
  * choose the key, so it cannot defeat it.
  */
@@ -49,7 +61,7 @@ export function hideIdempotencyKey(definition: ToolDefinition): ToolDefinition {
   const { idempotencyKey: _hidden, ...properties } = schema.properties;
   return {
     ...definition,
-    description: definition.description.replace(/\s*Repeating a call[^.]*\./, ""),
+    description: withoutKeySentence(definition.description),
     inputSchema: {
       ...schema,
       properties,
