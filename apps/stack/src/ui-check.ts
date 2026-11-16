@@ -75,7 +75,9 @@ async function approver(browser: Browser) {
     await page.getByRole("heading", { name: heading }).waitFor();
   }
   // Each list has loaded and none reported a failure.
-  await page.waitForFunction("!document.body.textContent.includes('Loading')");
+  for (const loading of await page.getByText("Loading…").all()) {
+    await loading.waitFor({ state: "detached" });
+  }
   if ((await page.locator("p.error").count()) > 0) {
     problems.push(`approver: ${await page.locator("p.error").first().textContent()}`);
   }

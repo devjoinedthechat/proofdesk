@@ -563,14 +563,27 @@ export function createPortalApp(deps: PortalDeps) {
     return c.json({ control: { scope, paused: input.paused } });
   });
 
+  // What is waiting for a decision, with the request it belongs to: nobody
+  // should approve a payment without seeing what the customer asked for.
   app.get("/staff/approvals", async (c) => {
     const staff = await approver(c.req.raw);
     const rows = await withRowScope(deps.db, { tenantId: staff.tenantId }, (trx) =>
       trx
-        .selectFrom("approvals")
-        .selectAll()
-        .where("status", "=", "pending")
-        .orderBy("requestedAt")
+        .selectFrom("approvals as a")
+        .innerJoin("tickets as t", "t.id", "a.ticketId")
+        .select([
+          "a.id",
+          "a.ticketId",
+          "a.tool",
+          "a.summary",
+          "a.reason",
+          "a.requestedAt",
+          "t.category",
+          "t.subject",
+          "t.body",
+        ])
+        .where("a.status", "=", "pending")
+        .orderBy("a.requestedAt")
         .execute(),
     );
     return c.json({
@@ -581,6 +594,7 @@ export function createPortalApp(deps: PortalDeps) {
         summary: row.summary,
         reason: row.reason,
         requestedAt: row.requestedAt.toISOString(),
+        ticket: { category: row.category, subject: row.subject, body: row.body },
       })),
     });
   });

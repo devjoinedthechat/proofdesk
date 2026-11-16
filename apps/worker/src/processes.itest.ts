@@ -396,6 +396,8 @@ describe("the system as separate processes", () => {
       ticketId,
       tool: "create_refund",
       summary: { amountCents: 980_00 },
+      // The request itself, so that staff can see what they are approving.
+      ticket: { category: "refund", subject: expect.any(String), body: expect.any(String) },
     });
     expect(await stack.refunds()).toEqual([]);
 
