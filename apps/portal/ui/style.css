@@ -200,19 +200,10 @@ section > :last-child {
 .reply {
   margin-top: 10px;
   padding: 10px 12px;
-  border-left: 3px solid var(--accent);
-  border-radius: 0 6px 6px 0;
+  border-radius: 6px;
   background: var(--bg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.reply.customer {
-  border-left-color: var(--muted);
-}
-
-.reply.staff {
-  border-left-color: var(--good);
 }
 
 .reply .author {
