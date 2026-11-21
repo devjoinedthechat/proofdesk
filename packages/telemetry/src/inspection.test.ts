@@ -1,5 +1,5 @@
 import { InMemorySpanExporter } from "@opentelemetry/sdk-trace";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type InspectedModelCall,
   noInspection,
@@ -174,5 +174,47 @@ describe("the inspection store", () => {
         project === "proofdesk-ten_a" ? "tkt_a" : "tkt_b",
       ]);
     }
+  });
+});
+
+describe("deleting a ticket from the inspection store", () => {
+  /** A store that answers each delete with the next status, and with "not found" after that. */
+  function store(statuses: number[]) {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: { method: string }) => {
+      asked.push(`${init.method} ${url}`);
+      return new Response(null, { status: statuses.shift() ?? 404 });
+    });
+    const inspection = startInspection({ endpoint: "http://store.test", deleteIntervalMs: 0 });
+    return { inspection, asked };
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("deletes again when a trace that was still on its way in turns up afterwards", async () => {
+    // Nothing there yet, then the trace arrives, then part of it arrives late.
+    const { inspection, asked } = store([404, 204, 404, 204]);
+
+    expect(await inspection.deleteTicket("ten_a", "tkt_1")).toBe(true);
+    // Two deletes found something. After the last one the store was asked
+    // four more times and had nothing each time.
+    expect(asked).toHaveLength(8);
+    expect(new Set(asked)).toEqual(
+      new Set([`DELETE http://store.test/v1/traces/${ticketTraceIds("tkt_1").traceId}`]),
+    );
+  });
+
+  it("says nothing was removed when the store never had the ticket", async () => {
+    const { inspection, asked } = store([]);
+    expect(await inspection.deleteTicket("ten_a", "tkt_1")).toBe(false);
+    expect(asked).toHaveLength(4);
+  });
+
+  it("fails, to be tried again, when the trace keeps coming back or the store refuses", async () => {
+    const endless = store(Array.from({ length: 100 }, () => 204));
+    await expect(endless.inspection.deleteTicket("ten_a", "tkt_1")).rejects.toThrow(
+      /kept receiving/,
+    );
+    const refusing = store([500]);
+    await expect(refusing.inspection.deleteTicket("ten_a", "tkt_1")).rejects.toThrow(/refused/);
   });
 });

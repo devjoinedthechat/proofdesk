@@ -182,11 +182,11 @@ export function createDeletionActivities(deps: DeletionDeps) {
     async eraseConversations(input: { ref: DeletionRef; ticketIds: string[] }): Promise<number> {
       const { inspection } = deps;
       if (!inspection) return 0;
-      let removed = 0;
-      for (const ticketId of input.ticketIds) {
-        if (await inspection.deleteTicket(input.ref.tenantId, ticketId)) removed += 1;
-      }
-      return removed;
+      // Side by side: each one waits until the store has stayed empty.
+      const removed = await Promise.all(
+        input.ticketIds.map((ticketId) => inspection.deleteTicket(input.ref.tenantId, ticketId)),
+      );
+      return removed.filter(Boolean).length;
     },
 
     /** Closes the billing account and removes the customer's access. */

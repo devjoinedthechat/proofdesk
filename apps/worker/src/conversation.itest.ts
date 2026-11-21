@@ -653,7 +653,20 @@ describe("one customer asking too much", () => {
     expect(statuses.filter((status) => status === 201).length).toBeLessThanOrEqual(6);
     expect(statuses.at(-1)).toBe(429);
 
-    // The limit is per customer. Another customer of the same company files as usual.
+    // The limit is per customer. Another customer of the same company files
+    // as usual, once the tickets they filed in the tests above are no longer
+    // open: under load those can still be in progress, and five open tickets
+    // would rightly earn this customer a wait of their own.
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const open = await env.dbs.app
+        .selectFrom("tickets")
+        .select("id")
+        .where("customerId", "=", customer.id)
+        .where("status", "=", "open")
+        .execute();
+      if (open.length < 5) break;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
     const other = await as(customer.email, "POST", "/tickets", {
       category: "refund",
       subject: "One more",

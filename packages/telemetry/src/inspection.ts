@@ -181,18 +181,26 @@ function flatten(system: string | undefined, messages: InspectedMessage[]) {
   return flat;
 }
 
+/** A deleted trace must be absent this many times in a row before it counts as gone. */
+const DELETE_QUIET_CHECKS = 4;
+/** After this many looks the store is still taking the trace in, and the caller should try later. */
+const DELETE_MAX_CHECKS = 40;
+
 export function startInspection(options: {
   /** The store's base URL, such as http://phoenix:6006. Nothing is sent without it. */
   endpoint?: string | undefined;
   apiKey?: string | undefined;
   /** For tests: where spans go instead of over the network. */
   exporter?: (project: string) => SpanExporter;
+  /** How long to wait between two looks at a trace that is being deleted. */
+  deleteIntervalMs?: number;
 }): Inspection {
   if (!options.endpoint && !options.exporter) return noInspection;
   const base = options.endpoint?.replace(/\/$/, "");
   const headers: Record<string, string> = options.apiKey
     ? { authorization: `Bearer ${options.apiKey}` }
     : {};
+  const deleteIntervalMs = options.deleteIntervalMs ?? 500;
 
   // One pipeline per company: each writes to its own project.
   const tenants = new Map<string, { provider: TracerProvider; ids: RootIdGenerator }>();
@@ -374,15 +382,30 @@ export function startInspection(options: {
       // Anything still waiting to be sent goes first, so that it is deleted
       // and does not arrive afterwards.
       await tenants.get(tenantId)?.provider.forceFlush();
-      const response = await fetch(`${base}/v1/traces/${ticketTraceIds(ticketId).traceId}`, {
-        method: "DELETE",
-        headers,
-      });
-      if (response.status === 404) return false;
-      if (!response.ok) {
-        throw new Error(`The inspection store refused to delete a trace (${response.status})`);
+      // The store takes spans in after it has accepted them, so a trace can
+      // still be on its way in when it is deleted: the delete finds nothing,
+      // or part of it, and the rest appears a moment later. So the delete is
+      // repeated until the store has had nothing for this ticket several
+      // times in a row.
+      const url = `${base}/v1/traces/${ticketTraceIds(ticketId).traceId}`;
+      let removed = false;
+      let quiet = 0;
+      for (let attempt = 0; quiet < DELETE_QUIET_CHECKS; attempt++) {
+        if (attempt >= DELETE_MAX_CHECKS) {
+          throw new Error("The inspection store kept receiving a trace that is being deleted");
+        }
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, deleteIntervalMs));
+        const response = await fetch(url, { method: "DELETE", headers });
+        if (response.status === 404) {
+          quiet += 1;
+        } else if (response.ok) {
+          removed = true;
+          quiet = 0;
+        } else {
+          throw new Error(`The inspection store refused to delete a trace (${response.status})`);
+        }
       }
-      return true;
+      return removed;
     },
 
     async flush() {
