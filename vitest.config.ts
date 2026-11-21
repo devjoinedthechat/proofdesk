@@ -4,6 +4,32 @@ const packages = "{apps,services,mcp,packages}/*/src";
 
 export default defineConfig({
   test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "json-summary"],
+      include: [`${packages}/**/*.ts`],
+      exclude: [
+        "**/*.{test,itest}.ts",
+        // Code that only ever runs in a process of its own, where this run
+        // cannot see it. The separate-process test and the smoke test are
+        // what exercise it.
+        "**/main.ts",
+        "apps/stack/src/**",
+        "apps/worker/src/testing/**",
+        // Workflow code runs inside the engine's sandbox.
+        "apps/worker/src/workflows.ts",
+        // Commands a person runs: evals on a real model, the load
+        // measurement, and the removal of controls.
+        "**/cli.ts",
+        "**/*-cli.ts",
+        "packages/evals/src/{eval-run,retrieval-eval,query-eval,screen-eval,replay-fixture}.ts",
+        "apps/worker/src/load.ts",
+        "packages/claims/src/{prove,write}.ts",
+      ],
+      // A floor, a little under what the suite reaches today. It is there
+      // to catch a part of the system losing its tests, not to be a target.
+      thresholds: { lines: 93, statements: 91, functions: 90, branches: 80 },
+    },
     projects: [
       {
         test: {

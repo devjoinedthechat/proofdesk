@@ -131,7 +131,9 @@ pnpm prove        # take each control out in turn and expect its tests to fail
 pnpm load         # time 200 tickets with the model taken out
 ```
 
-`pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes a few minutes. It includes the test that runs every service as a separate process and kills the worker mid-refund.
+`pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes a few minutes. It includes the test that runs every service as a separate process and kills the worker mid-refund. The tests cover 95% of lines and 83% of branches, and CI fails under 93% and 80%.
+
+`pnpm prove` takes about 25 minutes for every removal. `pnpm prove refund-once` runs one claim, and `pnpm prove --list` shows what would be removed.
 
 ### Run the whole system locally
 

@@ -32,7 +32,17 @@ jobs:
       - run: pnpm check:secrets
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      # Every test, with coverage. The run fails under the floor in
+      # vitest.config.ts: 93% of lines, 80% of branches.
+      - run: pnpm test:coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          node -e '
+            const { total } = require("./coverage/coverage-summary.json");
+            const row = (name) => `| ${name} | ${total[name].pct}% | ${total[name].covered} of ${total[name].total} |`;
+            console.log(["| | Covered | |", "| --- | --- | --- |", ...["lines", "branches", "functions"].map(row)].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
 
   prove:
     # Every claim in docs/claims.md names the control behind it. This takes

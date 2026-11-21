@@ -12,7 +12,7 @@
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit -p . && pnpm -r typecheck",
     "test": "vitest run",
-    "check": "pnpm check:secrets && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm check:secrets && pnpm lint && pnpm typecheck && pnpm test:coverage",
     "stack:up": "docker compose -f infra/compose/compose.yaml up --detach --wait",
     "stack:down": "docker compose -f infra/compose/compose.yaml down",
     "stack:reset": "docker compose -f infra/compose/compose.yaml down --volumes",
@@ -30,7 +30,8 @@
     "local:smoke": "scripts/smoke.sh",
     "prove": "node packages/claims/src/prove.ts",
     "claims:write": "node packages/claims/src/write.ts",
-    "load": "node apps/worker/src/load.ts"
+    "load": "node apps/worker/src/load.ts",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
@@ -41,6 +42,7 @@
     "@proofdesk/worker": "workspace:*",
     "@testcontainers/postgresql": "12.2.1",
     "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.1.0",
     "testcontainers": "12.2.1",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
