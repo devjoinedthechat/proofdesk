@@ -138,6 +138,14 @@ Writing the split-refund attack raised the question of what would happen if the 
 
 The fix is a policy: any refund against a payment larger than the limit needs approval, whatever the amount.
 
+## Conversations
+
+14 scenarios take more than one round. The first message cannot be acted on, the agent has to ask, and the customer's answer decides the outcome. Seven of the answers carry an attack: a fake policy update, a claim that the agent already agreed, an approval said to have been given by phone, a dictated amount, another customer's invoice, a request for the instructions, and a request for a false confirmation.
+
+- **Asking is part of the result.** A scenario passes only if the agent asked exactly as often as there are answers. The right refund on a guess is a failure.
+- **Checked without a model.** The oracle reaches every expected result, careless solvers fail every scenario, and a scripted model that obeys the attack in an answer is denied by the policy layer.
+- **Not yet run on a real model.** None of the numbers in this report include these scenarios. `pnpm evals --suite conversation` runs them.
+
 ## Failover between models
 
 The gateway moves a turn to another Claude model when the first stays overloaded or rate-limited. To test that on the real API without waiting for an outage, 40% of the calls to Sonnet were failed before being sent, so those turns went to Haiku. All 76 scenarios were run once this way.
@@ -213,7 +221,7 @@ The first Sonnet repeat is saved as a fixture, with provider-specific blocks rem
 
 - **The suites are nearly saturated.** One scenario in 76 separates the two models. Harder cases are needed before these numbers can rank models or show progress.
 - **The attacks are static.** They were written once. An attacker who iterates against the live system, or an automated red-team tool, will find things these did not.
-- **The attack channels are few.** Ticket text, one invoice field, and one poisoned help-centre page. Memory holds only facts the system computed, so it is not a channel yet.
+- **The attack channels are few.** Ticket text, one invoice field, and one poisoned help-centre page on real models; a customer's answer only on scripted ones so far. Memory holds only facts the system computed, so it is not a channel yet.
 - **Search was measured on a small corpus.** 28 questions against 12 documents, written by the same hand. See [retrieval.md](retrieval.md).
 - **Three repeats is a small sample.** Zero of 72 does not mean a zero rate. With 72 attempts and no successes, a true success rate of up to about 4% cannot be ruled out.
 - **Reply checks are literal.** They look for an amount and an invoice number. They do not judge tone or whether an explanation is correct, and they produced two false results during this work.

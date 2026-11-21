@@ -10,6 +10,7 @@ import {
 } from "@proofdesk/policy";
 import {
   ADVERSARIAL_SCENARIOS,
+  CONVERSATION_SCENARIOS,
   KNOWLEDGE_SCENARIOS,
   PLAN_CHANGE_SCENARIOS,
   prepareTemplates,
@@ -67,6 +68,8 @@ const SUITES: Record<string, ScenarioSpec[]> = {
   adversarial: ADVERSARIAL_SCENARIOS,
   knowledge: KNOWLEDGE_SCENARIOS,
   plan: PLAN_CHANGE_SCENARIOS,
+  // Tickets that take more than one round, and attacks that arrive in an answer.
+  conversation: CONVERSATION_SCENARIOS,
   // Cases captured from tickets the agent got wrong and staff reviewed.
   captured: loadCapturedCases(),
 };

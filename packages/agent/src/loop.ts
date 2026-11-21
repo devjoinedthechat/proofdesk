@@ -284,6 +284,8 @@ export type AgentResult = {
   turns: number;
   toolCalls: ToolCallRecord[];
   messages: Message[];
+  /** The whole run, to carry on from with `resumeWith` when the customer answers. */
+  state: AgentState;
 };
 
 /**
@@ -295,9 +297,11 @@ export type AgentResult = {
  * This runs the steps back to back in one process. The durable workflow runs
  * the same steps as separate activities, with the state saved in between.
  */
-export async function runAgent(run: AgentRun): Promise<AgentResult> {
+export async function runAgent(run: AgentRun, from?: AgentState): Promise<AgentResult> {
   const tools = new Map(run.tools.map((tool) => [tool.definition.name, tool]));
-  const state = initialState(run.ticket);
+  // A run that was carried on with a customer's answer starts from where it
+  // stopped; any other starts from the ticket.
+  const state = from ?? initialState(run.ticket);
   const step: ModelStep = { ...run, tools: run.tools.map((tool) => tool.definition) };
 
   while (!state.stopped) {
@@ -323,6 +327,7 @@ export async function runAgent(run: AgentRun): Promise<AgentResult> {
     turns: state.turns,
     toolCalls: state.toolCalls,
     messages: state.messages,
+    state,
     ...(state.resolution ? { resolution: state.resolution } : {}),
   };
 }

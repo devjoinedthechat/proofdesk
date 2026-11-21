@@ -35,7 +35,9 @@ export function createOracle(
       const passage = hits.find((hit) => `${hit.heading} ${hit.body}`.includes(lookup.phrase));
       if (passage) result.reply += ` ${passage.body}`;
     }
-    return result;
+    // When the customer answers a question, the oracle decides again on
+    // what the conversation now asks for.
+    return { ...result, resume: (reply) => createOracle(reply.intent, lookups)(context) };
   };
 }
 

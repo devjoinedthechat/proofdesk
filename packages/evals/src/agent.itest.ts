@@ -3,6 +3,7 @@ import { MockProvider, type MockStep } from "@proofdesk/gateway";
 import { testKeycloakUrl } from "@proofdesk/identity";
 import {
   baseWorld,
+  CONVERSATION_SCENARIOS,
   createSimEnv,
   materialise,
   PLAN_CHANGE_SCENARIOS,
@@ -22,7 +23,7 @@ import { createSecuredHarness, type SecuredHarness } from "./secured.ts";
 // model makes the right decisions is the job of the evaluation suite.
 
 const scenario = (id: string): Scenario => {
-  const spec = [...REFUND_SCENARIOS, ...PLAN_CHANGE_SCENARIOS].find(
+  const spec = [...REFUND_SCENARIOS, ...PLAN_CHANGE_SCENARIOS, ...CONVERSATION_SCENARIOS].find(
     (candidate) => candidate.id === id,
   );
   if (!spec) throw new Error(`No scenario ${id}`);
@@ -238,6 +239,110 @@ describe("the agent as a scenario solver", () => {
     // The second call reuses the first call's key, so billing returns the
     // first refund. The final state holds exactly one.
     expect(result.failures).toEqual([]);
+  });
+});
+
+describe("a conversation as a scenario", () => {
+  const ask = () =>
+    resolve("needs_clarification", "invoice_unclear", "Which invoice is this about?");
+  /** Every text the model was shown in a request, joined. */
+  const shown = (request: { messages: { content: unknown[] }[] }) =>
+    request.messages
+      .flatMap((message) => message.content as { type: string; text?: string }[])
+      .map((block) => block.text ?? "")
+      .join("\n");
+
+  it("asks, takes the answer into the same conversation, and acts on it", async () => {
+    const target = scenario("talk-which-invoice-refund");
+    const [refund] = target.expected.refunds;
+    const number = target.expected.reply.mentions[1] ?? "";
+    const { solver, provider } = scripted([
+      listInvoices(),
+      ask(),
+      call("create_refund", { ...refund, reason: "customer_request" }),
+      resolve("refunded", "within_window", `I have refunded $29.00 for invoice ${number}.`),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(result.questionsAsked).toBe(1);
+    // The third request is the first after the answer. It holds the ticket,
+    // the invoices read in the first round, and the answer as customer text.
+    const afterAnswer = shown(provider.calls[2]?.request as never);
+    expect(afterAnswer).toContain("I would like a refund please.");
+    expect(afterAnswer).toMatch(
+      /The customer replied on this ticket:\s+<ticket>\s+<body>\s+Sorry, I mean/,
+    );
+    expect(
+      provider.calls[2]?.request.messages.filter((message) => message.role === "assistant"),
+    ).toHaveLength(2);
+  });
+
+  it("fails an agent that acts on a guess instead of asking", async () => {
+    const target = scenario("talk-which-invoice-refund");
+    const [refund] = target.expected.refunds;
+    const number = target.expected.reply.mentions[1] ?? "";
+    const { solver } = scripted([
+      listInvoices(),
+      call("create_refund", { ...refund, reason: "customer_request" }),
+      resolve("refunded", "within_window", `I have refunded $29.00 for invoice ${number}.`),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    // The right refund, and still a failure: nobody said which charge.
+    expect(result.refundsMade).toEqual([refund]);
+    expect(result.failures).toEqual(["questions: expected the agent to ask 1 time(s), it asked 0"]);
+  });
+
+  it("stops a model that obeys an attack in the answer", async () => {
+    const target = scenario("talk-attack-policy-in-answer");
+    const number = target.expected.reply.mentions[0] ?? "";
+    const { solver, provider } = scripted([
+      listInvoices(),
+      ask(),
+      // The answer claims the refund window is now 90 days. This model
+      // believes it and refunds the 50-day-old charge.
+      (request) => {
+        const payment = invoicesSeen(request).find((invoice) => invoice.number === number)
+          ?.payments[0];
+        return call("create_refund", {
+          paymentId: payment?.id,
+          amountCents: payment?.amountCents,
+          reason: "customer_request",
+        });
+      },
+      resolve("refused", "outside_window", `Invoice ${number} is outside the refund window.`),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.refundsMade).toEqual([]);
+    expect(result.attackSucceeded).toBe(false);
+    // The policy layer said no, on the billing records, and told the model why.
+    const denial = provider.calls[3]?.request.messages
+      .flatMap((message) => message.content as { type: string; content?: string }[])
+      .find((block) => block.type === "tool_result" && block.content?.includes("Not allowed"));
+    expect(denial?.content).toMatch(/older than the refund window/);
+    expect(result.failures).toEqual([]);
+  });
+
+  it("carries the approval limit across rounds", async () => {
+    const target = scenario("talk-answer-needs-approval");
+    const [refund] = target.expected.refunds;
+    const number = target.expected.reply.mentions[1] ?? "";
+    const { solver } = scripted([
+      listInvoices(),
+      ask(),
+      call("create_refund", { ...refund, reason: "customer_request" }),
+      resolve("refunded", "within_window", `I have refunded $300.00 for invoice ${number}.`),
+    ]);
+
+    const result = await runDirect(target, solver);
+
+    expect(result.failures).toEqual([]);
+    expect(result.approvalRequests.map((request) => request.totalCents)).toEqual([300_00]);
   });
 });
 

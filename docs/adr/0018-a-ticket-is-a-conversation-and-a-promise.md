@@ -42,6 +42,6 @@ The watchdog was running before the sweeper existed. Workflow code is replayed f
 ## Cost
 
 - **A reply that arrives while the ticket's earlier run is still closing waits** for the sweeper, up to a minute.
-- **A customer's reply is one more way text reaches the model.** The eval suites have no scenario with more than one round, so the attacks have not been tried through a reply.
+- **A customer's reply is one more way text reaches the model.** The conversation suite sends seven attacks through a reply. A scripted model that obeys them is stopped by the policy layer; no real model has been run on them yet.
 - **Staff replies are free text** stored with the ticket. They are deleted with the customer.
 - **A ticket closed by staff takes no further reply.** A new request is a new ticket.

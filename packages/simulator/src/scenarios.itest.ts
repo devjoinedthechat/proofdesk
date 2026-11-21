@@ -5,6 +5,7 @@ import { createOracle } from "./oracle.ts";
 import { runScenario } from "./run.ts";
 import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scenario.ts";
 import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
+import { CONVERSATION_SCENARIOS } from "./scenarios/conversations.ts";
 import { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
 import { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
@@ -15,6 +16,7 @@ const SPECS = [
   ...ADVERSARIAL_SCENARIOS,
   ...KNOWLEDGE_SCENARIOS,
   ...PLAN_CHANGE_SCENARIOS,
+  ...CONVERSATION_SCENARIOS,
 ];
 const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 
@@ -59,6 +61,27 @@ const alwaysRefuse: Solver = async () => ({
   reasonCode: "outside_window",
   reply: "Sorry, no.",
 });
+
+/**
+ * Holds a conversation perfectly and ignores what is said in it: asks as
+ * often as the scenario has answers, then does what the careless solver
+ * always does. Without this, every conversation would fail a careless solver
+ * merely for not asking, which would say nothing about the scenario.
+ */
+const afterAsking =
+  (scenario: Scenario, solver: Solver): Solver =>
+  async (context) => {
+    const ask = (left: number): ReturnType<Solver> =>
+      left === 0
+        ? solver(context)
+        : Promise.resolve({
+            outcome: "needs_clarification",
+            reasonCode: "invoice_unclear",
+            reply: "Which one?",
+            resume: () => ask(left - 1),
+          });
+    return ask(scenario.replies?.length ?? 0);
+  };
 
 describe("the simulated company", () => {
   it("loads to an identical state every time", async () => {
@@ -106,6 +129,22 @@ describe("refund scenarios", () => {
     });
   });
 
+  describe.concurrent("a conversation cannot be passed without asking", () => {
+    it.for(scenarios.filter((scenario) => scenario.replies))("$id", async (scenario) => {
+      // The oracle is told what the last answer means from the start, so it
+      // reaches the right final state, and still fails for not having asked.
+      const final = scenario.replies?.at(-1)?.intent ?? scenario.intent;
+      const guessed = await run(scenario, async (context) => {
+        const { resume: _resume, ...result } = await createOracle(final, scenario.lookups)(context);
+        return result;
+      });
+      expect(guessed.failures.filter((failure) => failure.startsWith("questions:"))).toHaveLength(
+        1,
+      );
+      expect(guessed.questionsAsked).toBe(0);
+    });
+  });
+
   it("covers every attack class", () => {
     const classes = new Set(scenarios.flatMap((scenario) => scenario.attack?.class ?? []));
     expect([...classes].sort()).toEqual(Object.keys(ATTACK_CLASSES).sort());
@@ -115,8 +154,8 @@ describe("refund scenarios", () => {
   // must fail for a solver that always refunds or one that always refuses.
   describe.concurrent("a careless solver fails", () => {
     it.for(scenarios)("$id", async (scenario) => {
-      const refundResult = await run(scenario, alwaysRefund);
-      const refuseResult = await run(scenario, alwaysRefuse);
+      const refundResult = await run(scenario, afterAsking(scenario, alwaysRefund));
+      const refuseResult = await run(scenario, afterAsking(scenario, alwaysRefuse));
       expect(refundResult.passed || refuseResult.passed).toBe(false);
     });
   });

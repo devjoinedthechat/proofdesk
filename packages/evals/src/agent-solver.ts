@@ -1,7 +1,11 @@
 import {
   type AgentResult,
+  type AgentRun,
+  type AgentState,
   type AgentTool,
   checkResolution,
+  followUpMessage,
+  resumeWith,
   runAgent,
   systemPrompt,
   type TenantPolicy,
@@ -18,7 +22,7 @@ import type { ServiceTool } from "@proofdesk/mcp-server";
 import { createToolPolicy, policyAuthorizer, type ToolPolicy } from "@proofdesk/policy";
 import { GRANT_SCOPES } from "@proofdesk/portal";
 import { ServiceApiError } from "@proofdesk/service";
-import type { Solver, SolverContext } from "@proofdesk/simulator";
+import type { Solver, SolverContext, SolverResult } from "@proofdesk/simulator";
 import { z } from "zod";
 
 const productionPolicy = createToolPolicy();
@@ -135,7 +139,7 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       subject: ticket.subject,
       body: ticket.body,
     });
-    const result = await runAgent({
+    const run: AgentRun = {
       model: options.model,
       gateway: options.gateway,
       context: { tenantId: tenant.id, ticketId: ticket.id },
@@ -171,25 +175,48 @@ export function createAgentSolver(options: AgentSolverOptions): Solver {
       },
       ...(options.effort ? { effort: options.effort } : {}),
       ...(options.maxTurns ? { maxTurns: options.maxTurns } : {}),
-    });
+    };
 
     const handOver = (reasonCode: string) => ({
       outcome: "handed_to_staff" as const,
       reasonCode,
       reply: "I have passed your request to our team, who will reply to you directly.",
     });
-    const violations = result.resolution
-      ? checkResolution(result.resolution, result.toolCalls)
-      : [];
-    // Measured, not enforced: amounts in the reply that the agent was never shown.
-    const unsourced = result.resolution
-      ? ungroundedAmounts(result.resolution.reply, {
-          texts: [system, ticketText],
-          toolCalls: result.toolCalls,
-        })
-      : [];
-    options.onResult?.(result, violations, unsourced);
-    if (!result.resolution) return handOver(`agent_${result.stopped}`);
-    return violations[0] ? handOver(`guard_${violations[0]}`) : result.resolution;
+
+    /**
+     * One round: the agent works until it resolves or stops. `from` is the
+     * conversation so far, when the customer has answered a question.
+     */
+    async function round(from?: AgentState, answers = 0): Promise<SolverResult> {
+      const result = await runAgent(run, from);
+      const violations = result.resolution
+        ? checkResolution(result.resolution, result.toolCalls)
+        : [];
+      // Measured, not enforced: amounts in the reply that the agent was never shown.
+      const unsourced = result.resolution
+        ? ungroundedAmounts(result.resolution.reply, {
+            texts: [system, ticketText],
+            toolCalls: result.toolCalls,
+          })
+        : [];
+      options.onResult?.(result, violations, unsourced);
+      if (!result.resolution) return handOver(`agent_${result.stopped}`);
+      if (violations[0]) return handOver(`guard_${violations[0]}`);
+      return {
+        ...result.resolution,
+        // The customer's answer joins the same conversation, wrapped as the
+        // customer's text, exactly as the workflow does it. Turns, tool
+        // calls and what the ticket has refunded carry over.
+        resume(reply) {
+          const id = `reply-${answers + 1}`;
+          resumeWith(result.state, {
+            id,
+            text: followUpMessage({ now: context.now, body: reply.body }),
+          });
+          return round(result.state, answers + 1);
+        },
+      };
+    }
+    return round();
   };
 }

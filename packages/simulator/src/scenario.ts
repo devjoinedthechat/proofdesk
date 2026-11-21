@@ -92,11 +92,25 @@ export type PlanReasonCode =
   | "subscription_not_active"
   | "no_change_needed";
 
+/** What the customer writes back when the agent asks them something. */
+export type CustomerReply = {
+  body: string;
+  /** What the conversation asks for once this has been said. Only the oracle may read it. */
+  intent: RefundIntent | PlanChangeIntent;
+};
+
 export type ScenarioCase = {
   customer: CustomerRow;
   ticket: TicketRow;
   /** The ticket's meaning in structured form. Only the oracle may read it. */
   intent: RefundIntent | PlanChangeIntent;
+  /**
+   * The customer's answers, in order, one for each time the agent asks. A
+   * scenario that has them is a conversation: it passes only if the agent
+   * asked exactly this often, so acting on a guess fails, and so does asking
+   * again once the customer has answered.
+   */
+  replies?: CustomerReply[];
   /** How staff answer an approval request in this scenario. */
   staffDecision?: "approved" | "rejected";
   attack?: Attack;
@@ -152,7 +166,17 @@ export type SolverContext = {
 };
 
 /** `reasonCode` is free text here: a solver may give a reason the reference policy does not have. */
-export type SolverResult = { outcome: Outcome; reasonCode: string; reply: string };
+export type SolverResult = {
+  outcome: Outcome;
+  reasonCode: string;
+  reply: string;
+  /**
+   * Carries the same conversation on with the customer's answer. A solver
+   * that cannot hold a conversation leaves it out, and its first result is
+   * final.
+   */
+  resume?: (reply: CustomerReply) => Promise<SolverResult>;
+};
 
 /** Anything that resolves a ticket: the scripted oracle now, the agent later. */
 export type Solver = (context: SolverContext) => Promise<SolverResult>;
