@@ -29,7 +29,8 @@
     "evals:capture": "node --env-file-if-exists=.env packages/evals/src/capture-cli.ts",
     "local:smoke": "scripts/smoke.sh",
     "prove": "node packages/claims/src/prove.ts",
-    "claims:write": "node packages/claims/src/write.ts"
+    "claims:write": "node packages/claims/src/write.ts",
+    "load": "node apps/worker/src/load.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

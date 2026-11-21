@@ -102,7 +102,7 @@ export function renderHeadlines(claims: Claim[]): string {
     README_START,
     table(["Property", "How the test tries to break it", "Test"], rows),
     "",
-    `These are ${rows.length} of ${n.claims}. [The full list](docs/claims.md) names the tests behind each one and the control that was removed to check them.`,
+    `These are ${rows.length} of ${n.claims}. For ${n.proven} of them, \`pnpm prove\` takes the control out of the source and expects the tests to fail: ${n.removals} removals, run in CI on every push. [The full list](docs/claims.md) names the tests behind each claim and the edit that removes its control.`,
     README_END,
   ].join("\n");
 }

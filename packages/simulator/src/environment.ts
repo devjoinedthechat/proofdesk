@@ -177,7 +177,12 @@ export type SimEnv = Awaited<ReturnType<typeof createSimEnv>>;
 /** An isolated copy of the simulated company, with both services running in-process. */
 export async function createSimEnv(
   adminUrl: string,
-  options: { seeded?: boolean; now?: Date } = {},
+  options: {
+    seeded?: boolean;
+    now?: Date;
+    /** Connections each service holds. Small by default: many environments share one server. */
+    serviceConnections?: number;
+  } = {},
 ) {
   const now = options.now ?? SIM_NOW;
   const templates = options.seeded === false ? TEMPLATES.empty : TEMPLATES.seeded;
@@ -193,10 +198,11 @@ export async function createSimEnv(
   const dbs = open(urls);
   const serviceDbs = {
     billing: connect<BillingDatabase>(asRole(urls.billing, DB_ROLES.billing, SIM_ROLE_PASSWORD), {
-      maxConnections: 3,
+      maxConnections: options.serviceConnections ?? 3,
     }),
     entitlements: connect<EntitlementsDatabase>(
       asRole(urls.entitlements, DB_ROLES.entitlements, SIM_ROLE_PASSWORD),
+      options.serviceConnections ? { maxConnections: options.serviceConnections } : {},
     ),
   };
 

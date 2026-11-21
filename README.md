@@ -89,7 +89,7 @@ Each row is a property and the test that attacks it.
 | The kill switch stops work already in progress       | An operator pauses the agent after the model has read the invoices and before it refunds                                               | [controls.itest.ts](apps/worker/src/controls.itest.ts)                                                                      |
 | A deleted customer leaves no trace                   | Every table, every workflow history, the inspection store and the identity provider are searched for their name, email and ticket text | [deletion.itest.ts](apps/worker/src/deletion.itest.ts)                                                                      |
 
-These are 11 of 43. [The full list](docs/claims.md) names the tests behind each one and the control that was removed to check them.
+These are 11 of 43. For 37 of them, `pnpm prove` takes the control out of the source and expects the tests to fail: 53 removals, run in CI on every push. [The full list](docs/claims.md) names the tests behind each claim and the edit that removes its control.
 <!-- claims:end -->
 
 - **Authority is the customer's, per call.** Submitting a ticket creates a grant, and every tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it ([ADR 5](docs/adr/0005-ticket-grants-for-agent-authority.md)).
@@ -117,6 +117,8 @@ Three repeats of 76 scenarios on each model. An attempt passes only if the final
 
 The [eval report](docs/eval-report/README.md) has the method, every failure and the limits.
 
+With the model taken out, a ticket costs about 450 ms of this system's own time across seven durable steps, and one worker handles about 37 tickets a second. [What the system costs per ticket](docs/load.md) has the numbers and what they leave out.
+
 ## Quick start
 
 Requires Node 22.18 or later, pnpm and Docker.
@@ -126,6 +128,7 @@ pnpm install
 pnpm check        # secret scan, lint, type checks and every test
 pnpm test:unit    # only the tests that need no Docker
 pnpm prove        # take each control out in turn and expect its tests to fail
+pnpm load         # time 200 tickets with the model taken out
 ```
 
 `pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes a few minutes. It includes the test that runs every service as a separate process and kills the worker mid-refund.
@@ -248,7 +251,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets                      |
 | `packages/claims`                                                 | Every claim with its tests, and the command that removes each control to check them                              |
 | `infra`                                                           | Compose file, dashboards and the image every service runs from                                                   |
-| `docs`                                                            | Every claim, decision records, eval report, threat model, cut list                                               |
+| `docs`                                                            | Every claim, decision records, eval report, load numbers, threat model, cut list                                 |
 
 ## Design decisions
 
