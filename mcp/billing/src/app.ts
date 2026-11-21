@@ -1,6 +1,7 @@
 import { type BillingClient, createBillingClient } from "@proofdesk/billing";
 import { CLIENTS, type TokenClient, type TokenVerifier } from "@proofdesk/identity";
 import { createServiceMcpApp } from "@proofdesk/mcp-server";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { BILLING_TOOLS, CLOSE_ACCOUNT_TOOL } from "./tools.ts";
 
 export type BillingMcpDeps = {
@@ -15,6 +16,8 @@ export type BillingMcpDeps = {
   resourceUrl: string;
   /** The authorization server that issues tokens for this server. */
   issuer: string;
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
 };
 
 export function createBillingMcpApp(deps: BillingMcpDeps) {
@@ -32,5 +35,6 @@ export function createBillingMcpApp(deps: BillingMcpDeps) {
       }),
     resourceUrl: deps.resourceUrl,
     issuer: deps.issuer,
+    telemetry: deps.telemetry,
   });
 }

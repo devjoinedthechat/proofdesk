@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { bearerToken, type TokenVerifier } from "@proofdesk/identity";
 import { createJsonApp } from "@proofdesk/service";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { runSearch, SEARCH_TOOL, type SearchDeps } from "./tools.ts";
 
 export type DocumentsMcpDeps = SearchDeps & {
@@ -9,6 +10,8 @@ export type DocumentsMcpDeps = SearchDeps & {
   verify: TokenVerifier;
   resourceUrl: string;
   issuer: string;
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
 };
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource";
@@ -20,7 +23,7 @@ const METADATA_PATH = "/.well-known/oauth-protected-resource";
  * internal page cannot reach a customer through the agent.
  */
 export function createDocumentsMcpApp(deps: DocumentsMcpDeps) {
-  const app = createJsonApp();
+  const app = createJsonApp({ telemetry: deps.telemetry });
   const metadataUrl = new URL(METADATA_PATH, deps.resourceUrl).toString();
 
   app.get(METADATA_PATH, (c) =>

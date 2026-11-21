@@ -8,6 +8,7 @@ import {
   parseBody,
   requireScope,
 } from "@proofdesk/service";
+import type { Telemetry } from "@proofdesk/telemetry";
 import type { Kysely } from "kysely";
 import { type Entitlement, setEntitlementRequest } from "./api.ts";
 import type { EntitlementRow, EntitlementsDatabase } from "./schema.ts";
@@ -41,8 +42,10 @@ function toEntitlement(row: EntitlementRow): Entitlement {
   };
 }
 
-export function createEntitlementsApp(deps: EntitlementsDeps & { authenticate: Authenticate }) {
-  const app = createServiceApp(deps.authenticate);
+export function createEntitlementsApp(
+  deps: EntitlementsDeps & { authenticate: Authenticate; telemetry?: Telemetry | undefined },
+) {
+  const app = createServiceApp(deps.authenticate, { telemetry: deps.telemetry });
 
   app.get("/customers/:customerId/entitlement", async (c) => {
     const principal = c.get("principal");

@@ -1,7 +1,10 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import {
   type Meter,
   ROOT_CONTEXT,
+  type Span,
+  SpanKind,
   SpanStatusCode,
   TraceFlags,
   type Tracer,
@@ -55,6 +58,10 @@ export type Attributes = Partial<{
   "tokens.kind": string;
   "activity.name": string;
   "watchdog.action": string;
+  "http.method": string;
+  /** The route as it was declared, such as `/tickets/:ticketId/messages`. Never the path as sent. */
+  "http.route": string;
+  "http.status": number;
 }>;
 
 /** Attributes that identify one ticket. Kept on traces, left off metrics. */
@@ -94,6 +101,18 @@ export interface Telemetry {
     fn: (set: (more: Attributes) => void) => Promise<Result>,
   ): Promise<Result>;
   /**
+   * Runs `fn` inside a span for a request this process received. When the
+   * caller said which span it was in, with a `traceparent` header, this one
+   * hangs under it, so one ticket's trace runs through every service that
+   * worked on it.
+   */
+  server<Result>(
+    name: string,
+    traceparent: string | null | undefined,
+    attributes: Attributes,
+    fn: (set: (more: Attributes) => void) => Promise<Result>,
+  ): Promise<Result>;
+  /**
    * Opens a ticket's trace with its root span. Called once, when work on the
    * ticket starts; every later span about the ticket hangs under it.
    */
@@ -113,11 +132,43 @@ export interface Telemetry {
 /** Telemetry that does nothing, for when none is configured. */
 export const noTelemetry: Telemetry = {
   span: (_name, _attributes, fn) => fn(() => {}),
+  server: (_name, _traceparent, _attributes, fn) => fn(() => {}),
   ticket() {},
   spanAt() {},
   count() {},
   record() {},
 };
+
+/**
+ * The span the running code is inside, in the form one service hands it to
+ * the next. It follows the code through every `await`, so a call made three
+ * functions down still knows which span it belongs to.
+ */
+const active = new AsyncLocalStorage<string>();
+
+/**
+ * The header that tells the service being called which span the call is part
+ * of. Empty outside a span. It holds two random-looking ids and nothing else.
+ */
+export function traceHeaders(): Record<string, string> {
+  const traceparent = active.getStore();
+  return traceparent ? { traceparent } : {};
+}
+
+const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/;
+
+/** The caller's span, from its header. Anything that is not exactly a W3C trace parent is ignored. */
+function callerContext(traceparent: string | null | undefined) {
+  const match = traceparent ? TRACEPARENT.exec(traceparent) : null;
+  const [, traceId, spanId] = match ?? [];
+  if (!traceId || !spanId || /^0+$/.test(traceId) || /^0+$/.test(spanId)) return ROOT_CONTEXT;
+  return trace.setSpanContext(ROOT_CONTEXT, {
+    traceId,
+    spanId,
+    traceFlags: TraceFlags.SAMPLED,
+    isRemote: true,
+  });
+}
 
 /**
  * One trace per ticket. A ticket's work is spread over many activities,
@@ -130,6 +181,9 @@ function ticketIds(ticketId: string) {
   const digest = createHash("sha256").update(`proofdesk-ticket:${ticketId}`).digest("hex");
   return { traceId: digest.slice(0, 32), spanId: digest.slice(32, 48) };
 }
+
+/** The id of a ticket's trace, for finding it in a trace store. */
+export const ticketTraceId = (ticketId: string) => ticketIds(ticketId).traceId;
 
 function ticketContext(ticketId: string) {
   return trace.setSpanContext(ROOT_CONTEXT, {
@@ -195,25 +249,43 @@ export function createTelemetry(tracer: Tracer, meter: Meter, ids?: TicketIdGene
   const parent = (attributes: Attributes) =>
     attributes["ticket.id"] ? ticketContext(attributes["ticket.id"]) : ROOT_CONTEXT;
 
-  return {
-    async span(name, attributes, fn) {
-      const span = tracer.startSpan(
-        name,
-        { attributes: clean(attributes, false) },
-        parent(attributes),
+  async function within<Result>(
+    span: Span,
+    fn: (set: (more: Attributes) => void) => Promise<Result>,
+  ): Promise<Result> {
+    const { traceId, spanId } = span.spanContext();
+    try {
+      return await active.run(`00-${traceId}-${spanId}-01`, () =>
+        fn((more) => span.setAttributes(clean(more, false))),
       );
-      try {
-        return await fn((more) => span.setAttributes(clean(more, false)));
-      } catch (error) {
-        // The error's type and nothing else: a message can quote anything.
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.name : "Error",
-        });
-        throw error;
-      } finally {
-        span.end();
-      }
+    } catch (error) {
+      // The error's type and nothing else: a message can quote anything.
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.name : "Error",
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  return {
+    span(name, attributes, fn) {
+      return within(
+        tracer.startSpan(name, { attributes: clean(attributes, false) }, parent(attributes)),
+        fn,
+      );
+    },
+    server(name, traceparent, attributes, fn) {
+      return within(
+        tracer.startSpan(
+          name,
+          { attributes: clean(attributes, false), kind: SpanKind.SERVER },
+          callerContext(traceparent),
+        ),
+        fn,
+      );
     },
     ticket(ticketId, attributes) {
       // Without a generator that takes the ticket's ids there is no way to

@@ -116,6 +116,7 @@ services:
     command: ["node", "services/billing/src/main.ts"]
     environment:
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: &issuer http://localhost:${KEYCLOAK_PORT:-8080}/realms/proofdesk
       KEYCLOAK_BACKCHANNEL_URL: &backchannel http://keycloak:8080/realms/proofdesk
       BILLING_DATABASE_URL: postgresql://billing_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_billing
@@ -139,6 +140,7 @@ services:
     command: ["node", "services/entitlements/src/main.ts"]
     environment:
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_DATABASE_URL: postgresql://entitlements_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_entitlements
@@ -152,6 +154,7 @@ services:
     environment:
       BILLING_MCP_CLIENT_SECRET: *billing-mcp-secret
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       BILLING_URL: http://billing:3000
@@ -166,6 +169,7 @@ services:
     environment:
       ENTITLEMENTS_MCP_CLIENT_SECRET: *entitlements-mcp-secret
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       ENTITLEMENTS_URL: http://entitlements:3000
@@ -179,6 +183,7 @@ services:
     command: ["node", "mcp/documents/src/main.ts"]
     environment:
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       DOCUMENTS_DATABASE_URL: postgresql://documents_app:${DB_ROLE_PASSWORD:-local-role-password}@postgres:5432/proofdesk_documents
@@ -192,6 +197,7 @@ services:
     command: ["node", "apps/portal/src/main.ts"]
     environment:
       PORT: "3000"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://telemetry:4318
       KEYCLOAK_ISSUER: *issuer
       KEYCLOAK_BACKCHANNEL_URL: *backchannel
       GRANT_ISSUER: *grant-issuer

@@ -1,10 +1,16 @@
 import { CLIENTS, createTokenClient, createTokenVerifier } from "@proofdesk/identity";
 import { env, main, serve } from "@proofdesk/service";
+import { startTelemetry } from "@proofdesk/telemetry";
 import { createBillingMcpApp } from "./app.ts";
 
 main(async () => {
   const issuer = env("KEYCLOAK_ISSUER");
   const app = createBillingMcpApp({
+    // A span per request, in the trace of the ticket the caller is working on.
+    telemetry: startTelemetry({
+      serviceName: "proofdesk-billing-mcp",
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    }).telemetry,
     verify: createTokenVerifier({
       issuer,
       audience: CLIENTS.billingMcp,

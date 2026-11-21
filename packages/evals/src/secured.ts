@@ -29,6 +29,7 @@ import {
   type Solver,
   type SolverContext,
 } from "@proofdesk/simulator";
+import type { Telemetry } from "@proofdesk/telemetry";
 
 const PASSWORD = "simulation-only-password";
 const GRANT_ISSUER = "https://grants.proofdesk.test";
@@ -45,7 +46,12 @@ export type SecuredHarness = Awaited<ReturnType<typeof createSecuredHarness>>;
  * One realm serves all scenarios of a harness; each scenario gets its own
  * databases and its own Keycloak user.
  */
-export async function createSecuredHarness(options: { postgresUrl: string; keycloakUrl: string }) {
+export async function createSecuredHarness(options: {
+  postgresUrl: string;
+  keycloakUrl: string;
+  /** Where each service records its request spans, for tests of the trace across services. */
+  telemetry?: { portal?: Telemetry; mcp?: Telemetry; billing?: Telemetry };
+}) {
   const realm = `sim_${randomBytes(4).toString("hex")}`;
   const issuer = realmIssuer(options.keycloakUrl, realm);
   const admin = await connectKeycloakAdmin({
@@ -127,11 +133,13 @@ export async function createSecuredHarness(options: { postgresUrl: string; keycl
           signer,
           clock,
           newId,
+          telemetry: options.telemetry?.portal,
         });
         const billingApp = createBillingApp({
           db: env.serviceDbs.billing,
           clock,
           newId,
+          telemetry: options.telemetry?.billing,
           authenticate: async (request) => {
             const token = bearerToken(request);
             const verified = token ? await verifyBilling(token) : null;
@@ -145,6 +153,7 @@ export async function createSecuredHarness(options: { postgresUrl: string; keycl
           billingFetch: (request) => billingApp.fetch(request),
           resourceUrl: "http://billing-mcp.sim",
           issuer,
+          telemetry: options.telemetry?.mcp,
         });
         const toolTokens = createToolTokenSource({
           worker,

@@ -12,6 +12,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
     "@proofdesk/gateway": "workspace:*",
+    "@proofdesk/telemetry": "workspace:*",
     "zod": "4.6.7"
   }
 }

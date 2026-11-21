@@ -9,6 +9,7 @@ import {
   type GrantKey,
 } from "@proofdesk/identity";
 import { env, main, serve } from "@proofdesk/service";
+import { startTelemetry } from "@proofdesk/telemetry";
 import { Client, Connection } from "@temporalio/client";
 import { createPortalApp } from "./app.ts";
 import { mountUi } from "./ui.ts";
@@ -20,6 +21,11 @@ main(async () => {
   const taskQueue = env("TEMPORAL_TASK_QUEUE");
 
   const app = createPortalApp({
+    // A span per request, in the trace of the ticket the caller is working on.
+    telemetry: startTelemetry({
+      serviceName: "proofdesk-portal",
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    }).telemetry,
     db: connect<AppDatabase>(env("PORTAL_DATABASE_URL")),
     grantsDb: connect<AppDatabase>(env("GRANTS_DATABASE_URL")),
     verify: createTokenVerifier({

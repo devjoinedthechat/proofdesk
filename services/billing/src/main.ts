@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { connect } from "@proofdesk/db";
 import { bearerToken, CLIENTS, createTokenVerifier, principalFrom } from "@proofdesk/identity";
 import { env, main, serve } from "@proofdesk/service";
+import { startTelemetry } from "@proofdesk/telemetry";
 import { createBillingApp } from "./app.ts";
 import type { BillingDatabase } from "./schema.ts";
 
@@ -14,6 +15,11 @@ main(async () => {
     backchannel: process.env.KEYCLOAK_BACKCHANNEL_URL,
   });
   const app = createBillingApp({
+    // A span per request, in the trace of the ticket the caller is working on.
+    telemetry: startTelemetry({
+      serviceName: "proofdesk-billing",
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    }).telemetry,
     db: connect<BillingDatabase>(env("BILLING_DATABASE_URL")),
     clock: () => new Date(),
     newId: (prefix) => `${prefix}_${randomUUID().replaceAll("-", "")}`,

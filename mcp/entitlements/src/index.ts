@@ -6,6 +6,7 @@ import {
 } from "@proofdesk/entitlements";
 import { CLIENTS, SCOPES, type TokenClient, type TokenVerifier } from "@proofdesk/identity";
 import { createServiceMcpApp, defineTool, type ServiceTool } from "@proofdesk/mcp-server";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { z } from "zod";
 
 export const ENTITLEMENTS_TOOLS: ServiceTool<EntitlementsClient>[] = [
@@ -63,6 +64,8 @@ export type EntitlementsMcpDeps = {
   entitlementsFetch?: (request: Request) => Response | Promise<Response>;
   resourceUrl: string;
   issuer: string;
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
 };
 
 export function createEntitlementsMcpApp(deps: EntitlementsMcpDeps) {
@@ -80,5 +83,6 @@ export function createEntitlementsMcpApp(deps: EntitlementsMcpDeps) {
       }),
     resourceUrl: deps.resourceUrl,
     issuer: deps.issuer,
+    telemetry: deps.telemetry,
   });
 }

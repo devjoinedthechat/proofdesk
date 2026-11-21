@@ -27,7 +27,7 @@ The trace id is derived from the ticket id. Every span about a ticket, from any 
 
 - **No prompts or replies in these traces.** To see what the model was shown for a ticket, a person opens the same trace id in the inspection store, which has its own sign-in and is reached by deletion.
 - **Debugging is one step longer.** A trace says which step failed and how; the content is one lookup away.
-- **Only the worker is instrumented.** The portal, the services and the MCP servers do not emit telemetry yet.
+- **Keycloak is not in the trace.** The worker, the portal, the MCP servers and both services each record a span per request, joined by a `traceparent` header that holds two ids. A request span carries the method, the route as declared and the status, never the path as sent. The token requests to Keycloak in between are not recorded, and only the worker records metrics.
 - **The local stack's Grafana is a development image,** with anonymous access.
 
 ## How it is tested

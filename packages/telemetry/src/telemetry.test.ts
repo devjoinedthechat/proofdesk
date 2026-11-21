@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTestTelemetry, METRICS, REDACTED } from "./index.ts";
+import { createTestTelemetry, METRICS, REDACTED, traceHeaders } from "./index.ts";
 
 describe("telemetry", () => {
   it("puts every span about a ticket in one trace, whoever records it and whenever", async () => {
@@ -98,5 +98,61 @@ describe("telemetry", () => {
     ).rejects.toThrow();
     expect(test.spans()[0]?.status).toMatchObject({ message: "TypeError" });
     expect(await test.everything()).not.toContain("maya");
+  });
+
+  it("hands the span it is in to the next service, and nothing outside a span", async () => {
+    const { telemetry, spans } = createTestTelemetry();
+    expect(traceHeaders()).toEqual({});
+
+    let sent: Record<string, string> = {};
+    await telemetry.span("activity.executeNext", { "ticket.id": "tkt_1" }, async () => {
+      // Read after an await, as a real call would be made.
+      await Promise.resolve();
+      sent = traceHeaders();
+    });
+
+    const [span] = spans();
+    expect(sent).toEqual({ traceparent: `00-${span?.traceId}-${span?.spanId}-01` });
+    expect(traceHeaders()).toEqual({});
+  });
+
+  it("puts a request's span under the caller's, and passes its own on in turn", async () => {
+    const caller = createTestTelemetry();
+    const service = createTestTelemetry();
+    let fromCaller = "";
+    let fromService = "";
+    await caller.telemetry.span("activity.executeNext", { "ticket.id": "tkt_1" }, async () => {
+      fromCaller = traceHeaders().traceparent ?? "";
+      await service.telemetry.server(
+        "http.request",
+        fromCaller,
+        { "http.method": "POST" },
+        async (set) => {
+          fromService = traceHeaders().traceparent ?? "";
+          set({ "http.route": "/refunds", "http.status": 201 });
+        },
+      );
+    });
+
+    const [outer] = caller.spans();
+    const [inner] = service.spans();
+    expect(inner).toMatchObject({
+      traceId: outer?.traceId,
+      parentSpanId: outer?.spanId,
+      attributes: { "http.method": "POST", "http.route": "/refunds", "http.status": 201 },
+    });
+    expect(fromService).toBe(`00-${inner?.traceId}-${inner?.spanId}-01`);
+  });
+
+  it("starts a trace of its own for a request whose caller named none, or named nonsense", async () => {
+    const { telemetry, spans } = createTestTelemetry();
+    const zeros = `00-${"0".repeat(32)}-${"0".repeat(16)}-01`;
+    for (const header of [undefined, null, "", "not a trace parent", zeros, "00-abc-def-01"]) {
+      await telemetry.server("http.request", header, {}, async () => {});
+    }
+    const recorded = spans();
+    expect(recorded).toHaveLength(6);
+    expect(recorded.every((span) => span.parentSpanId === undefined)).toBe(true);
+    expect(new Set(recorded.map((span) => span.traceId)).size).toBe(6);
   });
 });

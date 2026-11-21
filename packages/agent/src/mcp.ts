@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ToolDefinition } from "@proofdesk/gateway";
+import { traceHeaders } from "@proofdesk/telemetry";
 import type { AgentTool, ToolOutcome } from "./tools.ts";
 
 export type McpToolOptions = {
@@ -25,7 +26,8 @@ async function withClient<T>(
   const client = new Client({ name: "proofdesk-agent", version: "0.1.0" });
   const send = options.fetch;
   const transport = new StreamableHTTPClientTransport(new URL(options.url), {
-    requestInit: { headers: { authorization: `Bearer ${token}` } },
+    // The trace header lets the server's spans join the ticket's trace.
+    requestInit: { headers: { ...traceHeaders(), authorization: `Bearer ${token}` } },
     ...(send
       ? {
           fetch: (url: string | URL, init?: RequestInit) =>

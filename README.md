@@ -89,7 +89,7 @@ Each row is a property and the test that attacks it.
 | The kill switch stops work already in progress       | An operator pauses the agent after the model has read the invoices and before it refunds                                               | [controls.itest.ts](apps/worker/src/controls.itest.ts)                                                                      |
 | A deleted customer leaves no trace                   | Every table, every workflow history, the inspection store and the identity provider are searched for their name, email and ticket text | [deletion.itest.ts](apps/worker/src/deletion.itest.ts)                                                                      |
 
-These are 11 of 43. For 37 of them, `pnpm prove` takes the control out of the source and expects the tests to fail: 53 removals, run in CI on every push. [The full list](docs/claims.md) names the tests behind each claim and the edit that removes its control.
+These are 11 of 44. For 38 of them, `pnpm prove` takes the control out of the source and expects the tests to fail: 54 removals, run in CI on every push. [The full list](docs/claims.md) names the tests behind each claim and the edit that removes its control.
 <!-- claims:end -->
 
 - **Authority is the customer's, per call.** Submitting a ticket creates a grant, and every tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it ([ADR 5](docs/adr/0005-ticket-grants-for-agent-authority.md)).

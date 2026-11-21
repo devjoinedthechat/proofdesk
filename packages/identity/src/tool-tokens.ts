@@ -1,3 +1,4 @@
+import { traceHeaders } from "@proofdesk/telemetry";
 import { SCOPES } from "./names.ts";
 import { type IssuedToken, type TokenClient, TokenError } from "./tokens.ts";
 
@@ -35,6 +36,7 @@ export function createToolTokenSource(options: {
         new Request(new URL(path, options.portalUrl), {
           method: "POST",
           headers: {
+            ...traceHeaders(),
             authorization: `Bearer ${await workerToken()}`,
             "content-type": "application/json",
           },

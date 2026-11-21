@@ -24,6 +24,7 @@
     "@proofdesk/portal": "workspace:*",
     "@proofdesk/service": "workspace:*",
     "@proofdesk/simulator": "workspace:*",
+    "@proofdesk/telemetry": "workspace:*",
     "@testcontainers/postgresql": "12.2.1",
     "kysely": "0.29.9",
     "zod": "4.6.7"

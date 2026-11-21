@@ -14,6 +14,7 @@
     "@proofdesk/dispatch": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/service": "workspace:*",
+    "@proofdesk/telemetry": "workspace:*",
     "@temporalio/client": "1.25.0",
     "hono": "4.13.18",
     "kysely": "0.29.9",

@@ -17,6 +17,7 @@ import {
   type VerifiedToken,
 } from "@proofdesk/identity";
 import { createJsonApp, HttpError, parseBody } from "@proofdesk/service";
+import type { Telemetry } from "@proofdesk/telemetry";
 import type { Kysely, Transaction } from "kysely";
 import { z } from "zod";
 
@@ -47,6 +48,8 @@ export type PortalDeps = {
   wallClock?: () => Date;
   /** Delivers a staff decision to the ticket's workflow. */
   decideApproval?: ApprovalDelivery;
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
 };
 
 /**
@@ -222,7 +225,7 @@ const toTicket = (row: TicketRow) => ({
 });
 
 export function createPortalApp(deps: PortalDeps) {
-  const app = createJsonApp();
+  const app = createJsonApp({ telemetry: deps.telemetry });
 
   async function authenticate(request: Request): Promise<VerifiedToken> {
     const token = bearerToken(request);

@@ -13,6 +13,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/service": "workspace:*",
+    "@proofdesk/telemetry": "workspace:*",
     "zod": "4.6.7"
   }
 }

@@ -1,6 +1,8 @@
 export { env, main, type Served, serve } from "./serve.ts";
 
+import { type Telemetry, traceHeaders } from "@proofdesk/telemetry";
 import { Hono } from "hono";
+import { routePath } from "hono/route";
 import type { z } from "zod";
 
 /** Who is calling a service, as established by the service's authenticator. */
@@ -37,9 +39,34 @@ export class HttpError extends Error {
 
 export const HEALTH_PATH = "/healthz";
 
+export type AppOptions = {
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
+};
+
 /** A Hono app whose failures all have one JSON shape. Unexpected errors return 500 without detail. */
-export function createJsonApp<Env extends { Variables: object } = { Variables: object }>() {
+export function createJsonApp<Env extends { Variables: object } = { Variables: object }>(
+  options: AppOptions = {},
+) {
   const app = new Hono<Env>();
+  const { telemetry } = options;
+  if (telemetry) {
+    // One span per request, under the caller's span when it named one. It
+    // carries the method, the route as declared and the status: no path as
+    // sent, no query, no body, so nothing a caller typed can ride along.
+    app.use(async (c, next) => {
+      if (c.req.path === HEALTH_PATH) return next();
+      await telemetry.server(
+        "http.request",
+        c.req.header("traceparent"),
+        { "http.method": c.req.method },
+        async (set) => {
+          await next();
+          set({ "http.route": routePath(c, -1), "http.status": c.res.status });
+        },
+      );
+    });
+  }
 
   app.onError((error, c) => {
     if (error instanceof HttpError) {
@@ -60,8 +87,11 @@ export function createJsonApp<Env extends { Variables: object } = { Variables: o
 }
 
 /** A JSON app where every route requires an authenticated principal. */
-export function createServiceApp(authenticate: Authenticate): Hono<ServiceEnv> {
-  const app = createJsonApp<ServiceEnv>();
+export function createServiceApp(
+  authenticate: Authenticate,
+  options: AppOptions = {},
+): Hono<ServiceEnv> {
+  const app = createJsonApp<ServiceEnv>(options);
 
   app.use(async (c, next) => {
     const principal = await authenticate(c.req.raw);
@@ -144,7 +174,12 @@ export async function callService<Schema extends z.ZodType>(
     headers?: Record<string, string>;
   },
 ): Promise<z.infer<Schema>> {
-  const headers = new Headers({ ...(await options.headers?.()), ...request.headers });
+  // The call says which span it is part of, so the service's own span joins the same trace.
+  const headers = new Headers({
+    ...traceHeaders(),
+    ...(await options.headers?.()),
+    ...request.headers,
+  });
   // A service that never answers must not hold its caller for ever.
   const timeout = AbortSignal.timeout(options.timeoutMs ?? 30_000);
   const init: RequestInit = { method: request.method, headers, signal: timeout };

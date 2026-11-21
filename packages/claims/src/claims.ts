@@ -26,6 +26,7 @@ const ROUTE = "apps/portal/src/route.test.ts";
 const TELEMETRY = "packages/telemetry/src/telemetry.test.ts";
 const TELEMETRY_RUN = "apps/worker/src/telemetry.itest.ts";
 const TOOL = "packages/mcp-server/src/tool.test.ts";
+const TRACING = "packages/evals/src/tracing.itest.ts";
 const WATCHDOG = "apps/worker/src/watchdog.test.ts";
 const WORKFLOW = "apps/worker/src/workflow.itest.ts";
 
@@ -875,6 +876,38 @@ export const CLAIMS: Claim[] = [
         fails: tests(
           TELEMETRY,
           "replaces a string that is not an identifier, and counts that it did",
+        ),
+      },
+    ],
+  },
+  {
+    id: "trace-across-services",
+    section: "Operations",
+    property: "One trace follows a ticket through every service",
+    attack:
+      "A tool call is followed from the worker through the portal, the MCP server and billing, each with telemetry of its own, and every span is searched for the customer",
+    tests: [
+      ...tests(
+        TRACING,
+        "holds a span from the worker, the portal, the MCP server and billing",
+        "hangs each service's span under the span of whoever called it",
+        "exports nothing about the customer or their ticket from any service",
+      ),
+      ...tests(
+        TELEMETRY,
+        "puts a request's span under the caller's, and passes its own on in turn",
+      ),
+    ],
+    removals: [
+      {
+        what: "The trace header on a call from one service to the next",
+        file: "packages/service/src/index.ts",
+        find: "    ...traceHeaders(),\n    ...(await options.headers?.()),",
+        replace: "    ...(await options.headers?.()),",
+        fails: tests(
+          TRACING,
+          "holds a span from the worker, the portal, the MCP server and billing",
+          "hangs each service's span under the span of whoever called it",
         ),
       },
     ],

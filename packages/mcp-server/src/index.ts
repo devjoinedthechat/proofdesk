@@ -3,6 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { bearerToken, type TokenClient, TokenError, type TokenVerifier } from "@proofdesk/identity";
 import { createJsonApp, ServiceApiError } from "@proofdesk/service";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { z } from "zod";
 
 /**
@@ -72,6 +73,8 @@ export type ServiceMcpOptions<Client> = {
   resourceUrl: string;
   /** The authorization server that issues tokens for this server. */
   issuer: string;
+  /** Where a span for each request goes. Nothing is recorded without it. */
+  telemetry?: Telemetry | undefined;
 };
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource";
@@ -100,7 +103,7 @@ const failed = (code: string, message: string): CallToolResult => ({
  * - Stateless: every request gets its own server instance.
  */
 export function createServiceMcpApp<Client>(options: ServiceMcpOptions<Client>) {
-  const app = createJsonApp();
+  const app = createJsonApp({ telemetry: options.telemetry });
   const metadataUrl = new URL(METADATA_PATH, options.resourceUrl).toString();
 
   // RFC 9728: tells a client which authorization server issues tokens for this server.

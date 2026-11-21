@@ -56,6 +56,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@temporalio/client':
         specifier: 1.25.0
         version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
@@ -193,6 +196,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -224,6 +230,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -255,6 +264,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -267,6 +279,9 @@ importers:
       '@proofdesk/gateway':
         specifier: workspace:*
         version: link:../gateway
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -345,6 +360,9 @@ importers:
       '@proofdesk/simulator':
         specifier: workspace:*
         version: link:../simulator
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       '@testcontainers/postgresql':
         specifier: 12.2.1
         version: 12.2.1(bare-buffer@3.7.1)(supports-color@8.1.1)
@@ -366,6 +384,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       jose:
         specifier: 6.2.17
         version: 6.2.17
@@ -381,6 +402,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -402,6 +426,9 @@ importers:
       '@hono/node-server':
         specifier: 2.1.8
         version: 2.1.8(hono@4.13.18)
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
       hono:
         specifier: 4.13.18
         version: 4.13.18
@@ -468,6 +495,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       hono:
         specifier: 4.13.18
         version: 4.13.18
@@ -498,6 +528,9 @@ importers:
       '@proofdesk/service':
         specifier: workspace:*
         version: link:../../packages/service
+      '@proofdesk/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       hono:
         specifier: 4.13.18
         version: 4.13.18

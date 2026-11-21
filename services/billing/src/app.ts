@@ -7,6 +7,7 @@ import {
   parseBody,
   requireScope,
 } from "@proofdesk/service";
+import type { Telemetry } from "@proofdesk/telemetry";
 import { changeSubscriptionRequest, createRefundRequest } from "./api.ts";
 import {
   type BillingDeps,
@@ -29,8 +30,10 @@ export const BILLING_SCOPES = {
 
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{8,200}$/;
 
-export function createBillingApp(deps: BillingDeps & { authenticate: Authenticate }) {
-  const app = createServiceApp(deps.authenticate);
+export function createBillingApp(
+  deps: BillingDeps & { authenticate: Authenticate; telemetry?: Telemetry | undefined },
+) {
+  const app = createServiceApp(deps.authenticate, { telemetry: deps.telemetry });
 
   app.get("/customers/:customerId/subscriptions", async (c) => {
     const principal = c.get("principal");
