@@ -11,6 +11,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.7
         version: 2.6.7
+      '@proofdesk/claims':
+        specifier: workspace:*
+        version: link:packages/claims
       '@proofdesk/db':
         specifier: workspace:*
         version: link:packages/db
@@ -267,6 +270,8 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/claims: {}
 
   packages/db:
     dependencies:

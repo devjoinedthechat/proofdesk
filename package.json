@@ -27,10 +27,13 @@
     "local:down": "scripts/local.sh down",
     "local:reset": "scripts/local.sh reset",
     "evals:capture": "node --env-file-if-exists=.env packages/evals/src/capture-cli.ts",
-    "local:smoke": "scripts/smoke.sh"
+    "local:smoke": "scripts/smoke.sh",
+    "prove": "node packages/claims/src/prove.ts",
+    "claims:write": "node packages/claims/src/write.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
+    "@proofdesk/claims": "workspace:*",
     "@proofdesk/db": "workspace:*",
     "@proofdesk/identity": "workspace:*",
     "@proofdesk/simulator": "workspace:*",

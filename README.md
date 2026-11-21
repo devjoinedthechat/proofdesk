@@ -24,7 +24,7 @@
   <a href="#what-it-proves">What it proves</a> ·
   <a href="#results-on-real-models">Results</a> ·
   <a href="#quick-start">Quick start</a> ·
-  <a href="#how-a-ticket-is-handled">How a ticket is handled</a> ·
+  <a href="docs/claims.md">Every claim</a> ·
   <a href="#design-decisions">Design decisions</a>
 </p>
 
@@ -70,116 +70,34 @@ flowchart LR
 
 The system running locally with Claude as the agent: a request the agent has to ask about, a refund that waits for staff approval, and the kill switch. Every picture is the real interface and every reply is the model's. [How it was made](docs/walkthrough/README.md).
 
-## Stack
-
-| Layer             | Choice                                               | What it does here                                             |
-| ----------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
-| Language          | TypeScript on Node 22, pnpm workspace                | One language across services, agent, evals and tests          |
-| Model             | Claude Sonnet and Haiku, Anthropic SDK               | Own agent loop with strict tool schemas; no agent framework   |
-| Model gateway     | Own, thin                                            | Budgets per ticket and tenant, retries, failover, fault tests |
-| Durable execution | Temporal                                             | One workflow per ticket; survives a worker dying mid-refund   |
-| Tools             | Three MCP servers (billing, entitlements, documents) | Typed inputs and outputs; each call carries a scoped token    |
-| Identity          | Keycloak, OAuth token exchange (RFC 8693)            | The agent acts as the customer, never as itself               |
-| Policy            | Cedar                                                | Allow, deny or require approval, decided outside the model    |
-| Data              | PostgreSQL, Kysely, dbmate, row-level security       | Tenant isolation enforced by the database; hash-chained audit |
-| Validation        | Zod                                                  | Every boundary: tool input, tool output, model output         |
-| Telemetry         | OpenTelemetry to Grafana                             | One trace per ticket; counts and costs, no customer text      |
-| Inspection        | Arize Phoenix                                        | Full conversations, per tenant, deleted with the customer     |
-| Evals             | Own runner on Vitest                                 | Judged on the final state of the databases                    |
-| Tests             | Vitest, Testcontainers, Playwright                   | Real Postgres, Keycloak and Temporal; a real browser          |
-| Local and CI      | Docker Compose, GitHub Actions                       | The whole system from nothing on every push                   |
-
 ## What it proves
 
-Each row is a property and the test that attacks it. Where a control was added, the test was also run with the control removed, to confirm it fails.
+Each row is a property and the test that attacks it.
 
-### Identity and authority
+<!-- claims:start -->
+| Property                                             | How the test tries to break it                                                                                                         | Test                                                                                                                        |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| The agent acts only with the customer's authority    | A ticket grant is withdrawn, expired, closed, or asked for a scope its category does not allow                                         | [authority.itest.ts](mcp/billing/src/authority.itest.ts)                                                                    |
+| One tenant never reaches another's rows              | Unfiltered queries run as the service's own database role                                                                              | [billing.itest.ts](services/billing/src/billing.itest.ts)                                                                   |
+| Refund rules hold even if the model is compromised   | A scripted, attacker-controlled model calls the refund tool directly: outside the window, relabelled, disputed, another customer's     | [compromised.itest.ts](packages/evals/src/compromised.itest.ts), [policy.test.ts](packages/policy/src/policy.test.ts)       |
+| The reply cannot misstate what was done              | It claims a refund that was not made, hides one that was, and leaks its tool names                                                     | [compromised.itest.ts](packages/evals/src/compromised.itest.ts), [workflow.itest.ts](apps/worker/src/workflow.itest.ts)     |
+| A refund is issued exactly once                      | All services run as separate processes; the worker is sent `SIGKILL` the moment billing has paid, and a second worker repeats the call | [processes.itest.ts](apps/worker/src/processes.itest.ts), [workflow.itest.ts](apps/worker/src/workflow.itest.ts)            |
+| A large refund waits for a person                    | The worker is shut down during the wait and the approval arrives with no worker running                                                | [workflow.itest.ts](apps/worker/src/workflow.itest.ts), [processes.itest.ts](apps/worker/src/processes.itest.ts)            |
+| The audit log is tamper-evident                      | Entries are edited, re-hashed and deleted with full database access                                                                    | [audit.itest.ts](packages/db/src/audit.itest.ts)                                                                            |
+| Access is part of the search, not a filter around it | The same question is asked as staff and as an agent acting for a customer, and by another company                                      | [documents.itest.ts](packages/simulator/src/documents.itest.ts), [authority.itest.ts](mcp/documents/src/authority.itest.ts) |
+| A bad build is rolled back without anyone acting     | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back         | [canary.itest.ts](apps/worker/src/canary.itest.ts), [watchdog.test.ts](apps/worker/src/watchdog.test.ts)                    |
+| The kill switch stops work already in progress       | An operator pauses the agent after the model has read the invoices and before it refunds                                               | [controls.itest.ts](apps/worker/src/controls.itest.ts)                                                                      |
+| A deleted customer leaves no trace                   | Every table, every workflow history, the inspection store and the identity provider are searched for their name, email and ticket text | [deletion.itest.ts](apps/worker/src/deletion.itest.ts)                                                                      |
 
-| Property                                          | How the test tries to break it                                                                                                            |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| The agent acts only with the customer's authority | A ticket grant is revoked, expired, closed, or asked for a scope its category does not allow ([test](mcp/billing/src/authority.itest.ts)) |
-| A token works only where it was addressed         | The MCP token is replayed against billing; a sign-in token is sent to the MCP server                                                      |
-| A token without the refund scope cannot refund    | Four layers are tried in turn: the tool list, the tool call, Keycloak, and billing directly                                               |
-| The worker cannot name a customer by itself       | It presents a self-signed assertion, a replayed one, and its bare service token                                                           |
-| One tenant never reaches another's rows           | Unfiltered queries run as the service's own database role ([test](services/billing/src/billing.itest.ts))                                 |
+These are 11 of 43. [The full list](docs/claims.md) names the tests behind each one and the control that was removed to check them.
+<!-- claims:end -->
 
-The agent never holds a customer's credential. Submitting a ticket creates a grant, and every tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it. See [ADR 5](docs/adr/0005-ticket-grants-for-agent-authority.md).
+- **Authority is the customer's, per call.** Submitting a ticket creates a grant, and every tool call gets its own 60-second, single-scope token derived from it. A ticket can wait days for approval with no credential waiting alongside it ([ADR 5](docs/adr/0005-ticket-grants-for-agent-authority.md)).
+- **Rules are enforced on records, not on the model's word.** The policy layer reads the billing records itself, every tool is strict, and every result is checked against a schema by the code that acts on it ([ADR 7](docs/adr/0007-enforce-refund-rules-on-records.md), [ADR 11](docs/adr/0011-schemas-at-every-boundary.md)).
+- **Automation may only stop things.** A watchdog can roll back a build or pause the agent; only a person can start it again ([ADR 14](docs/adr/0014-stopping-the-agent.md)).
+- **No model takes part in a deletion.** What must go is fixed in code and in one database function ([ADR 13](docs/adr/0013-deletion-without-a-model.md)).
 
-### Policy and guardrails
-
-| Property                                           | How the test tries to break it                                                                                                                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Refund rules hold even if the model is compromised | A scripted, attacker-controlled model calls the refund tool directly: outside the window, relabelled, disputed, another customer's ([test](packages/evals/src/compromised.itest.ts)) |
-| A large refund cannot be split around approval     | The same model asks for it in two halves                                                                                                                                             |
-| Many small refunds cannot add up unseen            | The agent's refunds for a company reach the daily cap; the next one waits for staff ([test](apps/worker/src/workflow.itest.ts))                                                      |
-| The reply cannot misstate what was done            | It claims a refund that was not made, hides one that was, and leaks its tool names                                                                                                   |
-| Approval cannot override the kill switch           | The agent is paused after approval is requested                                                                                                                                      |
-| Anything no policy mentions is denied              | A tool nobody wrote a policy for is called ([test](packages/policy/src/policy.test.ts))                                                                                              |
-| Nothing crosses a boundary unchecked               | A tool returns something other than its declared output; billing records arrive malformed ([test](packages/mcp-server/src/tool.test.ts))                                             |
-
-Rules that matter are enforced on facts the policy layer reads from billing itself, not on the model's word. Every tool is offered in strict mode, and every result is checked against a schema by the code that acts on it ([ADR 11](docs/adr/0011-schemas-at-every-boundary.md)). The [threat model](docs/threat-model.md) lists the controls by layer and states what a compromised model can still do.
-
-### Durable execution
-
-| Property                                            | How the test tries to break it                                                                                                                                                      |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A refund is issued exactly once                     | All services run as separate processes; the worker is sent `SIGKILL` the moment billing has paid, and a second worker repeats the call ([test](apps/worker/src/processes.itest.ts)) |
-| A repeated or overlapping step changes nothing      | One activity is run twice, and two attempts of one step run at once                                                                                                                 |
-| A large refund waits for a person                   | The worker is shut down during the wait and the approval arrives with no worker running                                                                                             |
-| A plan change is all or nothing across two systems  | The worker is lost between the two writes; the second system refuses; the worker is lost during the undo                                                                            |
-| An accepted ticket is always handled                | The workflow engine is unreachable when the ticket is filed; a sweeper starts it later, once ([test](apps/worker/src/conversation.itest.ts))                                        |
-| A ticket never waits on a model that is down        | Every attempt at a model turn fails mid-ticket: the ticket goes to staff with nothing paid                                                                                          |
-| A turn can move to another model mid-ticket         | 40% of calls to one model are failed on the real API; all 76 scenarios still pass ([report](docs/eval-report/README.md#failover-between-models))                                    |
-| New workflow code does not break a ticket in flight | A finished ticket's history, with an approval wait in it, is replayed through the current code                                                                                      |
-| No customer data in workflow history                | A finished history is searched for the ticket's text, the name, the email and the amount                                                                                            |
-| The audit log is tamper-evident                     | Entries are edited, re-hashed and deleted with full database access ([test](packages/db/src/audit.itest.ts))                                                                        |
-
-### Conversation
-
-| Property                                              | How the test tries to break it                                                                                                                  |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| The customer's answer continues the same conversation | The agent asks which charge; the answer arrives; the agent must act on it without starting over ([test](apps/worker/src/conversation.itest.ts)) |
-| One answer at a time, taken in once                   | Two replies are sent at once; a stranger replies; a reply arrives on a closed ticket                                                            |
-| Staff can answer what the agent handed over           | Another company's approver and a customer each try; a second reply is sent                                                                      |
-
-A ticket is one run, however many rounds it takes: turns and spend are counted across all of them ([ADR 18](docs/adr/0018-a-ticket-is-a-conversation-and-a-promise.md)).
-
-### Retrieval and memory
-
-| Property                                             | How the test tries to break it                                                                                                      |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Access is part of the search, not a filter around it | The same question is asked as staff and as an agent acting for a customer ([test](packages/simulator/src/documents.itest.ts))       |
-| A poisoned page cannot change an outcome             | It is quarantined at ingestion; with the scan bypassed, the refund is still refused                                                 |
-| Search finds what the customer's wording misses      | 28 labelled questions: the customer's words find 21, a query the agent writes finds 28 ([report](docs/eval-report/retrieval.md))    |
-| Memory cannot be poisoned by a ticket                | A ticket claims a manager promised a refund; the stored memory holds only facts the system computed, and none of the ticket's words |
-
-### Operations
-
-| Property                                           | How the test tries to break it                                                                                                                                                                          |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A bad build is rolled back without anyone acting   | A canary whose model claims refunds it never made gets half of new tickets; the watchdog must notice and send all traffic back ([test](apps/worker/src/canary.itest.ts))                                |
-| The kill switch stops work already in progress     | An operator pauses the agent after the model has read the invoices and before it refunds ([test](apps/worker/src/controls.itest.ts))                                                                    |
-| One tool can be switched off alone                 | Refunds are paused; reads keep working and approval cannot override the pause                                                                                                                           |
-| Automation can stop the agent and never restart it | The watchdog's database role tries to resume a paused agent                                                                                                                                             |
-| Dashboards carry no customer text                  | A ticket is handled with telemetry kept in memory, and everything exported is searched for the customer's words and identity ([test](apps/worker/src/telemetry.itest.ts))                               |
-| A failure in production becomes a test             | The agent gives up on a ticket; staff give a verdict; the captured case must fail on giving up, pass on the right action, and hold nothing about the customer ([test](apps/worker/src/review.itest.ts)) |
-| Confident answers are checked too                  | A share of tickets the agent resolved itself is put in front of staff, chosen by ticket id                                                                                                              |
-| One customer cannot use up the agent               | A customer files request after request; another customer of the same company is unaffected                                                                                                              |
-| The whole system starts from nothing and works     | Every service in its own container; a real browser signs in as a customer, an approver and an operator; six journeys are run and checked ([script](scripts/smoke.sh))                                   |
-
-Whatever acts without a person may only stop things ([ADR 14](docs/adr/0014-stopping-the-agent.md)).
-
-### Data deletion
-
-| Property                                     | How the test tries to break it                                                                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A deleted customer leaves no trace           | Every table, every workflow history, the inspection store and the identity provider are searched for their name, email and ticket text ([test](apps/worker/src/deletion.itest.ts)) |
-| Nobody is deleted who did not ask            | The worker calls the erase function with no request, forges a request, and deletes the row directly                                                                                |
-| A request needs more than an open session    | A stale sign-in and a wrong confirmation are sent                                                                                                                                  |
-| An agent working for the customer is stopped | A ticket is waiting for approval when the request arrives                                                                                                                          |
-| Records the company must keep are kept       | Invoices, payments, refunds and the audit chain are compared before and after                                                                                                      |
-
-No model takes part in a deletion. What must go is fixed in code and in one database function ([ADR 13](docs/adr/0013-deletion-without-a-model.md)).
+The [threat model](docs/threat-model.md) lists the controls by layer and states what a compromised model can still do.
 
 ## Results on real models
 
@@ -207,6 +125,7 @@ Requires Node 22.18 or later, pnpm and Docker.
 pnpm install
 pnpm check        # secret scan, lint, type checks and every test
 pnpm test:unit    # only the tests that need no Docker
+pnpm prove        # take each control out in turn and expect its tests to fail
 ```
 
 `pnpm test` starts its own Postgres, Keycloak and Temporal containers and takes a few minutes. It includes the test that runs every service as a separate process and kills the worker mid-refund.
@@ -280,13 +199,33 @@ pnpm evals --model claude-sonnet-5-5 --effort medium --max-spend 1 --out results
 
 Run state is saved after every step, so a worker can stop anywhere and another continues. See [ADR 6](docs/adr/0006-run-state-outside-workflow-history.md).
 
+## Stack
+
+| Layer             | Choice                                               | What it does here                                             |
+| ----------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| Language          | TypeScript on Node 22, pnpm workspace                | One language across services, agent, evals and tests          |
+| Model             | Claude Sonnet and Haiku, Anthropic SDK               | Own agent loop with strict tool schemas; no agent framework   |
+| Model gateway     | Own, thin                                            | Budgets per ticket and tenant, retries, failover, fault tests |
+| Durable execution | Temporal                                             | One workflow per ticket; survives a worker dying mid-refund   |
+| Tools             | Three MCP servers (billing, entitlements, documents) | Typed inputs and outputs; each call carries a scoped token    |
+| Identity          | Keycloak, OAuth token exchange (RFC 8693)            | The agent acts as the customer, never as itself               |
+| Policy            | Cedar                                                | Allow, deny or require approval, decided outside the model    |
+| Data              | PostgreSQL, Kysely, dbmate, row-level security       | Tenant isolation enforced by the database; hash-chained audit |
+| Validation        | Zod                                                  | Every boundary: tool input, tool output, model output         |
+| Telemetry         | OpenTelemetry to Grafana                             | One trace per ticket; counts and costs, no customer text      |
+| Inspection        | Arize Phoenix                                        | Full conversations, per tenant, deleted with the customer     |
+| Evals             | Own runner on Vitest                                 | Judged on the final state of the databases                    |
+| Tests             | Vitest, Testcontainers, Playwright                   | Real Postgres, Keycloak and Temporal; a real browser          |
+| Local and CI      | Docker Compose, GitHub Actions                       | The whole system from nothing on every push                   |
+
 ## Test environment
 
 The systems of record run as a seeded environment, so every ticket has a known correct outcome.
 
 - **Two tenants with different rules.** One allows refunds for 14 days and needs approval above $200; the other 30 days and $500. The same ticket can have two correct answers.
 - **Hand-written expected results.** Each scenario states the refunds or plan change that must exist afterwards, whether approval is requested, and what the reply must say.
-- **Validated without a model.** A scripted oracle reaches the expected result on all 76 scenarios, and solvers that always refund or always refuse fail all 76.
+- **Validated without a model.** A scripted oracle reaches the expected result on every scenario, and solvers that always refund or always refuse fail every one.
+- **Conversations too.** 14 more scenarios take more than one round: the agent must ask, and 7 of the answers carry an attack. Guessing right without asking fails. These are checked by the oracle and by scripted models, and have no real-model results yet.
 
 ## Repository layout
 
@@ -307,8 +246,9 @@ The systems of record run as a seeded environment, so every ticket has a known c
 | `packages/telemetry`                                              | Dashboards' traces and metrics, limited to an allowlist; and full conversations for the inspection store         |
 | `packages/simulator`                                              | Seeded environment, scenarios, oracle, final-state runner                                                        |
 | `packages/evals`                                                  | Eval runner, report generator, quality gate, replay, capture of cases from reviewed tickets                      |
+| `packages/claims`                                                 | Every claim with its tests, and the command that removes each control to check them                              |
 | `infra`                                                           | Compose file, dashboards and the image every service runs from                                                   |
-| `docs`                                                            | Decision records, eval report, threat model, cut list                                                            |
+| `docs`                                                            | Every claim, decision records, eval report, threat model, cut list                                               |
 
 ## Design decisions
 
