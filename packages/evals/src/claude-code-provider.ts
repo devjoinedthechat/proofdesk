@@ -383,72 +383,82 @@ export async function createClaudeCodeProvider(
         conversation.start(launch, request, `${served.url}/mcp`);
       }
       const current = conversation;
-      current.touch(() => end(current));
+      try {
+        current.touch(() => end(current));
 
-      // What the caller added since the last turn: results for the tool
-      // calls it was handed, and anything new the customer said.
-      const blocks = request.messages.flatMap((message) =>
-        message.role === "user" ? message.content : [],
-      );
-      const added = blocks.slice(current.consumed);
-      current.consumed = blocks.length;
-      let answered = 0;
-      for (const block of added) {
-        if (block.type === "text") {
-          current.unsent.push(block.text);
-          continue;
-        }
-        const asked = current.open.get(block.toolUseId);
-        if (!asked) continue;
-        current.open.delete(block.toolUseId);
-        const call = await current.calls.take(
-          (candidate) => candidate.name === asked.name && candidate.key === asked.key,
-          TURN_MS,
-          `the command line to call ${asked.name}`,
+        // What the caller added since the last turn: results for the tool
+        // calls it was handed, and anything new the customer said.
+        const blocks = request.messages.flatMap((message) =>
+          message.role === "user" ? message.content : [],
         );
-        call.answer(block);
-        answered += 1;
-      }
-
-      let message = answered > 0 ? await nextMessage(current) : undefined;
-      // The customer's words go in once the model has finished what it was
-      // saying. If it asked for another tool instead, they wait their turn.
-      while (current.unsent.length > 0 && message?.stopReason !== "tool_use") {
-        if (!current.idle) {
-          const ended = await current.turns.take(
-            (turn) => turn.kind !== "message",
-            TURN_MS,
-            "the turn to end",
-          );
-          if (ended.kind === "exit") {
-            end(current);
-            throw new ProviderError(
-              NAME,
-              "unavailable",
-              `The command line stopped: ${ended.detail}`,
-            );
+        const added = blocks.slice(current.consumed);
+        current.consumed = blocks.length;
+        let answered = 0;
+        for (const block of added) {
+          if (block.type === "text") {
+            current.unsent.push(block.text);
+            continue;
           }
-          current.idle = true;
+          const asked = current.open.get(block.toolUseId);
+          if (!asked) continue;
+          current.open.delete(block.toolUseId);
+          const call = await current.calls.take(
+            (candidate) => candidate.name === asked.name && candidate.key === asked.key,
+            TURN_MS,
+            `the command line to call ${asked.name}`,
+          );
+          call.answer(block);
+          answered += 1;
         }
-        current.say(current.unsent.splice(0).join("\n\n"));
-        message = await nextMessage(current);
-      }
-      if (!message) {
-        throw new ProviderError(NAME, "invalid_request", "The request adds nothing to answer");
-      }
 
-      for (const block of message.content) {
-        if (block.type === "tool_use") {
-          current.open.set(block.id, { name: block.name, key: stable(block.input) });
+        let message = answered > 0 ? await nextMessage(current) : undefined;
+        // The customer's words go in once the model has finished what it was
+        // saying. If it asked for another tool instead, they wait their turn.
+        while (current.unsent.length > 0 && message?.stopReason !== "tool_use") {
+          if (!current.idle) {
+            const ended = await current.turns.take(
+              (turn) => turn.kind !== "message",
+              TURN_MS,
+              "the turn to end",
+            );
+            if (ended.kind === "exit") {
+              end(current);
+              throw new ProviderError(
+                NAME,
+                "unavailable",
+                `The command line stopped: ${ended.detail}`,
+              );
+            }
+            current.idle = true;
+          }
+          current.say(current.unsent.splice(0).join("\n\n"));
+          message = await nextMessage(current);
         }
+        if (!message) {
+          throw new ProviderError(NAME, "invalid_request", "The request adds nothing to answer");
+        }
+
+        for (const block of message.content) {
+          if (block.type === "tool_use") {
+            current.open.set(block.id, { name: block.name, key: stable(block.input) });
+          }
+        }
+        current.touch(() => end(current));
+        return {
+          model: message.model,
+          content: message.content,
+          stopReason: message.stopReason,
+          usage: message.usage,
+        };
+      } catch (error) {
+        // A turn that failed leaves the command line somewhere this side
+        // cannot know. The conversation is closed, so that a retry of a
+        // first turn starts a new one, and a retry of a later turn is
+        // refused plainly instead of being mistaken for a continuation.
+        end(current);
+        byMessages.delete(request.messages);
+        throw error;
       }
-      current.touch(() => end(current));
-      return {
-        model: message.model,
-        content: message.content,
-        stopReason: message.stopReason,
-        usage: message.usage,
-      };
     },
 
     async close() {

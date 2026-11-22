@@ -107,4 +107,19 @@ describe("the model through the Claude Code command line", () => {
       kind: "unavailable",
     });
   });
+
+  it("starts afresh when a first turn that failed is tried again", async () => {
+    // The gateway retries a call that failed for a reason that may pass. The
+    // retry carries the same list of messages, and must not be taken for a
+    // conversation that is already under way.
+    const { provider, request, messages } = await start();
+    messages[0] = { role: "user", content: [{ type: "text", text: "exit" }] };
+    await expect(provider.complete(request, context)).rejects.toMatchObject({
+      kind: "unavailable",
+    });
+
+    messages[0] = { role: "user", content: [{ type: "text", text: "first" }] };
+    const retried = await provider.complete(request, context);
+    expect(retried.content.at(-1)).toMatchObject({ type: "tool_use", input: { q: "first" } });
+  });
 });
