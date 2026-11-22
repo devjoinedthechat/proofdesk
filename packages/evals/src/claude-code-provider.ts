@@ -126,12 +126,13 @@ class Conversation {
     this.tools = tools;
   }
 
-  start(binary: string, request: ModelRequest, mcpUrl: string) {
+  start(launch: Launch, request: ModelRequest, mcpUrl: string) {
     const config = { mcpServers: { [SERVER]: { type: "http", url: `${mcpUrl}/${this.token}` } } };
     const { ANTHROPIC_API_KEY: _key, ...env } = process.env;
     const proc = spawn(
-      binary,
+      launch.command,
       [
+        ...launch.args,
         "--print",
         "--verbose",
         "--input-format=stream-json",
@@ -276,14 +277,24 @@ class Conversation {
 
 export type ClaudeCodeProvider = ModelProvider & { close(): Promise<void> };
 
+/** How the command line is started. */
+export type Launch = { command: string; args: string[] };
+
 /**
  * A model provider that asks the Claude Code command line. `binary` is its
  * path, or its name when it is on the PATH.
  */
 export async function createClaudeCodeProvider(
-  options: { binary?: string } = {},
+  options: {
+    binary?: string;
+    /** For tests: a command and leading arguments to run instead of the command line. */
+    launch?: Launch;
+  } = {},
 ): Promise<ClaudeCodeProvider> {
-  const binary = options.binary ?? process.env.CLAUDE_CODE_BIN ?? "claude";
+  const launch = options.launch ?? {
+    command: options.binary ?? process.env.CLAUDE_CODE_BIN ?? "claude",
+    args: [],
+  };
   /** The conversation a request belongs to, found by the list of messages it carries. */
   const byMessages = new WeakMap<Message[], Conversation>();
   const byToken = new Map<string, Conversation>();
@@ -369,7 +380,7 @@ export async function createClaudeCodeProvider(
         conversation = new Conversation(request.tools ?? []);
         byMessages.set(request.messages, conversation);
         byToken.set(conversation.token, conversation);
-        conversation.start(binary, request, `${served.url}/mcp`);
+        conversation.start(launch, request, `${served.url}/mcp`);
       }
       const current = conversation;
       current.touch(() => end(current));
