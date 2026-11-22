@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ANTHROPIC_PRICES, createAnthropicProvider, type Effort } from "@proofdesk/gateway";
 import {
@@ -12,6 +13,7 @@ import {
   ADVERSARIAL_SCENARIOS,
   CONVERSATION_SCENARIOS,
   HARD_SCENARIOS,
+  HELD_OUT_SCENARIOS,
   KNOWLEDGE_SCENARIOS,
   PLAN_CHANGE_SCENARIOS,
   prepareTemplates,
@@ -33,6 +35,11 @@ import { toReplayFixture } from "./replay-fixture.ts";
 // It needs Docker (for a throwaway Postgres) and ANTHROPIC_API_KEY, which is
 // read from .env when present.
 
+/** Every run of the held-out suite, one line each. */
+const HELD_OUT_LOG = fileURLToPath(
+  new URL("../../../docs/eval-report/held-out/LOG.md", import.meta.url),
+);
+
 const { values } = parseArgs({
   options: {
     model: { type: "string" },
@@ -50,6 +57,7 @@ const { values } = parseArgs({
     policy: { type: "string", default: "production" },
     outage: { type: "string" },
     via: { type: "string", default: "api" },
+    final: { type: "boolean", default: false },
   },
 });
 
@@ -75,11 +83,18 @@ const SUITES: Record<string, ScenarioSpec[]> = {
   conversation: CONVERSATION_SCENARIOS,
   // Single tickets where rules meet, or the ticket leaves out the fact that decides.
   hard: HARD_SCENARIOS,
+  // Never used while changing a prompt. Needs --final, and every run is logged.
+  "held-out": HELD_OUT_SCENARIOS,
   // Cases captured from tickets the agent got wrong and staff reviewed.
   captured: loadCapturedCases(),
 };
 const suiteName = values.suite ?? "refund";
 const suiteSpecs = SUITES[suiteName] ?? fail(`Unknown suite "${suiteName}"`);
+if (suiteName === "held-out" && !values.final) {
+  fail(
+    "The held-out suite is for a final measurement, not for changing a prompt against. Run it with --final; the run is logged in docs/eval-report/held-out/LOG.md.",
+  );
+}
 
 // "prompt-only" drops the rules enforced on billing records, leaving them to
 // the model's prompt alone. It exists to measure what that enforcement is worth.
@@ -166,6 +181,12 @@ try {
   }
 
   const passed = results.runs.filter((run) => run.passed).length;
+  if (suiteName === "held-out") {
+    appendFileSync(
+      HELD_OUT_LOG,
+      `| ${results.startedAt.slice(0, 10)} | \`${model}\` | ${results.promptVersion} | ${results.via ?? "api"} | ${passed} of ${results.runs.length} | ${out} |\n`,
+    );
+  }
   console.log(
     `\n${passed}/${results.runs.length} attempts passed, $${(results.totalCostMicros / 1_000_000).toFixed(2)} spent${results.stoppedAtSpendCap ? " (stopped at the spend cap)" : ""}. Wrote ${out}`,
   );

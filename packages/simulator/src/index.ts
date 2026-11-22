@@ -47,6 +47,7 @@ export {
 export { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 export { CONVERSATION_SCENARIOS } from "./scenarios/conversations.ts";
 export { HARD_SCENARIOS } from "./scenarios/hard.ts";
+export { HELD_OUT_SCENARIOS } from "./scenarios/held-out.ts";
 export { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
 export { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 export { REFUND_SCENARIOS } from "./scenarios/refunds.ts";

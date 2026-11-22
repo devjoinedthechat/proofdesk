@@ -7,6 +7,7 @@ import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scena
 import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 import { CONVERSATION_SCENARIOS } from "./scenarios/conversations.ts";
 import { HARD_SCENARIOS } from "./scenarios/hard.ts";
+import { HELD_OUT_SCENARIOS } from "./scenarios/held-out.ts";
 import { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
 import { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
@@ -19,6 +20,9 @@ const SPECS = [
   ...PLAN_CHANGE_SCENARIOS,
   ...CONVERSATION_SCENARIOS,
   ...HARD_SCENARIOS,
+  // Checked here without a model, like every other suite. That is not
+  // tuning: no prompt sees these scenarios.
+  ...HELD_OUT_SCENARIOS,
 ];
 const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 
