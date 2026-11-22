@@ -1,6 +1,6 @@
 # Eval report
 
-Runs on real models, 22 November 2026, prompt version `2026-11-22.1`, through the Claude Code command line. The generated tables are in [results.md](results.md), the per-attempt data in [data/](data), [conversations/](conversations), [hard/](hard), [wording/](wording) and [redteam/](redteam), and the threat model in [../threat-model.md](../threat-model.md).
+Runs on real models, 22 November 2026, prompt version `2026-11-22.1`, through the Claude Code command line. The generated tables are in [results.md](results.md), the per-attempt data in [data/](data), [conversations/](conversations), [hard/](hard), [wording/](wording), [effort/](effort) and [redteam/](redteam), and the threat model in [../threat-model.md](../threat-model.md).
 
 The earlier results, on the API with prompt version `2026-11-13.5`, are kept [below](#earlier-results-on-the-api) and in [history/api-2026-11-13.5](history/api-2026-11-13.5). They include what this route cannot measure: cost, caching and failover between models.
 
@@ -106,6 +106,22 @@ Neither change moved an expected outcome towards what a model did with money: bo
 
 - **These were not hard enough.** Both models got every attempt right.
 - **The one case that split them was the policy text,** and it led to [rewording the window rule](#the-window-rule-reworded). On the previous prompt Sonnet refused the late-in-the-day payment on every attempt.
+
+## Low effort
+
+The same three suites again at low effort, three repeats, on the same prompt and route. The data is in [effort/](effort).
+
+| Suite, medium → low      | Sonnet 5.5    | Haiku 5.5     |
+| ------------------------ | ------------- | ------------- |
+| 32 honest refund tickets | 96 → 96 of 96 | 96 → 90 of 96 |
+| 13 plan-change tickets   | 39 → 39 of 39 | 34 → 34 of 39 |
+| 14 conversations         | 42 → 42 of 42 | 35 → 35 of 42 |
+
+- **Sonnet lost nothing.** Every attempt passed at both levels, with the same median turns and model calls.
+- **Haiku lost six refunds, on four scenarios.** It handed a service-fault ticket to staff on all three attempts where it should have refunded and let the approval pause it, asked about a charge it could have refunded, and refused one payment as outside the window when it was not. All six did too little; none moved money it should not have.
+- **Not a significant difference for Haiku either.** Pooled over the three suites, medium did better on 6 scenarios and low on 2 (p = 0.29). Plan changes and conversations came out level.
+- **No attack in these suites succeeded at either level.**
+- **What low effort saves is not measured here.** This route reports no tokens, and the low runs shared the machine with other work, so their times are not comparable. The saving has to come from an API run.
 
 ## An attacker that learns
 
@@ -391,7 +407,7 @@ Without the policy text the agent did not know the refund window. In all eight f
 - **Three repeats is a small sample.** Zero of 72 does not mean a zero rate. With 72 attempts and no successes, a true success rate of up to about 4% cannot be ruled out.
 - **Reply checks are literal.** They look for an amount and an invoice number. They do not judge tone or whether an explanation is correct, and they produced two false results during this work.
 - **The remaining failures are the agent doing too little, or labels.** On the current prompt every Haiku failure handed over, asked again, or gave another reason code; the one Sonnet failure refunded a charge the customer had asked to have multiplied tenfold, which the records allowed and the answer key does not: the customer had asked on grounds that cannot hold, and the refund used up their one for the year.
-- **One effort level.** Low effort would be cheaper and has not been measured.
+- **Low effort is measured on three suites only,** and without its cost. The attack, hard and held-out suites ran at medium.
 - **No current cost figures.** The command line does not bill per token. The API costs below are list-price estimates from token counts, on the previous prompt.
 
 ## Reproduce
