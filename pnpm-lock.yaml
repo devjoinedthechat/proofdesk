@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@biomejs/biome':
-        specifier: 2.6.7
-        version: 2.6.7
+        specifier: 2.6.8
+        version: 2.6.8
       '@proofdesk/claims':
         specifier: workspace:*
         version: link:packages/claims
@@ -33,8 +33,8 @@ importers:
         specifier: 22.20.5
         version: 22.20.5
       '@vitest/coverage-v8':
-        specifier: 5.1.0
-        version: 5.1.0(vitest@5.1.0)
+        specifier: 5.1.1
+        version: 5.1.1(vitest@5.1.1)
       testcontainers:
         specifier: 12.2.1
         version: 12.2.1(bare-buffer@3.7.1)(supports-color@8.1.1)
@@ -42,8 +42,8 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: 5.1.0
-        version: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
+        specifier: 5.1.1
+        version: 5.1.1(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.1)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
 
   apps/portal:
     dependencies:
@@ -63,11 +63,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/telemetry
       '@temporalio/client':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       hono:
-        specifier: 4.13.18
-        version: 4.13.18
+        specifier: 4.13.19
+        version: 4.13.19
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -106,8 +106,8 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
       playwright-core:
-        specifier: 1.65.0
-        version: 1.65.0
+        specifier: 1.65.1
+        version: 1.65.1
 
   apps/worker:
     dependencies:
@@ -136,20 +136,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/telemetry
       '@temporalio/activity':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       '@temporalio/client':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       '@temporalio/common':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       '@temporalio/worker':
-        specifier: 1.25.0
-        version: 1.25.0(lightningcss@1.33.0)(long@5.3.2)(postcss@8.5.32)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(lightningcss@1.33.0)(long@5.3.2)(postcss@8.5.32)(protobufjs@8.8.1)
       '@temporalio/workflow':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -310,11 +310,11 @@ importers:
   packages/dispatch:
     dependencies:
       '@temporalio/client':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       '@temporalio/common':
-        specifier: 1.25.0
-        version: 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+        specifier: 1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -382,8 +382,8 @@ importers:
   packages/gateway:
     dependencies:
       '@anthropic-ai/sdk':
-        specifier: 1.8.0
-        version: 1.8.0(zod@4.6.7)
+        specifier: 1.10.0
+        version: 1.10.0(zod@4.6.7)
 
   packages/identity:
     dependencies:
@@ -394,8 +394,8 @@ importers:
         specifier: workspace:*
         version: link:../telemetry
       jose:
-        specifier: 6.2.17
-        version: 6.2.17
+        specifier: 6.2.18
+        version: 6.2.18
 
   packages/mcp-server:
     dependencies:
@@ -418,8 +418,8 @@ importers:
   packages/policy:
     dependencies:
       '@cedar-policy/cedar-wasm':
-        specifier: 4.14.0
-        version: 4.14.0
+        specifier: 4.15.0
+        version: 4.15.0
       '@proofdesk/agent':
         specifier: workspace:*
         version: link:../agent
@@ -430,14 +430,14 @@ importers:
   packages/service:
     dependencies:
       '@hono/node-server':
-        specifier: 2.1.8
-        version: 2.1.8(hono@4.13.18)
+        specifier: 2.1.9
+        version: 2.1.9(hono@4.13.19)
       '@proofdesk/telemetry':
         specifier: workspace:*
         version: link:../telemetry
       hono:
-        specifier: 4.13.18
-        version: 4.13.18
+        specifier: 4.13.19
+        version: 4.13.19
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -460,8 +460,8 @@ importers:
         specifier: workspace:*
         version: link:../service
       hono:
-        specifier: 4.13.18
-        version: 4.13.18
+        specifier: 4.13.19
+        version: 4.13.19
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -505,8 +505,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/telemetry
       hono:
-        specifier: 4.13.18
-        version: 4.13.18
+        specifier: 4.13.19
+        version: 4.13.19
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -538,8 +538,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/telemetry
       hono:
-        specifier: 4.13.18
-        version: 4.13.18
+        specifier: 4.13.19
+        version: 4.13.19
       kysely:
         specifier: 0.29.9
         version: 0.29.9
@@ -549,8 +549,8 @@ importers:
 
 packages:
 
-  '@anthropic-ai/sdk@1.8.0':
-    resolution: {integrity: sha512-yDOArk2+Qpd/djEKmZjrv7JZ+pn5iBHARJ9PAdvfhGf4H5wNqTgY/2K0/yDKdQdm8G8hrNQchMlBAHpPK7yBfg==}
+  '@anthropic-ai/sdk@1.10.0':
+    resolution: {integrity: sha512-j4uVct5p3aGIz/BU4K8VU5vt2A6AueHTvx2gfF3xr4mVpwH9IJMWEAUKNwSwdZSJOHQq1Za2tv5huYc5v02D0w==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -586,77 +586,77 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@biomejs/biome@2.6.7':
-    resolution: {integrity: sha512-2bT1FE6FvZZgPLFw4BjcDyRwG8Ry9zYla4X+Lw8oj2SxvqiXHiYkkEpjcrsWQrik6iYHygAa/D67YxLbVz9P1Q==}
+  '@biomejs/biome@2.6.8':
+    resolution: {integrity: sha512-kqZUFvX6/aYQOmzfRN5ANcfNS9wLH4aHLWWP/dQKyhRZVoA6rdWszA7DGugFcxPbMiznUyVYyukVl+ExZN4PQA==}
     engines: {node: '>=14.21.3'}
     hasBin: true
 
-  '@biomejs/cli-android-arm64@2.6.7':
-    resolution: {integrity: sha512-f4fyRTl+rW6QZp+iHdZrKAKptG/xmIDijTnxWhpC1Hnzr8yvjaBm/aJ98JiMv5mMx7jL1MOu4+zwmQUzfcoKBg==}
+  '@biomejs/cli-android-arm64@2.6.8':
+    resolution: {integrity: sha512-X4JKPLK85kfUTwuuaORFplnBfGjKkp62PsFhhcL7F/Tpltc7pyUofjlkkMnlZZLWsifFl7LNB8ngVrwJg1uo1Q==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [android]
 
-  '@biomejs/cli-android-x64@2.6.7':
-    resolution: {integrity: sha512-eUdeN+mh2bwen+By1feKzpFkFGAfLG3Pxi6tbwpzMvePBwFGMd4mnE6gaxDRMiWJ1eMuc+Xhtg3ErbLLbtL5wQ==}
+  '@biomejs/cli-android-x64@2.6.8':
+    resolution: {integrity: sha512-C3Hk485vl+deEj53K08+SYYelPIPkdSZL3qHuD31Xi+qydVa4q2ze+aCYo1k3iJGWtvWtjHaGkDh7S2sX6wk8w==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [android]
 
-  '@biomejs/cli-darwin-arm64@2.6.7':
-    resolution: {integrity: sha512-GewLcsnCsVblgnWYw5QRz5ydy9xphCtlFP37TpLKarezqwZMrH2qxrYblhY6DPOir4gnKyaqDnS/xZWIGVjaKw==}
+  '@biomejs/cli-darwin-arm64@2.6.8':
+    resolution: {integrity: sha512-DHyj+JnRHcn4YdvpiqgTFZMYKSPELMCfFpNNlEuu1L8DKTGXhzW7raIwdsbo2Ie9nCljQLAQkVWQk/mwM0ueiA==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [darwin]
 
-  '@biomejs/cli-darwin-x64@2.6.7':
-    resolution: {integrity: sha512-AMPl+Q+bHjRcNUBn8gwBl+dJAnKRUWGZ7ZiJo2U8tQtdpqJ32OqvIg4cwTH+xv0jrcNVkUSE69nj57zsHZ1WBA==}
+  '@biomejs/cli-darwin-x64@2.6.8':
+    resolution: {integrity: sha512-QWWUPjlA0RnkkgYnFLUHZu+RrDc0FdK0A+wEPA+dENQJwsuSHMH89lspnAw2QUWWc9VHyfluGx1Xmp6Y2GZi8Q==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [darwin]
 
-  '@biomejs/cli-linux-arm64-musl@2.6.7':
-    resolution: {integrity: sha512-BIA7qVO1O15D2wVKxLTcvEWszgOqJVZRUhlksg1KQ9N0VtYCbvknV1vyjFiSrzuBT57+z59gbzhYQCinw9lRSQ==}
+  '@biomejs/cli-linux-arm64-musl@2.6.8':
+    resolution: {integrity: sha512-WB9PhOitX+bRc0G3+GNJGlvbKoWn3JoB9z4E04JQizIC9aPCQyIvwvWG7QZHxw6k20Fi+dHLmZ2fSEmBa9HqiA==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@biomejs/cli-linux-arm64@2.6.7':
-    resolution: {integrity: sha512-Qa2edxQClKn17y1ASWkOOuT96K2si1nTLiPbXMOMilNJ79eNsa1as1kaSbgxOXy1kRUENw76sp4pAddneq3l8Q==}
+  '@biomejs/cli-linux-arm64@2.6.8':
+    resolution: {integrity: sha512-0Bjim8lKwnrvXUHoI4k3Tb51BjoiLEwDnovCI8nSzkk6wj3dShiuAjrx6+X0Hjf4ejR1sRZgTQiSDHlpy9vB7w==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@biomejs/cli-linux-x64-musl@2.6.7':
-    resolution: {integrity: sha512-+AOQyCsPR4nH5L4Hjzp8T0iaHm4UxY3unjL/KUJKc/8ziLnbkbmL3adtWmQW5ERB1zi6LRA1fsjaSuf/xGnLaQ==}
+  '@biomejs/cli-linux-x64-musl@2.6.8':
+    resolution: {integrity: sha512-64Yzo+J4fEk7Kf9SMnVdVxC+Y2A2e/L86QTP9JjGQ57lsddyELLpbBcNMxSJggre2T1AvISwwSrOApkBAHDqNA==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@biomejs/cli-linux-x64@2.6.7':
-    resolution: {integrity: sha512-VpHQ33CPNYrlIn0vyDdRS1KUlS3AiM17FiyEE2gwU000NwzyY4MgjzVHEv2KrmMb5D9Ksm3gFkwg+IOx/ULJNQ==}
+  '@biomejs/cli-linux-x64@2.6.8':
+    resolution: {integrity: sha512-XIk3pLQT56I6Tti+u0DF8FtSNXjCMTPbxVTzfJ9cS2t1ImVKvrqV5b52GuEaJg6/wuiXvz0sjfb5saB4TPRjzA==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@biomejs/cli-win32-arm64@2.6.7':
-    resolution: {integrity: sha512-2nLivZfgcGMIXP/bI8w1FZP5JE2MetP+XZInyMQ7SvJBKlDoGrm/nRjN7uUi9dOaaSlpbRWkHSfb7PqcQR3nXg==}
+  '@biomejs/cli-win32-arm64@2.6.8':
+    resolution: {integrity: sha512-ezjCEZzHIWE2pdh83a7zLVcAAcDaERcTcvfA7uWlxqz/1CuDxgtfO19pDg9B6YY4wKYIDvYBw2QCMnqIshSwmw==}
     engines: {node: '>=14.21.3'}
     cpu: [arm64]
     os: [win32]
 
-  '@biomejs/cli-win32-x64@2.6.7':
-    resolution: {integrity: sha512-uYfH+n+IAtVz3lh7m6JxdjxfJ3WCvAJDE3spHIUbU955V42oKymlhiQiu92fAhXZb7KOjvRcrfImySQbc1MFFg==}
+  '@biomejs/cli-win32-x64@2.6.8':
+    resolution: {integrity: sha512-cD6HvGczZUiAYsY8s2TxxXj2AHFzEdMomvVJfEjzOjBM45nGqIDfBpbtvwGQzDCN8X2yKKk9u1jnDZisT2nxIg==}
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
 
-  '@cedar-policy/cedar-wasm@4.14.0':
-    resolution: {integrity: sha512-TPyz3zMl5r7W5iSHq51IgG+NTILGoXB0VPrEcXnzCEpPUqL/7b+AtMPVVHB/UoJWuXA8YORjLuWxKHUW33ePAA==}
+  '@cedar-policy/cedar-wasm@4.15.0':
+    resolution: {integrity: sha512-j/5dIUzaEy9MsCOGiFewmeptRTmS3lrnZSYIZlPKw6123725oLHFkIaxVSNJXkmxLNcOT/uMLYQl94RYf4i2og==}
 
   '@dbmate/darwin-arm64@2.38.1':
     resolution: {integrity: sha512-cf8e23w/FtJMvP+jJY59bBHLp2XYgP3pVdTppOUekI/6vZnFA5G/3fQfBAM2e/xRpOhAyT8ctwpJITD3TqGruw==}
@@ -716,8 +716,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@hono/node-server@2.1.8':
-    resolution: {integrity: sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==}
+  '@hono/node-server@2.1.9':
+    resolution: {integrity: sha512-Sk4NQd3GFY0WZWCzndwFMPwJhtD0y9qjsQ+pjID0/03nK9pxyBCUoUHCho8QYBLBVhi0ssL8UkNPHqbgSOFPIQ==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4 || ^5.0.0-0
@@ -1187,54 +1187,54 @@ packages:
   '@swc/types@0.1.28':
     resolution: {integrity: sha512-V6Mnml8v09QALx6K0elJ7o9K/MkVDtW3t6L+7Ou/JcWtb3xwId2AH4FeOceySd2JaO87IMw4+6vSZxLm34LPbw==}
 
-  '@temporalio/activity@1.25.0':
-    resolution: {integrity: sha512-IBz6/pqfwlZpZcw2KBFSQa5iu7B9gH6/RUCI/VCqywP9gfj0KVs6rGVAQj1/48oY63eIU5WcAllWdbaRDWY1+A==}
+  '@temporalio/activity@1.26.0':
+    resolution: {integrity: sha512-j0/yL0PDasvbOuIH571c1rr1n+xsm0BnGX0dl/G+lpWRurxyojCCJmZG9FF472x8xUON6WWequ2qOGquw0gb8A==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/client@1.25.0':
-    resolution: {integrity: sha512-IbWlxzQiQg2fuIum+d2PkQWOGPVPyeN294sKdBCylKxVsGc1IoixXjWjEZ0dxVuYNFZq+16Vn9Fh2UNVDfXePA==}
+  '@temporalio/client@1.26.0':
+    resolution: {integrity: sha512-01hNfP6m6bjlut/huL6oCJ8czAMXm3jWKriLnEoLmnh5RzU6AEuqzbw77dmNDF3lQiZaFeY++lCKjSig4IVd9A==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/common@1.25.0':
-    resolution: {integrity: sha512-R9q/5wJZLi47kktJ3GfGh+eMO2HleRxKQGDysCvoObdVjK7Q+F+Vq0M1EeMu4EMHQZdT9A4vgN5rQ9L8cTgU8w==}
+  '@temporalio/common@1.26.0':
+    resolution: {integrity: sha512-mHpfPAm6IThHUreLmH9iE7G0ekURbj6jDqJZuG8kfg2unMVx33fQ1cx05TkRuzG8U6IPjIMheyVDnVrBid/TBg==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/core-bridge@1.25.0':
-    resolution: {integrity: sha512-4C7lOpBXo9nTTwuEZwlPWGEZy3dchSbEgp+HeX87EbovC4QlPf1Th9iWz7jcce0C9l/O3kaXfA34uPMGRu15DA==}
+  '@temporalio/core-bridge@1.26.0':
+    resolution: {integrity: sha512-O2vtTOtFkHyl4YQwmUZni63HGlTUxOVoiZNRTZezaygMXG3LJw0dMap4+qCMponkBOiV8Z6qkrGNnShslqYC5g==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/nexus@1.25.0':
-    resolution: {integrity: sha512-uUq7FK0WdCQcwj57Tt1wIeLc51fn8FgAPN6+hiFD1A/o+EDpao7YZ2A/holuJ9cjFZk4c9lswKJaNZYTznE2fw==}
+  '@temporalio/nexus@1.26.0':
+    resolution: {integrity: sha512-Tj44f+H+hNQl3lgrLAduv17Nv3bcPXj4i1hN6wv3C+ZPjFbklD5sroN6gMHK6bzlEqGSR9s5UInjbfE4if8J9w==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/proto@1.25.0':
-    resolution: {integrity: sha512-cZF6C1F4ZHWrVwrDNW6hTB7HvBi1sofqPWxQrqJq0b9hPE21y5IU5rTNEUx3Ju6G03xqdpwdH0LECAul0KAi2Q==}
+  '@temporalio/proto@1.26.0':
+    resolution: {integrity: sha512-hrYoXs/b3W7u+PvuK6qB2Cvb/TZv1AxKJn9Rj4YCeQsemWknZ3a4+2FICRuGxwB6bR0qsoVFf5uKQOPtouyDCw==}
     engines: {node: '>= 20.3.0'}
 
-  '@temporalio/worker@1.25.0':
-    resolution: {integrity: sha512-I4b/OwhDb/UhyoHLJDCnuKqROSlT95xHACRxOsg0UjH6qgcYCusch+9mLol1IN7ml2cNkSbnm+5hvzpVuywP3Q==}
+  '@temporalio/worker@1.26.0':
+    resolution: {integrity: sha512-X6xdDzBtPNBfP7wdl2PWaWov4wmMtzBLb6PAQYQmOmupPVBZSTajLUi9wP+Fz0s1sqFvUQamY02QaQ3TJysrRA==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
       protobufjs: ^8.7.1
 
-  '@temporalio/workflow@1.25.0':
-    resolution: {integrity: sha512-2Z5BvOtsfOHL3Dy+4cewXEHDu9NeseEn4FeaaitNwn704POgEfshz0zxyZB8ofxbna2P0wsC5l3rnYHkOvtX9A==}
+  '@temporalio/workflow@1.26.0':
+    resolution: {integrity: sha512-wa5SYoxn4qNVOtNaP6D7QPzyifg8KX6rzTkmE9oIqAqF5uxPgCgv1BbIIRq8Iu7Z0AH/mkkUCGwhwirdcmQwhA==}
     engines: {node: '>= 20.3.0'}
     peerDependencies:
       long: ^5.3.2
@@ -1402,11 +1402,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@vitest/coverage-v8@5.1.0':
-    resolution: {integrity: sha512-OY9aShBQG5KOIw2zCo9fDoCHI9RHliNHJ//nM7m6jGg41Hyke9JOGWmeMlK74xYErsxMoK8mIB3gAeEyFVA7LA==}
+  '@vitest/coverage-v8@5.1.1':
+    resolution: {integrity: sha512-xL4NkbVx/UqqDHaXSOyvB8qsSoLQ+dVNGR9H2Bh/4ggQtmaPFNPUC9gZQwKZePLOQ6WDcgwXVnPulFW9eCHt0w==}
     peerDependencies:
-      '@vitest/browser': 5.1.0
-      vitest: 5.1.0
+      '@vitest/browser': 5.1.1
+      vitest: 5.1.1
     peerDependenciesMeta:
       '@vitest/browser':
         optional: true
@@ -1419,8 +1419,8 @@ packages:
     resolution: {integrity: sha512-Qba+8OpQQAbWrmq3u1olh6jqE/vyW4OYJe6TLrrTBpXhjJhbY7Os69wyVvMQmNA64KJhGd5nQ/c7l4io8tPCHQ==}
     engines: {node: '>=22'}
 
-  '@vitest/mocker@5.1.0':
-    resolution: {integrity: sha512-5umB9/jlWcqVS6fsrFmv5Gdnpu6wAUio/lEOwAmvB7v+lFo/IW2B9FhAD0p19GCULTgMzLCdUmuCDCnAzWgppQ==}
+  '@vitest/mocker@5.1.1':
+    resolution: {integrity: sha512-b2OgTB4+3ImWIVafXKazJXwLKwQxUNnix6b3xUvUTMh7RyXlrtzoxfZr8aEz9zkHOMAS4K5lu3TvFWoiVeVTQg==}
     peerDependencies:
       msw: ^2.4.9 || ^3.0.0
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -1430,8 +1430,8 @@ packages:
       vite:
         optional: true
 
-  '@vitest/spy@5.1.0':
-    resolution: {integrity: sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==}
+  '@vitest/spy@5.1.1':
+    resolution: {integrity: sha512-6K8C6alQG1/Yc8/ZI22iJS7JEsxPdVzqtqDq+/xM4Z0mGVykemMVjLhqMy/q6/IHYG3kKD8hKSwRen/ZdyI9vQ==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -1966,8 +1966,8 @@ packages:
     resolution: {integrity: sha512-EQfezRg0NCZGNlhlDR3Evrw1FVL2G3LhU7EgPoxufQKruNBSYA8MiRPHeWbU+36o+Fhel0wMwM+sLEiBAlNLJA==}
     engines: {node: '>=10.0.0'}
 
-  hono@4.13.18:
-    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
+  hono@4.13.19:
+    resolution: {integrity: sha512-KmXvQAXwcAHV+muzbIwoJ23niEB5nMoDVr9WcRkU8mvjUECm/1+7v4Jgp7P7a+H6MLFrh+vXrGonGrGS+RQfkA==}
     engines: {node: '>=16.9.0'}
 
   http-errors@2.0.1:
@@ -2024,8 +2024,8 @@ packages:
     resolution: {integrity: sha512-7vuh85V5cdDofPyxn58nrPjBktZo0u9x1g8WtjQol+jZDaE+fhN+cIvTj11GndBnMnyfrUOG1sZQxCdjKh+DKg==}
     engines: {node: '>= 10.13.0'}
 
-  jose@6.2.17:
-    resolution: {integrity: sha512-wOuK9V1yujQFH5S0ZWmLcDZN7+IKh9bUCC2ZPCf2HDlol3WWHy+PPyNjEI75FXRLMp3vDKQcupP59xhVU95hcg==}
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -2354,8 +2354,8 @@ packages:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
 
-  playwright-core@1.65.0:
-    resolution: {integrity: sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA==}
+  playwright-core@1.65.1:
+    resolution: {integrity: sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2762,20 +2762,20 @@ packages:
       yaml:
         optional: true
 
-  vitest@5.1.0:
-    resolution: {integrity: sha512-MzmNFnrwa8v8lF1bLxw3UJ4EREwVOVb75VqJZmUDRjJ6EluK/x9th7qTbaeDk41WxE1GxWqmTXcdsfobfH5sOA==}
+  vitest@5.1.1:
+    resolution: {integrity: sha512-trVmzUFOSraCZcI3uZIMD5FqBh4atFkC/XuJP/IU7qtyQay0FCs3Ia+0QiQ2JJwGyWG/xrcBoJNel2+O7kEZ0g==}
     engines: {node: ^22.12.0 || ^24.0.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
       '@types/node': ^22.0.0 || >=24.0.0
-      '@vitest/browser-playwright': 5.1.0
-      '@vitest/browser-preview': 5.1.0
+      '@vitest/browser-playwright': 5.1.1
+      '@vitest/browser-preview': 5.1.1
       '@vitest/browser-webdriverio': ^5.0.0-beta.5 || >=5.0.0
-      '@vitest/coverage-istanbul': 5.1.0
-      '@vitest/coverage-v8': 5.1.0
-      '@vitest/ui': 5.1.0
+      '@vitest/coverage-istanbul': 5.1.1
+      '@vitest/coverage-v8': 5.1.1
+      '@vitest/ui': 5.1.1
       happy-dom: '*'
       jsdom: '*'
       vite: ^6.4.0 || ^7.0.0 || ^8.0.0
@@ -2877,7 +2877,7 @@ packages:
 
 snapshots:
 
-  '@anthropic-ai/sdk@1.8.0(zod@4.6.7)':
+  '@anthropic-ai/sdk@1.10.0(zod@4.6.7)':
     dependencies:
       '@opentelemetry/api': 1.10.0
       json-schema-to-ts: 3.1.1
@@ -2904,50 +2904,50 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@biomejs/biome@2.6.7':
+  '@biomejs/biome@2.6.8':
     optionalDependencies:
-      '@biomejs/cli-android-arm64': 2.6.7
-      '@biomejs/cli-android-x64': 2.6.7
-      '@biomejs/cli-darwin-arm64': 2.6.7
-      '@biomejs/cli-darwin-x64': 2.6.7
-      '@biomejs/cli-linux-arm64': 2.6.7
-      '@biomejs/cli-linux-arm64-musl': 2.6.7
-      '@biomejs/cli-linux-x64': 2.6.7
-      '@biomejs/cli-linux-x64-musl': 2.6.7
-      '@biomejs/cli-win32-arm64': 2.6.7
-      '@biomejs/cli-win32-x64': 2.6.7
+      '@biomejs/cli-android-arm64': 2.6.8
+      '@biomejs/cli-android-x64': 2.6.8
+      '@biomejs/cli-darwin-arm64': 2.6.8
+      '@biomejs/cli-darwin-x64': 2.6.8
+      '@biomejs/cli-linux-arm64': 2.6.8
+      '@biomejs/cli-linux-arm64-musl': 2.6.8
+      '@biomejs/cli-linux-x64': 2.6.8
+      '@biomejs/cli-linux-x64-musl': 2.6.8
+      '@biomejs/cli-win32-arm64': 2.6.8
+      '@biomejs/cli-win32-x64': 2.6.8
 
-  '@biomejs/cli-android-arm64@2.6.7':
+  '@biomejs/cli-android-arm64@2.6.8':
     optional: true
 
-  '@biomejs/cli-android-x64@2.6.7':
+  '@biomejs/cli-android-x64@2.6.8':
     optional: true
 
-  '@biomejs/cli-darwin-arm64@2.6.7':
+  '@biomejs/cli-darwin-arm64@2.6.8':
     optional: true
 
-  '@biomejs/cli-darwin-x64@2.6.7':
+  '@biomejs/cli-darwin-x64@2.6.8':
     optional: true
 
-  '@biomejs/cli-linux-arm64-musl@2.6.7':
+  '@biomejs/cli-linux-arm64-musl@2.6.8':
     optional: true
 
-  '@biomejs/cli-linux-arm64@2.6.7':
+  '@biomejs/cli-linux-arm64@2.6.8':
     optional: true
 
-  '@biomejs/cli-linux-x64-musl@2.6.7':
+  '@biomejs/cli-linux-x64-musl@2.6.8':
     optional: true
 
-  '@biomejs/cli-linux-x64@2.6.7':
+  '@biomejs/cli-linux-x64@2.6.8':
     optional: true
 
-  '@biomejs/cli-win32-arm64@2.6.7':
+  '@biomejs/cli-win32-arm64@2.6.8':
     optional: true
 
-  '@biomejs/cli-win32-x64@2.6.7':
+  '@biomejs/cli-win32-x64@2.6.8':
     optional: true
 
-  '@cedar-policy/cedar-wasm@4.14.0': {}
+  '@cedar-policy/cedar-wasm@4.15.0': {}
 
   '@dbmate/darwin-arm64@2.38.1':
     optional: true
@@ -3005,9 +3005,9 @@ snapshots:
       protobufjs: 7.6.6
       yargs: 17.7.3
 
-  '@hono/node-server@2.1.8(hono@4.13.18)':
+  '@hono/node-server@2.1.9(hono@4.13.19)':
     dependencies:
-      hono: 4.13.18
+      hono: 4.13.19
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -3175,7 +3175,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.2(supports-color@8.1.1)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.8(hono@4.13.18)
+      '@hono/node-server': 2.1.9(hono@4.13.19)
       ajv: 8.20.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -3185,8 +3185,8 @@ snapshots:
       eventsource-parser: 3.1.1
       express: 5.3.0(supports-color@8.1.1)
       express-rate-limit: 8.7.4(express@5.3.0(supports-color@8.1.1))(supports-color@8.1.1)
-      hono: 4.13.18
-      jose: 6.2.17
+      hono: 4.13.19
+      jose: 6.2.18
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
@@ -3415,63 +3415,63 @@ snapshots:
     dependencies:
       '@swc/counter': 0.1.3
 
-  '@temporalio/activity@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/activity@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
-      '@temporalio/client': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/client': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       long: 5.3.2
       protobufjs: 8.8.1
 
-  '@temporalio/client@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/client@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
       '@grpc/grpc-js': 1.14.7
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/proto': 1.25.0
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/proto': 1.26.0
       long: 5.3.2
       nexus-rpc: 0.0.3
       protobufjs: 8.8.1
       uuid: 11.1.1
 
-  '@temporalio/common@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/common@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
-      '@temporalio/proto': 1.25.0
+      '@temporalio/proto': 1.26.0
       long: 5.3.2
       ms: 3.0.0-canary.202508261828
       nexus-rpc: 0.0.3
       protobufjs: 8.8.1
 
-  '@temporalio/core-bridge@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/core-bridge@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
       '@grpc/grpc-js': 1.14.7
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       long: 5.3.2
       protobufjs: 8.8.1
 
-  '@temporalio/nexus@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/nexus@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
-      '@temporalio/client': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/proto': 1.25.0
+      '@temporalio/client': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/proto': 1.26.0
       long: 5.3.2
       nexus-rpc: 0.0.3
       protobufjs: 8.8.1
 
-  '@temporalio/proto@1.25.0':
+  '@temporalio/proto@1.26.0':
     dependencies:
       long: 5.3.2
       protobufjs: 8.8.1
 
-  '@temporalio/worker@1.25.0(lightningcss@1.33.0)(long@5.3.2)(postcss@8.5.32)(protobufjs@8.8.1)':
+  '@temporalio/worker@1.26.0(lightningcss@1.33.0)(long@5.3.2)(postcss@8.5.32)(protobufjs@8.8.1)':
     dependencies:
       '@grpc/grpc-js': 1.14.7
       '@swc/core': 1.16.22
-      '@temporalio/activity': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/client': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/core-bridge': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/nexus': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/proto': 1.25.0
-      '@temporalio/workflow': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/activity': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/client': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/core-bridge': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/nexus': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/proto': 1.26.0
+      '@temporalio/workflow': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       heap-js: 2.7.1
       long: 5.3.2
       memfs: 4.80.0
@@ -3503,10 +3503,10 @@ snapshots:
       - uglify-js
       - webpack-cli
 
-  '@temporalio/workflow@1.25.0(long@5.3.2)(protobufjs@8.8.1)':
+  '@temporalio/workflow@1.26.0(long@5.3.2)(protobufjs@8.8.1)':
     dependencies:
-      '@temporalio/common': 1.25.0(long@5.3.2)(protobufjs@8.8.1)
-      '@temporalio/proto': 1.25.0
+      '@temporalio/common': 1.26.0(long@5.3.2)(protobufjs@8.8.1)
+      '@temporalio/proto': 1.26.0
       long: 5.3.2
       nexus-rpc: 0.0.3
       protobufjs: 8.8.1
@@ -3634,7 +3634,7 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@vitest/coverage-v8@5.1.0(vitest@5.1.0)':
+  '@vitest/coverage-v8@5.1.1(vitest@5.1.1)':
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/istanbul-lib-coverage': 2.1.1
@@ -3644,7 +3644,7 @@ snapshots:
       obug: 3.0.0
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
+      vitest: 5.1.1(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.1)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
 
   '@vitest/istanbul-lib-coverage@2.1.1': {}
 
@@ -3652,16 +3652,16 @@ snapshots:
     dependencies:
       '@vitest/istanbul-lib-coverage': 2.1.1
 
-  '@vitest/mocker@5.1.0(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))':
+  '@vitest/mocker@5.1.1(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      '@vitest/spy': 5.1.0
+      '@vitest/spy': 5.1.1
       estree-walker: 3.0.3
       magic-string: 1.4.5
     optionalDependencies:
       vite: 8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1)
 
-  '@vitest/spy@5.1.0': {}
+  '@vitest/spy@5.1.1': {}
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
@@ -4236,7 +4236,7 @@ snapshots:
 
   heap-js@2.7.1: {}
 
-  hono@4.13.18: {}
+  hono@4.13.19: {}
 
   http-errors@2.0.1:
     dependencies:
@@ -4286,7 +4286,7 @@ snapshots:
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
-  jose@6.2.17: {}
+  jose@6.2.18: {}
 
   js-tokens@10.0.0: {}
 
@@ -4515,7 +4515,7 @@ snapshots:
 
   pkce-challenge@5.0.1: {}
 
-  playwright-core@1.65.0: {}
+  playwright-core@1.65.1: {}
 
   postcss@8.5.32:
     dependencies:
@@ -5010,10 +5010,10 @@ snapshots:
       terser: 5.51.2
       yaml: 2.9.1
 
-  vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1)):
+  vitest@5.1.1(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(@vitest/coverage-v8@5.1.1)(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.1.0(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
+      '@vitest/mocker': 5.1.1(vite@8.3.8(@types/node@22.20.5)(terser@5.51.2)(yaml@2.9.1))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -5029,7 +5029,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
       '@types/node': 22.20.5
-      '@vitest/coverage-v8': 5.1.0(vitest@5.1.0)
+      '@vitest/coverage-v8': 5.1.1(vitest@5.1.1)
     transitivePeerDependencies:
       - msw
 
