@@ -1,59 +1,33 @@
 name: Evals
 
-# Real-model runs. These spend money, so they are not part of every push.
-# The gate runs when something that changes the agent's behaviour changes,
-# and the full suite runs on request.
+# Real-model runs. They spend money, so they run only when someone starts
+# them by hand, with the API key set as a repository secret. Nothing here
+# runs on a push or a pull request: those use the free checks in ci.yml,
+# including the replay of a recorded real-model run.
 on:
   workflow_dispatch:
     inputs:
+      what:
+        description: "gate: the quality gate sample, or full: every scenario"
+        type: choice
+        options: [gate, full]
+        default: gate
       model:
         description: Model to evaluate
         default: claude-sonnet-5-5
       repeats:
         description: Repeats per scenario
-        default: "3"
+        default: "2"
       max_spend:
         description: Spend cap in dollars
         default: "3"
-  pull_request:
-    paths:
-      - packages/agent/src/prompt.ts
-      - packages/agent/src/resolution.ts
-      - packages/policy/policies/**
-      - mcp/billing/src/tools.ts
 
 permissions:
   contents: read
 
 jobs:
-  gate:
-    name: Quality gate
-    # A pull request from a fork is not given the API key, and should not be:
-    # its code is not trusted yet. The gate is skipped there, not failed, and
-    # a maintainer runs the suite by hand before merging.
-    if: >-
-      github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Run the gate sample on the real model
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: >
-          pnpm evals --model claude-sonnet-5-5 --effort medium --scenarios gate
-          --repeats 2 --max-spend 1 --min-pass-rate 0.9 --out gate.json
-
-  full:
-    name: Full suite
-    if: github.event_name == 'workflow_dispatch'
+  evals:
+    name: Real-model evaluation (${{ inputs.what }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -64,16 +38,25 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Run every scenario on the real model
+      - name: Run on the real model
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          WHAT: ${{ inputs.what }}
           MODEL: ${{ inputs.model }}
           REPEATS: ${{ inputs.repeats }}
           MAX_SPEND: ${{ inputs.max_spend }}
-        run: >
-          pnpm evals --model "$MODEL" --effort medium --repeats "$REPEATS"
-          --max-spend "$MAX_SPEND" --out results.json
+        # The gate fails the job when the pass rate on its sample falls
+        # under 90%.
+        run: |
+          if [ "$WHAT" = gate ]; then
+            pnpm evals --model "$MODEL" --effort medium --scenarios gate \
+              --repeats "$REPEATS" --max-spend "$MAX_SPEND" --min-pass-rate 0.9 --out results.json
+          else
+            pnpm evals --model "$MODEL" --effort medium --repeats "$REPEATS" \
+              --max-spend "$MAX_SPEND" --out results.json
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: eval-results
           path: results.json
