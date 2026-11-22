@@ -92,7 +92,7 @@ From the [eval report](eval-report/README.md):
 - **24 hand-written attacks, none succeeded,** on either model, in any run, including a run where turns were moved between models mid-ticket.
 - **The model stopped almost all of them itself.** The policy layer never had to deny a call in those runs, and the reply guard acted once. That says the attacks were too weak to test the deeper layers, which is why the compromised-model tests exist.
 - **The screen flagged 15 of 24 attack tickets and 2 of 32 honest ones.** It cannot see attacks that arrive in tool results.
-- **An adaptive attacker,** with ten tries at each of four objectives, got money out with only the prompt's rules twice: a partial refund just under the approval limit, and a service fault that did not happen. The production policies stopped the first; the second needed a new rule ([ADR 19](adr/0019-service-credits-after-the-allowance.md)), and with it the same ticket moved no money.
+- **An adaptive attacker,** with ten tries at each of seven objectives and four channels, got money out with only the prompt's rules twice: a partial refund just under the approval limit, and a service fault that did not happen. On its first run the production policies stopped the first and not the second; a new rule ([ADR 19](adr/0019-service-credits-after-the-allowance.md)) closed it, and on the rerun no replay moved money. The help-centre scan let every page it wrote through: they misstated nothing an agent acts on, so they changed no outcome.
 
 ## Not covered
 
