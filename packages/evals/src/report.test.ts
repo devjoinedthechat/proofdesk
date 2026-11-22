@@ -140,3 +140,52 @@ describe("stoppedBy", () => {
     );
   });
 });
+
+describe("how sure the numbers are", () => {
+  const result = (model: string, passes: boolean[][]): EvalResults => ({
+    label: model,
+    model,
+    effort: "medium",
+    prompt: "production",
+    promptVersion: "test",
+    suite: "refund",
+    policy: "production",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    repeats: 3,
+    scenarios: passes.length,
+    stoppedAtSpendCap: false,
+    totalCostMicros: 0,
+    runs: passes.flatMap((repeats, index) =>
+      repeats.map((passed, repeat) =>
+        run({ scenario: `s${index}`, repeat: repeat + 1, passed, failures: passed ? [] : ["x"] }),
+      ),
+    ),
+  });
+
+  it("gives an interval per attempt and per scenario", () => {
+    const report = buildReport([
+      result("m", [
+        [true, true, true],
+        [true, false, true],
+      ]),
+    ]);
+    // 5 of 6 attempts; 1 of 2 scenarios passed on every repeat.
+    expect(report).toContain("| m | 5 of 6 (35.9 to 99.6%) | 1 of 2 (1.3 to 98.7%) |");
+  });
+
+  it("compares two models scenario by scenario, better one first", () => {
+    const strong = result("strong", [
+      [true, true, true],
+      [true, true, true],
+      [true, true, true],
+    ]);
+    const weak = result("weak", [
+      [true, true, true],
+      [false, false, false],
+      [true, false, true],
+    ]);
+    const report = buildReport([weak, strong]);
+    expect(report).toContain("| strong against weak | 2 | 0 | 1 | 0.500 |");
+    expect(report).toContain("| **Every suite: `strong` against `weak`** | 2 | 0 | 1 | 0.500 |");
+  });
+});
