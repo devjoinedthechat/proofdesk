@@ -24,6 +24,8 @@ export default defineConfig({
         "**/*-cli.ts",
         "packages/evals/src/{eval-run,retrieval-eval,query-eval,screen-eval,replay-fixture}.ts",
         "apps/worker/src/load.ts",
+        // Needs the Claude Code command line and a sign-in.
+        "packages/evals/src/claude-code-provider.ts",
         "packages/claims/src/{prove,write}.ts",
       ],
       // A floor, a little under what the suite reaches today. It is there

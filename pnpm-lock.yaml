@@ -321,6 +321,9 @@ importers:
 
   packages/evals:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(supports-color@8.1.1)(zod@4.6.7)
       '@proofdesk/agent':
         specifier: workspace:*
         version: link:../agent

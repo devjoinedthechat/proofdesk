@@ -19,6 +19,7 @@ import {
 } from "@proofdesk/simulator";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { loadCapturedCases } from "./cases.ts";
+import { createClaudeCodeProvider } from "./claude-code-provider.ts";
 import { runEval } from "./eval-run.ts";
 import { GATE_SAMPLE, PROMPT_VARIANTS } from "./prompts.ts";
 import { toReplayFixture } from "./replay-fixture.ts";
@@ -47,6 +48,7 @@ const { values } = parseArgs({
     suite: { type: "string", default: "refund" },
     policy: { type: "string", default: "production" },
     outage: { type: "string" },
+    via: { type: "string", default: "api" },
   },
 });
 
@@ -95,6 +97,12 @@ const outage =
       ? fail("--outage takes a model and a share, such as claude-sonnet-5-5:0.4")
       : undefined;
 
+// "--via claude-code" reaches the model through the Claude Code command line,
+// which signs in by itself, so the run needs no API key. The results file
+// says which way was used: the two are not the same measurement.
+if (values.via !== "api" && values.via !== "claude-code") fail(`Unknown --via "${values.via}"`);
+const claudeCode = values.via === "claude-code" ? await createClaudeCodeProvider() : undefined;
+
 const postgres = await new PostgreSqlContainer("pgvector/pgvector:0.8.7-pg17").start();
 try {
   await prepareTemplates(postgres.getConnectionUri());
@@ -103,7 +111,8 @@ try {
   const results = await runEval({
     label: values.label ?? model,
     postgresUrl: postgres.getConnectionUri(),
-    provider: createAnthropicProvider(),
+    provider: claudeCode ?? createAnthropicProvider(),
+    via: claudeCode ? "claude-code" : "api",
     prices: ANTHROPIC_PRICES,
     model,
     repeats: Number(values.repeats),
@@ -126,6 +135,22 @@ try {
       );
     },
   });
+
+  // Through the command line the token counts are its own, with whatever
+  // it adds around the prompt, and nothing is billed per token. They are
+  // used for the spend cap during the run and left out of the file.
+  if (claudeCode) {
+    results.totalCostMicros = 0;
+    for (const run of results.runs) {
+      Object.assign(run, {
+        costMicros: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      });
+    }
+  }
 
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(results, null, 2)}\n`);
@@ -154,5 +179,6 @@ try {
     if (verdict === "FAILED") process.exitCode = 1;
   }
 } finally {
+  await claudeCode?.close();
   await postgres.stop();
 }

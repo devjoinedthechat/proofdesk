@@ -65,6 +65,11 @@ export type EvalResults = {
   suite: string;
   /** Which policy set was enforced. */
   policy: string;
+  /**
+   * How the model was reached: the API, or the Claude Code command line.
+   * Absent in files written before there were two ways, which all used the API.
+   */
+  via?: "api" | "claude-code";
   /** Present when calls to one model were made to fail, to exercise failover. */
   outage?: { model: string; rate: number; backup: string };
   startedAt: string;
@@ -90,6 +95,7 @@ export type EvalOptions = {
   /** The most one ticket may spend. */
   perTicketMicros?: number;
   scenarioIds?: string[];
+  via?: "api" | "claude-code";
   /** The scenarios to run. Defaults to the refund suite. */
   suite?: { name: string; specs: ScenarioSpec[] };
   /** A different policy set, for measuring what the enforced rules are worth. */
@@ -262,6 +268,7 @@ export async function runEval(options: EvalOptions): Promise<EvalResults> {
     promptVersion: PROMPT_VERSION,
     suite: options.suite?.name ?? "refund",
     policy: options.policy?.name ?? "production",
+    ...(options.via ? { via: options.via } : {}),
     ...(options.outage
       ? { outage: { ...options.outage, backup: CLAUDE_FAILOVER[options.outage.model] ?? "none" } }
       : {}),

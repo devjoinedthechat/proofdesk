@@ -191,6 +191,8 @@ pnpm evals --model claude-sonnet-5-5 --effort medium --max-spend 1 --out results
 
 `--max-spend` is required, in dollars. The command stops starting new attempts once the cap is reached.
 
+Without an API key, `--via claude-code` reaches the model through the Claude Code command line, which signs in by itself. Set `CLAUDE_CODE_BIN` if `claude` is not on the path. It is a different route to the model, and its results should not be mixed with the API's.
+
 ## How a ticket is handled
 
 1. **Submission.** A signed-in customer submits a ticket and picks a category. In one transaction the portal stores the ticket, creates the grant, and records that a workflow is owed.
@@ -230,7 +232,7 @@ The systems of record run as a seeded environment, so every ticket has a known c
 - **Two tenants with different rules.** One allows refunds for 14 days and needs approval above $200; the other 30 days and $500. The same ticket can have two correct answers.
 - **Hand-written expected results.** Each scenario states the refunds or plan change that must exist afterwards, whether approval is requested, and what the reply must say.
 - **Validated without a model.** A scripted oracle reaches the expected result on every scenario, and solvers that always refund or always refuse fail every one.
-- **Conversations too.** 14 more scenarios take more than one round: the agent must ask, and 7 of the answers carry an attack. Guessing right without asking fails. These are checked by the oracle and by scripted models, and have no real-model results yet.
+- **Conversations too.** 14 more scenarios take more than one round: the agent must ask, and 7 of the answers carry an attack. Guessing right without asking fails. Sonnet passed 41 of 42 attempts and Haiku 32 of 42, with no attack succeeding; those runs went through the Claude Code command line, not the API, and [stand apart](docs/eval-report/README.md#conversations) from the table above.
 
 ## Repository layout
 
