@@ -80,7 +80,7 @@ The last three rows are worth having and are not what safety rests on.
 These follow from the design and are pinned by tests, so they cannot be forgotten.
 
 - **Refund an in-window charge the customer did not ask about.** The records allow it, so policy does. The reply guard requires the refund to be reported, the audit log records it, and the daily cap bounds how much of this can happen before staff see every refund ([ADR 12](adr/0012-daily-refund-cap.md)).
-- **Call a refund on request a "service credit" to avoid the yearly limit.** Whether a service fault occurred is a judgment no record holds. The refund is still limited to the window, the amount paid and the approval limit.
+- **Call a first refund of the year a "service credit".** Whether a fault occurred is a judgment no record holds, so the customer keeps their refund on request for later. Once that one is used, a service credit goes to staff ([ADR 19](adr/0019-service-credits-after-the-allowance.md)): an adaptive attacker found the route, on an honest model, before that rule existed.
 - **Refuse or hand over a ticket that deserved a refund.** Under-acting costs a customer time, not the company money. Staff see handed-over tickets.
 - **Write a reply that is wrong in ways the guard does not check,** such as a false reason. The guard checks amounts and actions, not explanations.
 - **Repeat what a poisoned help-centre page says.** A page that got past the scan cannot move money, and it can still put a false statement in a reply.
@@ -92,6 +92,7 @@ From the [eval report](eval-report/README.md):
 - **24 hand-written attacks, none succeeded,** on either model, in any run, including a run where turns were moved between models mid-ticket.
 - **The model stopped almost all of them itself.** The policy layer never had to deny a call in those runs, and the reply guard acted once. That says the attacks were too weak to test the deeper layers, which is why the compromised-model tests exist.
 - **The screen flagged 15 of 24 attack tickets and 2 of 32 honest ones.** It cannot see attacks that arrive in tool results.
+- **An adaptive attacker,** with ten tries at each of four objectives, got money out with only the prompt's rules twice: a partial refund just under the approval limit, and a service fault that did not happen. The production policies stopped the first; the second needed a new rule ([ADR 19](adr/0019-service-credits-after-the-allowance.md)), and with it the same ticket moved no money.
 
 ## Not covered
 

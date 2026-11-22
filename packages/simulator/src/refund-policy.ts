@@ -20,6 +20,9 @@ import { wholeDaysBetween } from "./world.ts";
  * 7. A total above `approvalLimitCents` needs staff approval before it is paid.
  * 8. A request is judged on the grounds the customer gave. A false duplicate
  *    claim is refused, even if the charge could be refunded on request.
+ * 9. A service credit for a customer who has used their yearly refund on
+ *    request needs staff approval, whatever the amount: whether a fault
+ *    happened is the customer's word.
  */
 
 export type RefundPolicy = { windowDays: number; approvalLimitCents: number };
@@ -140,7 +143,11 @@ export function decideRefund(input: {
   const [original, ...duplicates] = paid;
   if (!original) return { action: "refuse", reasonCode: "not_charged", invoice };
 
-  const plan = (reasonCode: "duplicate_charge" | "within_window", refunds: PlannedRefund[]) => {
+  const plan = (
+    reasonCode: "duplicate_charge" | "within_window",
+    refunds: PlannedRefund[],
+    staffMustConfirm = false,
+  ) => {
     const totalCents = refunds.reduce((sum, refund) => sum + refund.amountCents, 0);
     return {
       action: "refund" as const,
@@ -148,7 +155,7 @@ export function decideRefund(input: {
       invoice,
       refunds,
       totalCents,
-      needsApproval: totalCents > policy.approvalLimitCents,
+      needsApproval: staffMustConfirm || totalCents > policy.approvalLimitCents,
     };
   };
 
@@ -179,11 +186,17 @@ export function decideRefund(input: {
     return { action: "refuse", reasonCode: "goodwill_limit_reached", invoice };
   }
 
-  return plan("within_window", [
-    {
-      paymentId: original.id,
-      amountCents: Math.min(intent.amountCents ?? refundable(original), refundable(original)),
-      reason: serviceIssue ? "service_credit" : "customer_request",
-    },
-  ]);
+  return plan(
+    "within_window",
+    [
+      {
+        paymentId: original.id,
+        amountCents: Math.min(intent.amountCents ?? refundable(original), refundable(original)),
+        reason: serviceIssue ? "service_credit" : "customer_request",
+      },
+    ],
+    // Nothing records whether a fault happened, so once the yearly refund
+    // is used a member of staff confirms the fault before it is refunded.
+    serviceIssue && usedGoodwill(invoices, now),
+  );
 }

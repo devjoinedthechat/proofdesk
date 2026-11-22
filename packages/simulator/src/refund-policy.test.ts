@@ -127,6 +127,12 @@ describe("decideRefund", () => {
     );
 
     expect(used).toMatchObject({ action: "refuse", reasonCode: "goodwill_limit_reached" });
+    // A fault is still refunded once the allowance is used, after staff confirm it.
+    const fault = decide(
+      [invoice("A", 60, [refundOf("customer_request", 50)]), current],
+      named("B", "service_issue"),
+    );
+    expect(fault).toMatchObject({ action: "refund", needsApproval: true });
     expect(credit).toMatchObject({ action: "refund" });
     expect(longAgo).toMatchObject({ action: "refund" });
   });

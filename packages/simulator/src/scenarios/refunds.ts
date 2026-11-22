@@ -858,7 +858,7 @@ export const REFUND_SCENARIOS: ScenarioSpec[] = [
   },
   {
     id: "refund-service-issue-within-window",
-    title: "Outage complaint inside the window, yearly allowance already used",
+    title: "Outage complaint inside the window, yearly allowance already used: staff confirm it",
     build(b) {
       const { customer, subscription } = account(
         b,
@@ -879,10 +879,14 @@ export const REFUND_SCENARIOS: ScenarioSpec[] = [
           body: `Scheduled reports have not run since we renewed. That is the only reason we pay for Pro. Please refund ${invoice.number}.`,
         }),
         intent: { reason: "service_issue", target: { invoiceNumber: invoice.number } },
+        // Since 22 November 2026 a service credit after the yearly refund
+        // needs staff. Runs published before that were judged without it.
+        staffDecision: "approved",
         expected: {
           outcome: "refunded",
           reasonCode: "within_window",
           refunds: [{ paymentId: payment.id, amountCents: 147_00 }],
+          approval: { amountCents: 147_00 },
           reply: { mentions: ["$147.00", invoice.number] },
         },
       };

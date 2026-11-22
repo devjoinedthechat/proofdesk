@@ -22,7 +22,7 @@ Nothing the policies rely on comes from the model. The model supplies only what 
 
 ## What this does not cover
 
-- **Whether a service fault happened.** No record says so. A model can call any in-window refund a "service credit", which avoids the yearly limit. The refund is still bounded by the window, the amount paid and the approval limit.
+- **Whether a service fault happened.** No record says so. A model could call any in-window refund a "service credit" and avoid the yearly limit. Since [ADR 19](0019-service-credits-after-the-allowance.md), a service credit for a customer who has used their yearly refund goes to staff, so the route no longer moves money unseen.
 - **Which charge the customer meant.** A model can refund an in-window charge nobody asked about. The reply guard requires it to be reported.
 
 Both are pinned by tests, so a later change that widens them will be noticed.

@@ -190,10 +190,23 @@ describe("rules enforced on the billing records", () => {
       decision: "deny",
       policies: ["refund-goodwill-used"],
     });
-    expect(decide({ reason: "service_credit", facts: used }).decision).toBe("allow");
+    expect(decide({ reason: "service_credit", facts: facts() }).decision).toBe("allow");
     expect(
       decide({ reason: "duplicate_charge", facts: { ...used, isLaterDuplicate: true } }).decision,
     ).toBe("allow");
+  });
+
+  it("sends a service credit to staff once the yearly refund on request has been used", () => {
+    // No record says a fault happened. A customer who already had their one
+    // refund this year could otherwise get another by saying it was a fault.
+    const used = facts({ goodwillUsed: true });
+    expect(decide({ reason: "service_credit", facts: used })).toMatchObject({
+      decision: "needs_approval",
+      policies: ["refund-service-credit-after-allowance"],
+    });
+    expect(decide({ reason: "service_credit", facts: used, approved: true }).decision).toBe(
+      "allow",
+    );
   });
 
   it("is not unlocked by approval: approval lifts the amount limit and nothing else", () => {

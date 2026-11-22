@@ -21,6 +21,7 @@ export const RECORD_BASED_POLICIES = [
   "refund-outside-window",
   "refund-not-duplicate",
   "refund-goodwill-used",
+  "refund-service-credit-after-allowance",
   "refund-large-payment",
   "refund-tenant-daily-cap",
 ];
@@ -112,6 +113,8 @@ const FORBIDDEN_BECAUSE: Record<string, string> = {
   "refund-not-duplicate":
     "That payment is not a duplicate: no earlier successful payment exists for the invoice.",
   "refund-goodwill-used": "The customer already had a refund on request in the last 12 months.",
+  "refund-service-credit-after-allowance":
+    "The customer already had a refund on request in the last 12 months, so a refund for a service fault needs staff to confirm the fault.",
   "plan-change-seat-limit": "More than 50 seats must be arranged by staff.",
   "refund-over-limit": "The refund total for this ticket is above the approval limit.",
   "refund-large-payment":

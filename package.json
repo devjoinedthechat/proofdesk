@@ -31,7 +31,8 @@
     "prove": "node packages/claims/src/prove.ts",
     "claims:write": "node packages/claims/src/write.ts",
     "load": "node apps/worker/src/load.ts",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "redteam": "node packages/evals/src/redteam.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
