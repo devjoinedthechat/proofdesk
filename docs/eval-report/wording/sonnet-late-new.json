@@ -1,0 +1,275 @@
+{
+  "label": "wording: sonnet-5-5, full 24-hour periods",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "prompt": "production",
+  "promptVersion": "2026-11-22.1",
+  "suite": "hard",
+  "policy": "production",
+  "via": "claude-code",
+  "startedAt": "2026-11-22T14:52:52.443Z",
+  "repeats": 6,
+  "scenarios": 1,
+  "stoppedAtSpendCap": false,
+  "totalCostMicros": 0,
+  "runs": [
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were still in time. Your payment for INV-000166 was made on 12 February, which is just inside our 30-day refund window. I've refunded the full $38.00 to your original payment method. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 23102,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were just in time. Your payment for INV-000166 was made on 12 February, which is still inside our 30-day refund window. I've refunded the full $38.00. This uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 10041,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were just in time. Your payment for INV-000166 was made on 12 February, which is just under 31 days ago and inside our 30-day refund window. I've refunded the full $38.00. Please note that this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 24539,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 4,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were just in time. Your payment for INV-000166 was made on 12 February, which is still inside our 30-day refund window. I've refunded the full $38.00. This uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12508,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 5,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were just in time. Your payment for INV-000166 was made on 12 February, a little under 31 days ago, which is still inside our 30-day refund window. I've refunded the full $38.00 to your original payment method. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 15948,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 6,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Yes, you were just in time. Your payment for INV-000166 was made on 12 February, which is a little under 31 days ago and inside our 30-day refund window. I've refunded the full $38.00. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 8746,
+      "unsourcedAmounts": []
+    }
+  ]
+}

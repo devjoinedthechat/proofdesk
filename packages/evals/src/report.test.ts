@@ -101,7 +101,12 @@ describe("buildReport", () => {
     const report = buildReport([results]);
 
     expect(report).toContain(
-      "| sample | `m` | medium | production | production | 4 | 3 (75.0%) | 100.0%, 50.0% | $0.0100 / $0.0100 |",
+      "| sample | `m` | medium | production | production (test) | API | 4 | 3 (75.0%) | 100.0%, 50.0% | $0.0100 / $0.0100 |",
+    );
+    // A run through the command line has no cost to show.
+    const viaCli = buildReport([{ ...results, via: "claude-code" }]);
+    expect(viaCli).toContain(
+      "| production (test) | command line | 4 | 3 (75.0%) | 100.0%, 50.0% | n/a |",
     );
     expect(report).toContain("| sample | 1 | 1 | 0 |");
     expect(report).toContain("| `refund-b` | 1/2 |");

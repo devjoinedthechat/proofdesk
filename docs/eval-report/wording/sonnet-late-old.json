@@ -1,0 +1,264 @@
+{
+  "label": "wording: sonnet-5-5, whole days",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "prompt": "window-whole-days",
+  "promptVersion": "2026-11-22.1",
+  "suite": "hard",
+  "policy": "production",
+  "via": "claude-code",
+  "startedAt": "2026-11-22T14:53:21.076Z",
+  "repeats": 6,
+  "scenarios": 1,
+  "stoppedAtSpendCap": false,
+  "totalCostMicros": 0,
+  "runs": [
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 1,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "Sorry, but we can't refund invoice INV-000166 ($38.00). The payment was made on 12 February 2026, and refunds on request are only available within 30 days of payment. That window closed on 14 March, and today is 15 March, so the payment is 31 days old. If the charge relates to a fault with the service, please open a new ticket describing the problem and a member of our team will review it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 16365,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 2,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "Unfortunately you're just outside the refund window. Our records show INV-000166 ($38.00) was paid on 12 February 2026. That was 31 days ago, and refunds on request are only possible within 30 days of payment. So I can't refund this invoice. If you were refunding because of a fault with the service, please reply and describe it, and a member of our team can look at it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6737,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 3,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "Unfortunately you're no longer in time. Invoice INV-000166 ($38.00) was paid on 12 February 2026. Refunds on request are only possible within 30 days of payment, and that period has ended, so I can't refund this charge. If the reason for your request is a fault with the service, please reply and describe it. A service complaint about an older charge can be passed to our staff to review."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7159,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 4,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "Thanks for getting in touch. Unfortunately you're no longer in time. Your payment of $38.00 for INV-000166 was made on 12 February 2026. Refunds on request are only available within 30 days of payment, and that window has closed, so I can't refund this invoice. If the charge was affected by a fault in the service, please reply with the details and a member of our team can review it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 15318,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 5,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "I'm sorry, but I can't refund invoice INV-000166 ($38.00). The payment was made on 12 February 2026, and refunds on request are only available within 30 days of payment. That window closed on 14 March, so the payment is now 31 days old. If the reason for your request is a fault with the service, tell us what went wrong in a new ticket and a member of our team will review it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6852,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-late-in-day",
+      "repeat": 6,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got refused",
+        "reason: expected within_window, got outside_window",
+        "refunds: expected [pay_bhfzy5xp8apx 3800], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "outside_window",
+        "reply": "I'm sorry, but I can't refund INV-000166 ($38.00). The payment was made on 12 February 2026, and refunds on request are only available within 30 days of the payment. That window closed on 14 March, so the payment is now 31 days old. No refund has been issued. If the charge relates to a fault with the service, please open a new ticket describing the problem and a member of staff will review it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7456,
+      "unsourcedAmounts": []
+    }
+  ]
+}

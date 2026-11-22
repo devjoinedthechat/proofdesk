@@ -1,0 +1,495 @@
+{
+  "label": "wording: haiku-5-5, full 24-hour periods",
+  "model": "claude-haiku-5-5",
+  "effort": "medium",
+  "prompt": "production",
+  "promptVersion": "2026-11-22.1",
+  "suite": "knowledge",
+  "policy": "production",
+  "via": "claude-code",
+  "startedAt": "2026-11-22T14:51:09.760Z",
+  "repeats": 10,
+  "scenarios": 1,
+  "stoppedAtSpendCap": false,
+  "totalCostMicros": 0,
+  "runs": [
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000166, the payment made on 6 March 2026. Card refunds usually reach your statement within 3 to 5 business days, though your bank may take a little longer to show it. Please note this was a change-of-mind refund, so it uses your one refund on request for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 28058,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded INV-000166 in full: $49.00, returned to the card you paid with. Card refunds usually appear on your statement within 3 to 5 business days, though your bank may take a little longer to post it. Please note that this was your refund on request for the year, so another change-of-mind refund won't be available for 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 5,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 5,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 16630,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded the full $49.00 payment on invoice INV-000166. Refunds go back to the card you paid with. Card refunds usually show on your statement within 3 to 5 business days, though your bank may take a little longer to post it. Your invoice in Billing > Invoices will also show the refund with its date and amount. Please note that this was the one change-of-mind refund available to your account for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 13218,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 4,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded INV-000166 in full: $49.00 to your original payment method. Card refunds usually appear on your statement within 3 to 5 business days, though your bank may take a little longer to post it. You can see the refund on the invoice under Billing, then Invoices. Please note that this was your refund on request for the next 12 months, so another change-of-mind refund won't be available until then."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 13216,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 5,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000166, the full amount of that payment. Refunds go back to your original payment method. Card refunds usually appear on your statement within 3 to 5 business days, though your bank may take a little longer to post it."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12159,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 6,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got handed_to_staff",
+        "reason: expected within_window, got other",
+        "refunds: expected [pay_5hzfc9f04ezw 4900], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "other",
+        "reply": "Hello, I found invoice INV-000166 for $49.00, paid on 6 March 2026, and it has no earlier refunds. I have not issued the refund myself. I've passed your request to our billing team to confirm it, because the date of your payment needs checking against today's date before money is returned. They will get back to you on this ticket.\n\nOnce a refund is issued, card refunds usually reach your statement within 3 to 5 business days. Large refunds are reviewed by our billing team first, normally within two working days."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 14857,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 7,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Hello, I've refunded $49.00 for invoice INV-000166, paid on 6 March 2026. The refund is returned to the card you paid with. Card refunds usually reach your statement within 3 to 5 business days, though your bank may take a little longer to post it. Each refund also appears on the invoice under Billing, Invoices."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 5,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 5,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11098,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 8,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000166, the payment made on 6 March 2026. The refund is returned to the card you paid with. Card refunds usually appear on your statement within 3 to 5 business days, though your bank may take a little longer to post it. You can see the refund on the invoice under Billing, then Invoices."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 10202,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 9,
+      "passed": false,
+      "failures": [
+        "outcome: expected refunded, got handed_to_staff",
+        "reason: expected within_window, got other",
+        "refunds: expected [pay_5hzfc9f04ezw 4900], got []"
+      ],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "other",
+        "reply": "Thanks for getting in touch about invoice INV-000166 ($49.00, paid on 6 March 2026). I have not issued the refund yet. The date on our side is inconsistent, and whether this payment is still inside our refund window depends on that date, so I have passed your request to our billing team to confirm before any money moves. You should hear back from them soon.\n\nIf the refund is approved, card refunds usually appear on your statement within 3 to 5 business days, and bank debit refunds can take up to 8 business days. Larger refunds are first reviewed by our billing team, normally within two working days. You can check the refund on the invoice under Billing, then Invoices."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 29857,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "knowledge-refund-timing-tallyfield",
+      "repeat": 10,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000166 to your original payment method. Card refunds usually appear on your statement within 3 to 5 business days. You can see the refund on the invoice under Billing, then Invoices."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "search_help_center",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11092,
+      "unsourcedAmounts": []
+    }
+  ]
+}

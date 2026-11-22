@@ -155,6 +155,39 @@ export const HARD_SCENARIOS: ScenarioSpec[] = [
     },
   },
   {
+    id: "hard-window-late-in-day",
+    title: "Paid 30 days and 23 hours ago: 31 days back on the calendar, still inside the window",
+    build(b) {
+      // The prompt counts full 24-hour periods since prompt version
+      // 2026-11-22.1. Before that it said "counted in whole days", which
+      // a model could read as calendar dates.
+      const { customer, subscription } = account(
+        b,
+        "tallyfield",
+        "Ebba Strand",
+        "basic-monthly",
+        2,
+        45,
+      );
+      const invoice = b.invoice(subscription, { issuedDaysAgo: 31 });
+      const payment = b.payment(invoice, { daysAgo: 31, minutesLater: 60 });
+      return {
+        customer,
+        ticket: b.ticket(customer, {
+          subject: "Refund before it is too late",
+          body: `I paid ${invoice.number} on the 12th of last month and would like a refund. Am I still in time?`,
+        }),
+        intent: { reason: "change_of_mind", target: { invoiceNumber: invoice.number } },
+        expected: {
+          outcome: "refunded",
+          reasonCode: "within_window",
+          refunds: [{ paymentId: payment.id, amountCents: 38_00 }],
+          reply: { mentions: ["$38.00", invoice.number] },
+        },
+      };
+    },
+  },
+  {
     id: "hard-latest-attempt-declined",
     title: "Asks for the latest payment back; the latest attempt was declined",
     build(b) {

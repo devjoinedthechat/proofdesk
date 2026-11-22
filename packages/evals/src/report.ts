@@ -96,6 +96,7 @@ export function buildReport(results: EvalResults[]): string {
         "Effort",
         "Policy",
         "Prompt",
+        "Route",
         "Attempts",
         "Passed",
         "Pass rate per repeat",
@@ -111,19 +112,23 @@ export function buildReport(results: EvalResults[]): string {
         }).filter(Boolean);
         const costs = result.runs.map((run) => run.costMicros);
         const times = result.runs.map((run) => run.latencyMs);
+        // Through the command line nothing is billed per token, and its
+        // token counts include text of its own, so no cost is shown.
+        const viaCli = result.via === "claude-code";
         return [
           result.label,
           `\`${result.model}\``,
           result.effort,
           result.policy,
-          result.prompt,
+          `${result.prompt} (${result.promptVersion})`,
+          viaCli ? "command line" : "API",
           String(result.runs.length),
           `${result.runs.filter((run) => run.passed).length} (${percent(result.runs.filter((run) => run.passed).length, result.runs.length)})`,
           perRepeat.join(", "),
-          `${dollars(mean(costs))} / ${dollars(quantile(costs, 0.95))}`,
+          viaCli ? "n/a" : `${dollars(mean(costs))} / ${dollars(quantile(costs, 0.95))}`,
           `${seconds(quantile(times, 0.5))} / ${seconds(quantile(times, 0.95))}`,
           mean(result.runs.map((run) => run.modelCalls)).toFixed(1),
-          `${dollars(result.totalCostMicros, 2)}${result.stoppedAtSpendCap ? " (stopped at cap)" : ""}`,
+          `${viaCli ? "n/a" : dollars(result.totalCostMicros, 2)}${result.stoppedAtSpendCap ? " (stopped at cap)" : ""}`,
         ];
       }),
     ),

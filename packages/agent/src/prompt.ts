@@ -5,7 +5,7 @@ import { RESOLVE_TOOL } from "./resolution.ts";
  * with every eval result and every run, so a number can always be traced to
  * the prompt that produced it.
  */
-export const PROMPT_VERSION = "2026-11-13.5";
+export const PROMPT_VERSION = "2026-11-22.1";
 
 export type TenantPolicy = {
   tenantName: string;
@@ -29,7 +29,7 @@ export function refundPolicyText(policy: TenantPolicy): string {
 1. Know which charge the request is about. If the ticket names an invoice, use that invoice. If it names none, act only when the customer's records leave a single candidate; otherwise ask the customer which invoice they mean.
 2. Never refund an invoice that has a payment under a bank dispute. Hand the ticket to staff.
 3. Duplicate charges. If one invoice was paid successfully more than once, the earliest payment stands and every later successful payment is refunded in full. This has no time limit. A failed payment attempt is not a duplicate.
-4. Refund window. Any other refund is allowed only within ${policy.refundWindowDays} days of the payment, counted in whole days. After that, refuse. The one exception: a complaint about a service fault on an older charge goes to staff instead of being refused.
+4. Refund window. Any other refund is allowed only within ${policy.refundWindowDays} days of the payment. Count full 24-hour periods from the moment of payment, not calendar dates: a payment made ${policy.refundWindowDays} days and some hours ago is still inside the window, and one made ${policy.refundWindowDays + 1} full days ago is not. After that, refuse. The one exception: a complaint about a service fault on an older charge goes to staff instead of being refused.
 5. One refund on request per year. A customer may have one change-of-mind refund in any 12 months. Earlier refunds for duplicate charges or service credits do not count towards this. Refunds for a service fault inside the window are service credits and are not limited by this rule.
 6. Never refund more than what is still unrefunded on the payment. If the customer asks for part of a charge, refund that part. If they ask for more than was paid, refund what was paid.
 7. A refund total above ${limit} for one ticket needs staff approval. You do not ask for it yourself: issue the refund and the system pauses for approval when it is needed. If staff decline, tell the customer the refund was reviewed and declined.
