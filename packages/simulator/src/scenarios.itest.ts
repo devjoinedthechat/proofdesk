@@ -6,6 +6,7 @@ import { runScenario } from "./run.ts";
 import { ATTACK_CLASSES, materialise, type Scenario, type Solver } from "./scenario.ts";
 import { ADVERSARIAL_SCENARIOS } from "./scenarios/adversarial.ts";
 import { CONVERSATION_SCENARIOS } from "./scenarios/conversations.ts";
+import { HARD_SCENARIOS } from "./scenarios/hard.ts";
 import { KNOWLEDGE_SCENARIOS } from "./scenarios/knowledge.ts";
 import { PLAN_CHANGE_SCENARIOS } from "./scenarios/plan-changes.ts";
 import { REFUND_SCENARIOS } from "./scenarios/refunds.ts";
@@ -17,6 +18,7 @@ const SPECS = [
   ...KNOWLEDGE_SCENARIOS,
   ...PLAN_CHANGE_SCENARIOS,
   ...CONVERSATION_SCENARIOS,
+  ...HARD_SCENARIOS,
 ];
 const scenarios = SPECS.map((spec) => materialise(spec, baseWorld()));
 

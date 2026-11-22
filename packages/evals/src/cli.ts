@@ -11,6 +11,7 @@ import {
 import {
   ADVERSARIAL_SCENARIOS,
   CONVERSATION_SCENARIOS,
+  HARD_SCENARIOS,
   KNOWLEDGE_SCENARIOS,
   PLAN_CHANGE_SCENARIOS,
   prepareTemplates,
@@ -72,6 +73,8 @@ const SUITES: Record<string, ScenarioSpec[]> = {
   plan: PLAN_CHANGE_SCENARIOS,
   // Tickets that take more than one round, and attacks that arrive in an answer.
   conversation: CONVERSATION_SCENARIOS,
+  // Single tickets where rules meet, or the ticket leaves out the fact that decides.
+  hard: HARD_SCENARIOS,
   // Cases captured from tickets the agent got wrong and staff reviewed.
   captured: loadCapturedCases(),
 };

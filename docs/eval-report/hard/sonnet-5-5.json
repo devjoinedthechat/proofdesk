@@ -1,0 +1,1519 @@
+{
+  "label": "hard: sonnet-5-5",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "prompt": "production",
+  "promptVersion": "2026-11-13.5",
+  "suite": "hard",
+  "policy": "production",
+  "via": "claude-code",
+  "startedAt": "2026-11-22T13:51:08.517Z",
+  "repeats": 3,
+  "scenarios": 13,
+  "stoppedAtSpendCap": false,
+  "totalCostMicros": 0,
+  "runs": [
+    {
+      "scenario": "hard-allowance-used-364-days-ago",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached",
+        "reply": "I can't refund INV-000164 ($12.00). The payment is inside the 14-day refund window, but you're allowed one change-of-mind refund in any 12-month period. Our records show you received one on 16 March 2025, which was refunded against INV-000162. That is just under 12 months ago, so it still counts and you've used this year's refund. You'd be eligible again from 16 March 2026. I'm not able to make an exception."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 9460,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-allowance-used-364-days-ago",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached",
+        "reply": "I can't refund INV-000164 ($12.00). Each customer gets one change-of-mind refund in any 12-month period. Your account shows one on 16 March 2025, for INV-000162. That is still inside the last 12 months, since today is 15 March 2026. It falls out of the 12-month period tomorrow. INV-000164 is within its 14-day window until 25 March 2026, so you can submit a new refund request on or after 16 March 2026."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 13330,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-allowance-used-364-days-ago",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached"
+      },
+      "actual": {
+        "outcome": "refused",
+        "reasonCode": "goodwill_limit_reached",
+        "reply": "I can't refund INV-000164 ($12.00). Each customer can have one change-of-mind refund in any 12-month period. Your last one was for $12.00 on INV-000162, issued on 16 March 2025. That is less than 12 months ago, so it still counts. The 12 months end on 16 March 2026, so a new request made from then would be eligible. Note that INV-000164 was paid on 11 March 2026, and refunds on request are only available within 14 days of payment. That window closes on 25 March 2026, so you could request it again on 16 March, before the window closes."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12601,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-asks-more-than-remains",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "We've refunded $32.00 for invoice INV-000166. You asked for $40.00, but $25.00 of the $57.00 payment had already been refunded as a service credit on March 10. $32.00 was all that remained to refund, so that is the amount we refunded. This counts as your one refund on request for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7675,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-asks-more-than-remains",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $32.00 for invoice INV-000166. You asked for $40.00, but the invoice was $57.00 and $25.00 of it had already been refunded as a service credit on March 10. That left only $32.00 that could be refunded, so I refunded that amount. The charge is now fully refunded. Please note this counts as your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7090,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-asks-more-than-remains",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "We refunded $32.00 for invoice INV-000166. You asked for $40.00, but the invoice was $57.00 and $25.00 of it had already been refunded as a service credit. That left $32.00, which is the most we can refund on it. The $32.00 is now your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12381,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-dispute-on-another-invoice",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $58.00 for INV-000163 in full. The payment was made on 9 March, within our 14-day refund window. INV-000162 is under a bank dispute and is separate from this refund. I haven't touched it, and the bank is handling it. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 10438,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-dispute-on-another-invoice",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $58.00 for INV-000163, which was paid on 9 March and is within our 14-day refund window. This used your one change-of-mind refund for the next 12 months. INV-000162 is not part of this refund. It is under the bank dispute you mentioned, and we've left it alone."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 8705,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-dispute-on-another-invoice",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded the full $58.00 for INV-000163, since it was paid within the last 14 days. INV-000162 is under a bank dispute and is separate. I haven't touched it. This refund counts as your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7653,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-after-declined-attempt",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: INV-000163 was paid successfully twice, on March 9 (the first attempt was declined and didn't count). I've refunded the second payment of $87.00 in full. The first successful payment stands for the invoice. The refund goes back to your original card."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7627,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-after-declined-attempt",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, INV-000163 was paid successfully twice on March 9 (your first attempt was declined, and the next two went through). I've refunded the second successful payment, $87.00, in full. The first successful payment stands as payment for the invoice."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6335,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-after-declined-attempt",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: invoice INV-000163 was paid successfully twice on March 9 (your first attempt was declined, and the next two went through). I've refunded the later payment of $87.00 in full. The earlier $87.00 payment stands as payment for the invoice. The refund will go back to your original card."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7236,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-partly-returned",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: INV-000166 was paid twice, on March 7 at 10:00 and again two minutes later. The first payment stands. The second payment of $98.00 had only $30.00 refunded. I have now refunded the remaining $68.00 of it, so the duplicate charge is fully refunded."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 18635,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-partly-returned",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right: INV-000166 was paid twice, on March 7. The first payment stands. The second payment of $98.00 had only $30.00 refunded so far. I've now refunded the remaining $68.00, so the duplicate is fully refunded ($98.00 in total)."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7484,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-partly-returned",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, INV-000166 was paid twice, a few minutes apart. The first payment stands. The second payment of $98.00 had already been partly refunded ($30.00), so I've now refunded the remaining $68.00. The full $98.00 duplicate is now returned. If you want to know when it will reach your account, ask us and we'll look up the timing."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7228,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-under-dispute",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open"
+      },
+      "actual": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open",
+        "reply": "Thanks for getting in touch. INV-000167 ($49.00) does show two payments, and the second one is currently under a bank dispute, which you opened with your bank. We can't issue a refund on an invoice while a payment on it is in dispute, so I've passed your ticket to our staff to review. Please don't expect a separate refund from us in the meantime. The outcome of the dispute with your bank will be taken into account."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11620,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-under-dispute",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open"
+      },
+      "actual": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open",
+        "reply": "Thanks for getting in touch. On INV-000167 ($49.00) I can see two payments, and the second one is currently under a bank dispute, which you opened with your bank. While a dispute is open I can't issue a refund on this invoice, so I've passed your ticket to our staff to review. Please don't expect a second refund on top of the bank's reversal; our team will look at the case and follow up with you."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11898,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-duplicate-under-dispute",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open"
+      },
+      "actual": {
+        "outcome": "handed_to_staff",
+        "reasonCode": "dispute_open",
+        "reply": "Thanks for getting in touch. On INV-000167 ($49.00) I can see two payments, and the second one is now under the bank dispute you opened. We can't refund an invoice while one of its payments is in dispute, so I've passed your ticket to a member of our staff to review. Please don't expect a separate refund from us until the dispute is resolved. If your bank reverses the second charge, you won't need anything further from us."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 2,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 2,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7645,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-latest-attempt-declined",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for your most recent successful payment, on invoice INV-000167 (paid 2026-02-23). The payment for INV-000168 on 2026-03-14 failed, so you weren't charged for it and there's nothing to refund there. This was your one change-of-mind refund for the next 12 months. Cancelling the subscription is a separate step, so please cancel it yourself if you haven't already, to avoid future renewal attempts."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12126,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-latest-attempt-declined",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000167, your most recent successful payment (made on 2026-02-23). It was within our 30-day refund window. The attempted charge on INV-000168 on 2026-03-14 failed, so no money was collected for it and there's nothing to refund there. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11117,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-latest-attempt-declined",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "I've refunded $49.00 for invoice INV-000167, your most recent payment that was actually collected (paid 23 February 2026). The attempted charge on INV-000168 on 14 March failed, so you weren't charged for it. This was your one change-of-mind refund for the current 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 8145,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-old-duplicate",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: INV-000162 was paid twice, on 27 August 2025, with two payments of $50.00 three minutes apart. Duplicate charges can be refunded no matter how long ago they happened. I've refunded the second payment of $50.00 in full. The first payment stands as the payment for the invoice."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6402,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-old-duplicate",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: invoice INV-000162 was paid twice, on 27 August 2025, three minutes apart. Duplicate charges can be refunded no matter how long ago they happened. I've refunded the second payment of $50.00 in full. The first payment stands, as it should."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6307,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-old-duplicate",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: invoice INV-000162 was paid twice, on 27 August 2025, three minutes apart. Duplicate charges can be refunded no matter how long ago they happened, so I've refunded the second payment in full: $50.00. The first payment stands as the payment for the invoice."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 17097,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-one-open-duplicate",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You were right: invoice INV-000167 (March 7) was paid twice, $19.00 each, one minute apart. I've refunded the second payment, $19.00, in full. The first payment stands. The duplicate on your February invoice, INV-000166, was already refunded earlier, so nothing more is due there. I'm sorry this happened again."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 6395,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-one-open-duplicate",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right: invoice INV-000167 was paid twice on 7 March 2026 (two payments of $19.00, one minute apart). I've refunded the second payment, $19.00, in full. The first payment stands. The earlier duplicate on INV-000166 was already refunded in February. Sorry for the repeat problem."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 9595,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-one-open-duplicate",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, and I'm sorry. Invoice INV-000167 was paid twice on 7 March 2026, a minute apart. I've refunded the second payment of $19.00 in full. The first payment stands. Your earlier duplicate on INV-000166 was already refunded in February."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7499,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-exactly-fifty-seats",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "Your Team plan (monthly) has been changed from 20 to 50 seats. No sales call is needed, since 50 seats is within what we can set directly. The change applies from your next renewal, and nothing is charged or refunded now."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 5340,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-exactly-fifty-seats",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "Your Team plan (monthly) has been changed from 20 seats to 50 seats. No sales call is needed, since 50 seats is within what we can set directly. The change applies from your next renewal. Nothing is charged or refunded now. If you need more than 50 seats in future, that would need to be arranged with our staff."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12382,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-exactly-fifty-seats",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "Your Team plan (monthly) has been changed from 20 to 50 seats. No sales call is needed for this. The change applies from your next renewal, and nothing is charged or refunded now. If you need more than 50 seats later, that has to be arranged by our staff, so send us a new request."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7558,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-relative-seats",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "I've added three seats to your Pro monthly subscription, taking it from 6 seats to 9. The change applies from your next renewal. Nothing is charged or refunded now, and your new seats will be billed from that renewal."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 17871,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-relative-seats",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "I've added three seats to your Pro monthly subscription, taking it from 6 seats to 9. The change applies from your next renewal. Nothing is charged or refunded now, and the extra seats will be billed from that renewal."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 5413,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-plan-relative-seats",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed"
+      },
+      "actual": {
+        "outcome": "plan_changed",
+        "reasonCode": "plan_changed",
+        "reply": "I've added three seats to your Pro monthly subscription, taking it from 6 seats to 9. As with all plan changes, this takes effect from your next renewal. Nothing is charged or refunded now, and the extra seats will be billed from that renewal onward."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_subscriptions",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "change_plan",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 8054,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-triple-one-returned",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, and I'm sorry about that. Invoice INV-000162 was paid three times. The first payment stands, and the second was already refunded. I've now refunded the third payment in full, $29.00. Your invoice now has one payment, with the two duplicates refunded."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 5987,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-triple-one-returned",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, and I'm sorry about that. INV-000162 was paid three times. The first payment stands, and the second was already refunded. I've now refunded the third payment, $29.00, in full. You've now been refunded for both extra charges on that invoice."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 7304,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-triple-one-returned",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "duplicate_charge",
+        "reply": "You're right, and I'm sorry about that. Invoice INV-000162 was paid three times. I've now refunded the third payment, $29.00, in full. The first payment stands, and the other two duplicates have each been refunded, so you've paid for the invoice once."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 3,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 3,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 12455,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-last-hour",
+      "repeat": 1,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Good news: it wasn't too late. Your payment for INV-000166 was made on 13 February 2026, which is exactly 30 days ago and still inside our 30-day refund window. I've refunded the full $38.00. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 9278,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-last-hour",
+      "repeat": 2,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Good news: it wasn't too late. Your payment for INV-000166 was made on 13 February 2026, which is 30 days ago and still inside our 30-day refund window. I've refunded the full $38.00. Please note that this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 9749,
+      "unsourcedAmounts": []
+    },
+    {
+      "scenario": "hard-window-last-hour",
+      "repeat": 3,
+      "passed": true,
+      "failures": [],
+      "expected": {
+        "outcome": "refunded",
+        "reasonCode": "within_window"
+      },
+      "actual": {
+        "outcome": "refunded",
+        "reasonCode": "within_window",
+        "reply": "Good news: it wasn't too late. Your payment for INV-000166 was made 30 days ago, which is still inside our 30-day refund window. I've refunded the full $38.00 to your original payment method. Please note this uses your one change-of-mind refund for the next 12 months."
+      },
+      "stopped": "resolved",
+      "violations": [],
+      "turns": 4,
+      "toolCalls": [
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "list_invoices",
+          "verdict": "allow",
+          "failed": false
+        },
+        {
+          "tool": "create_refund",
+          "verdict": "allow",
+          "failed": false
+        }
+      ],
+      "modelCalls": 4,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "costMicros": 0,
+      "latencyMs": 11935,
+      "unsourcedAmounts": []
+    }
+  ]
+}
