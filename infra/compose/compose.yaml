@@ -56,7 +56,7 @@ services:
 
   temporal:
     # Single-binary dev server: workflow state is in memory and resets on restart.
-    image: temporalio/temporal:1.10.0
+    image: temporalio/temporal:1.10.1
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "proofdesk"]
     ports:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
@@ -281,7 +281,7 @@ services:
   # the telemetry above it holds customer text, so it requires sign-in, each
   # company has its own project, and a deletion request removes from it.
   phoenix:
-    image: arizephoenix/phoenix:version-21.1.0
+    image: arizephoenix/phoenix:version-21.2.1
     profiles: ["app"]
     environment:
       PHOENIX_WORKING_DIR: /mnt/data
