@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@cedar-policy/cedar-wasm": "4.14.0",
+    "@cedar-policy/cedar-wasm": "4.15.0",
     "@proofdesk/agent": "workspace:*",
     "zod": "4.6.7"
   }

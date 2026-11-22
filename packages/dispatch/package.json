@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@temporalio/client": "1.25.0",
-    "@temporalio/common": "1.25.0",
+    "@temporalio/client": "1.26.0",
+    "@temporalio/common": "1.26.0",
     "zod": "4.6.7"
   }
 }
