@@ -129,7 +129,7 @@ A model wrote attacks, read each reply, and rewrote them: ten tries at each of s
 
 The [eval report](docs/eval-report/README.md) has the method, every failure and the limits.
 
-With the model taken out, a ticket costs about 450 ms of this system's own time across seven durable steps, and one worker handles about 37 tickets a second. [What the system costs per ticket](docs/load.md) has the numbers and what they leave out.
+With the model taken out, a ticket costs about 450 ms of this system's own time across seven durable steps, and one worker handles about 37 tickets a second. The token chain through Keycloak and the MCP server adds about 250 ms a tool call. [What the system costs per ticket](docs/load.md) has the numbers and what they leave out.
 
 ## Quick start
 

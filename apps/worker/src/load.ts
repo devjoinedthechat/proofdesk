@@ -1,7 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { cpus, totalmem } from "node:os";
 import { parseArgs } from "node:util";
-import type { McpToolDescriptor, ToolOutcome } from "@proofdesk/agent";
+import {
+  callMcpTool,
+  listMcpTools,
+  type McpToolDescriptor,
+  type ToolOutcome,
+} from "@proofdesk/agent";
+import { createBillingApp } from "@proofdesk/billing";
 import {
   type AppDatabase,
   appendAudit,
@@ -12,8 +18,25 @@ import {
   verifyAudit,
 } from "@proofdesk/db";
 import { createGateway } from "@proofdesk/gateway";
-import { BILLING_TOOLS } from "@proofdesk/mcp-billing";
-import { createToolPolicy, policyVersion } from "@proofdesk/policy";
+import {
+  bearerToken,
+  CLIENTS,
+  connectKeycloakAdmin,
+  createGrantSigner,
+  createTokenClient,
+  createTokenVerifier,
+  createToolTokenSource,
+  generateGrantKey,
+  principalFrom,
+  provisionCustomer,
+  provisionRealm,
+  realmIssuer,
+  SCOPES,
+  TokenError,
+} from "@proofdesk/identity";
+import { BILLING_TOOLS, createBillingMcpApp } from "@proofdesk/mcp-billing";
+import { createToolPolicy, invoiceRecords, policyVersion } from "@proofdesk/policy";
+import { createPortalApp, GRANT_SCOPES } from "@proofdesk/portal";
 import { ServiceApiError } from "@proofdesk/service";
 import {
   baseWorld,
@@ -26,7 +49,12 @@ import {
 import { Client, Connection } from "@temporalio/client";
 import { NativeConnection } from "@temporalio/worker";
 import { z } from "zod";
-import { startPostgres, startTemporal } from "../../../test/containers.ts";
+import {
+  type Started,
+  startKeycloak,
+  startPostgres,
+  startTemporal,
+} from "../../../test/containers.ts";
 import { createActivities, type TicketRef } from "./activities.ts";
 import { createDbLedger } from "./ledger.ts";
 import ruleModel, { prices } from "./testing/duplicate-refund-model.ts";
@@ -39,8 +67,12 @@ import { createTicketWorker } from "./worker.ts";
 // stand-in, which answers at once, so the time measured is the workflow
 // engine, the database, the policy layer and the billing service.
 //
-// What is left out is said in docs/load.md: the services run in this
-// process, and tool calls skip the token chain through Keycloak.
+// Each level is measured two ways. `direct`: tool calls go straight to the
+// billing service. `token chain`: as in production, every tool call gets a
+// signed assertion from the portal, trades it at Keycloak for a token of one
+// scope, and calls the MCP server, which exchanges that token at Keycloak
+// again for one addressed to billing. What is still left out is said in
+// docs/load.md: the services run in this process, not in containers.
 
 const { values } = parseArgs({
   options: {
@@ -48,15 +80,17 @@ const { values } = parseArgs({
     concurrency: { type: "string", default: "1,8,32" },
     "audit-entries": { type: "string", default: "3000" },
     "audit-writers": { type: "string", default: "1,8,32" },
+    paths: { type: "string", default: "direct,chain" },
   },
 });
 const TICKETS = Number(values.tickets);
 const LEVELS = String(values.concurrency).split(",").map(Number);
 const AUDIT_ENTRIES = Number(values["audit-entries"]);
 const AUDIT_WRITERS = String(values["audit-writers"]).split(",").map(Number);
+const PATHS = String(values.paths).split(",") as ("direct" | "chain")[];
 
-const SCOPES = ["billing:read", "billing:refund"];
-const refundTools = BILLING_TOOLS.filter((tool) => SCOPES.includes(tool.scope));
+const GRANTED = ["billing:read", "billing:refund"];
+const refundTools = BILLING_TOOLS.filter((tool) => GRANTED.includes(tool.scope));
 const descriptors: McpToolDescriptor[] = refundTools.map((tool) => ({
   definition: {
     name: tool.name,
@@ -116,6 +150,7 @@ async function lanes<Item>(items: Item[], width: number, work: (item: Item) => P
 }
 
 type TicketRow = {
+  path: "direct" | "chain";
   concurrency: number;
   tickets: number;
   seconds: number;
@@ -124,24 +159,156 @@ type TicketRow = {
   auditEntries: number;
 };
 
+const GRANT_ISSUER = "https://grants.proofdesk.load";
+const MCP_URL = "http://billing-mcp.load/mcp";
+
+/**
+ * The production path for the agent's tools: assertions from the portal,
+ * tokens from Keycloak, the billing MCP server and billing behind it, each
+ * checking the token it is given. Built for one company and its customers.
+ */
+async function tokenChain(keycloakUrl: string, env: SimEnv, refs: TicketRef[]) {
+  const realm = `load_${randomBytes(4).toString("hex")}`;
+  const issuer = realmIssuer(keycloakUrl, realm);
+  const admin = await connectKeycloakAdmin({
+    url: keycloakUrl,
+    username: "admin",
+    password: "admin",
+  });
+  const key = await generateGrantKey();
+  const secrets = { worker: "load-worker", billingMcp: "load-mcp", entitlementsMcp: "load-ent" };
+  await provisionRealm(admin, {
+    realm,
+    grantIssuer: GRANT_ISSUER,
+    grantPublicKey: key.publicKeySpki,
+    grantKeyId: key.kid,
+    secrets,
+    insecureHttp: true,
+  });
+  // A Keycloak account and a ticket grant for every customer, as filing the
+  // ticket through the portal would have made.
+  const customers = await env.dbs.app.selectFrom("customers").selectAll().execute();
+  const byId = new Map(customers.map((customer) => [customer.id, customer]));
+  await lanes(refs, 8, async (ref) => {
+    const customer = byId.get(ref.customerId);
+    if (!customer) throw new Error(`No customer ${ref.customerId}`);
+    await provisionCustomer(admin, customer, realm);
+  });
+  const now = new Date();
+  await env.dbs.app
+    .insertInto("ticketGrants")
+    .values(
+      refs.map((ref) => ({
+        ticketId: ref.ticketId,
+        tenantId: ref.tenantId,
+        customerId: ref.customerId,
+        scopes: GRANT_SCOPES.refund,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + 86_400_000),
+        revokedAt: null,
+      })),
+    )
+    .execute();
+
+  const portal = createPortalApp({
+    db: connect<AppDatabase>(asRole(env.urls.app, DB_ROLES.portal, TEST_ROLE_PASSWORD), {
+      maxConnections: 10,
+    }),
+    grantsDb: connect<AppDatabase>(asRole(env.urls.app, DB_ROLES.grants, TEST_ROLE_PASSWORD), {
+      maxConnections: 10,
+    }),
+    verify: createTokenVerifier({ issuer, audience: CLIENTS.portal }),
+    signer: await createGrantSigner({ issuer: GRANT_ISSUER, audience: issuer, key }),
+    clock: () => new Date(),
+    newId: (prefix) => `${prefix}_${randomBytes(6).toString("hex")}`,
+  });
+  const verifyBilling = createTokenVerifier({ issuer, audience: CLIENTS.billingApi });
+  const billingApp = createBillingApp({
+    db: env.serviceDbs.billing,
+    clock: () => env.now,
+    newId: (prefix) => `${prefix}_${randomBytes(6).toString("hex")}`,
+    authenticate: async (request) => {
+      const token = bearerToken(request);
+      const verified = token ? await verifyBilling(token) : null;
+      return verified ? principalFrom(verified, "agent") : null;
+    },
+  });
+  const mcpApp = createBillingMcpApp({
+    verify: createTokenVerifier({ issuer, audience: CLIENTS.billingMcp }),
+    tokens: createTokenClient({
+      issuer,
+      clientId: CLIENTS.billingMcp,
+      clientSecret: secrets.billingMcp,
+    }),
+    billingUrl: "http://billing.load",
+    billingFetch: (request) => billingApp.fetch(request),
+    resourceUrl: "http://billing-mcp.load",
+    issuer,
+  });
+  const toolTokens = createToolTokenSource({
+    worker: createTokenClient({ issuer, clientId: CLIENTS.worker, clientSecret: secrets.worker }),
+    portalUrl: "http://portal.load",
+    portalFetch: (request) => portal.fetch(request),
+  });
+  const tokenFor = (ref: TicketRef) => async (scope: string) => {
+    try {
+      return (await toolTokens.forTool({ ticketId: ref.ticketId, scope })).accessToken;
+    } catch (error) {
+      if (error instanceof TokenError) return null;
+      throw error;
+    }
+  };
+  const fetchMcp = (request: Request) => mcpApp.fetch(request);
+  return {
+    tools: {
+      list: (ref: TicketRef) =>
+        listMcpTools({
+          url: MCP_URL,
+          scopes: [SCOPES.billingRead, SCOPES.billingRefund],
+          tokenFor: tokenFor(ref),
+          fetch: fetchMcp,
+        }),
+      call: (ref: TicketRef, tool: McpToolDescriptor, input: Record<string, unknown>) =>
+        callMcpTool(
+          { url: MCP_URL, tokenFor: tokenFor(ref), fetch: fetchMcp },
+          { name: tool.definition.name, scope: tool.scope },
+          input,
+        ),
+    },
+    async invoices(ref: TicketRef) {
+      const result = await callMcpTool(
+        { url: MCP_URL, tokenFor: tokenFor(ref), fetch: fetchMcp },
+        { name: "list_invoices", scope: SCOPES.billingRead },
+        {},
+      );
+      if (result.isError) throw new Error(`Could not read invoices: ${result.content}`);
+      return invoiceRecords.parse((JSON.parse(result.content) as { invoices?: unknown }).invoices);
+    },
+  };
+}
+
 async function tickets(
   adminUrl: string,
   native: NativeConnection,
   client: Client,
   concurrency: number,
+  path: "direct" | "chain",
+  keycloakUrl?: string,
 ): Promise<TicketRow> {
   const env = await createSimEnv(adminUrl, { serviceConnections: 20 });
   const db = connect<AppDatabase>(asRole(env.urls.app, DB_ROLES.worker, TEST_ROLE_PASSWORD), {
     maxConnections: 20,
   });
   const refs = await company(env, TICKETS);
+  const chain =
+    path === "chain" && keycloakUrl ? await tokenChain(keycloakUrl, env, refs) : undefined;
   const clientsFor = (ref: TicketRef) =>
     env.clientsFor({
       tenantId: ref.tenantId,
       actor: "agent",
       subject: `agent:ticket:${ref.ticketId}`,
       customerId: ref.customerId,
-      scopes: SCOPES,
+      scopes: GRANTED,
     });
 
   const activities = createActivities({
@@ -157,8 +324,9 @@ async function tickets(
     versions: { model: "rule-model", prompt: "load", policy: policyVersion() },
     policy: createToolPolicy(),
     clock: () => env.now,
-    invoices: (ref) => clientsFor(ref).billing.listInvoices(ref.customerId),
-    tools: {
+    invoices: (ref) =>
+      chain ? chain.invoices(ref) : clientsFor(ref).billing.listInvoices(ref.customerId),
+    tools: chain?.tools ?? {
       list: async () => descriptors,
       async call(ref, descriptor, input): Promise<ToolOutcome> {
         const tool = refundTools.find((candidate) => candidate.name === descriptor.definition.name);
@@ -206,7 +374,8 @@ async function tickets(
     const refunds = await env.dbs.billing
       .selectFrom("refunds")
       .select((eb) => eb.fn.countAll<number>().as("count"))
-      .where("createdBy", "like", "agent:ticket:%")
+      // The agent's refunds carry its idempotency key; the seeded history does not.
+      .where("idempotencyKey", "like", "%:create_refund:%")
       .executeTakeFirstOrThrow();
     if (Number(refunds.count) !== refs.length) {
       throw new Error(`${refunds.count} refunds for ${refs.length} tickets`);
@@ -220,6 +389,7 @@ async function tickets(
 
     times.sort((a, b) => a - b);
     return {
+      path,
       concurrency,
       tickets: refs.length,
       seconds,
@@ -275,6 +445,7 @@ function table(headers: string[], rows: string[][]): string {
 }
 
 const [postgres, temporal] = await Promise.all([startPostgres(), startTemporal()]);
+const keycloak: Started | undefined = PATHS.includes("chain") ? await startKeycloak() : undefined;
 try {
   await prepareTemplates(postgres.url);
   const connection = await Connection.connect({ address: temporal.url });
@@ -282,9 +453,11 @@ try {
   const client = new Client({ connection, namespace: "default" });
 
   const ticketRows: TicketRow[] = [];
-  for (const level of LEVELS) {
-    console.error(`tickets: ${TICKETS} at ${level} at a time...`);
-    ticketRows.push(await tickets(postgres.url, native, client, level));
+  for (const path of PATHS) {
+    for (const level of LEVELS) {
+      console.error(`tickets (${path}): ${TICKETS} at ${level} at a time...`);
+      ticketRows.push(await tickets(postgres.url, native, client, level, path, keycloak?.url));
+    }
   }
   const auditRows = [];
   for (const writers of AUDIT_WRITERS) {
@@ -299,8 +472,16 @@ try {
       `Machine: ${cpus().length} cores, ${Math.round(totalmem() / 2 ** 30)} GB, Node ${process.version}, ${process.platform} ${process.arch}.`,
       "",
       table(
-        ["Tickets at a time", "Tickets", "Tickets a second", "Median", "95th percentile"],
+        [
+          "Tool calls",
+          "Tickets at a time",
+          "Tickets",
+          "Tickets a second",
+          "Median",
+          "95th percentile",
+        ],
         ticketRows.map((row) => [
+          row.path === "chain" ? "token chain" : "direct",
           String(row.concurrency),
           String(row.tickets),
           (row.tickets / row.seconds).toFixed(1),
@@ -322,5 +503,5 @@ try {
     ].join("\n"),
   );
 } finally {
-  await Promise.all([postgres.stop(), temporal.stop()]);
+  await Promise.all([postgres.stop(), temporal.stop(), keycloak?.stop()]);
 }

@@ -6,7 +6,7 @@ Run on 21 November 2026 with `pnpm load`, on one laptop: 12 cores, 24 GB, Node 2
 
 ## Tickets
 
-Every ticket is a duplicate charge that the agent refunds: three model turns, two tool calls, seven durable steps and four audit entries. 200 tickets per row, each for its own customer, with one worker process.
+Run with the tool calls going straight to billing. Every ticket is a duplicate charge that the agent refunds: three model turns, two tool calls, seven durable steps and four audit entries. 200 tickets per row, each for its own customer, with one worker process.
 
 | Tickets at a time | Tickets a second | Median | 95th percentile |
 | ----------------- | ---------------- | ------ | --------------- |
@@ -32,19 +32,36 @@ Every company's entries go into one chain, and appends take turns on a single lo
 - **The lock is not the limit.** At four entries per ticket, 2,200 entries a second is about 550 tickets a second, fifteen times what the rest of the system reached.
 - **More writers do not slow it.** They wait in line, and the line moves at the same speed.
 
+## The token chain
+
+In the full system a tool call does not go straight to billing. The agent's runtime fetches an assertion for the ticket from the portal, trades it at Keycloak for a token scoped to that tool, and the MCP server exchanges that token again before it calls billing. `pnpm load` runs both ways side by side: the same tickets, the same two tool calls, once direct and once through the chain.
+
+Run on 22 November 2026 on the same laptop, while other work kept it busy (a load average near 50 on 12 cores). The numbers are lower than in the tables above, and lower again for the audit chain, which took about 280 entries a second in the same run. Only the two columns are comparable with each other.
+
+| Tickets at a time | Direct: median, per second | Token chain: median, per second |
+| ----------------- | -------------------------- | ------------------------------- |
+| 1                 | 497 ms, 1.8                | 1,001 ms, 0.9                   |
+| 8                 | 1,521 ms, 4.5              | 3,026 ms, 2.4                   |
+| 32                | 5,180 ms, 5.9              | 7,152 ms, 4.2                   |
+
+- **The chain costs about 250 ms a tool call.** One ticket at a time it doubles the system's own time, from 0.5 to 1 second, for two tool calls. Against the 4.7 seconds a real model takes it is still the smaller part.
+- **That figure is probably near the quiet one.** The direct path, one at a time, was only about 10% slower here than on the quiet run. Under more tickets at once the busy machine dominates both paths.
+- **Every chained run was checked too.** Each row ended with exactly one refund per ticket and an unbroken audit chain. Billing refuses a call without a token Keycloak signed for it, so every one of those refunds went through the whole chain.
+
 ## What this does not measure
 
-- **The token chain.** Tool calls here go straight to the billing service. In the full system each one also fetches an assertion from the portal, trades it at Keycloak, and is exchanged again by the MCP server.
 - **The network.** The services run inside the measuring process, not in their own containers.
 - **A production workflow engine.** Temporal runs as its development server, with one worker.
+- **A production Keycloak.** It runs as one development container.
 - **The daily refund cap.** It is lifted for the run. With it in place, every ticket after the first few would wait for staff, which is the cap doing its job.
 - **Another machine.** These are one laptop's numbers. They show where the time goes, not what a deployment would reach.
 
 ## Reproduce
 
 ```sh
-pnpm load                                  # 200 tickets at 1, 8 and 32 at a time
+pnpm load                                  # 200 tickets at 1, 8 and 32 at a time, direct and through the token chain
+pnpm load --paths direct                   # without the token chain
 pnpm load --tickets 500 --concurrency 64   # other sizes
 ```
 
-Needs Docker. It starts its own Postgres and Temporal, and spends nothing.
+Needs Docker. It starts its own Postgres, Temporal and, for the token chain, Keycloak, and spends nothing.
